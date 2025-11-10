@@ -1,0 +1,773 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-sidebar: #f5f5f7;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --bg-active: rgba(0, 0, 0, 0.08);
+            
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            
+            --border-color: #e5e7eb;
+            --border-card: #e5e7eb;
+            
+            --color-primary: #2563eb;
+            --color-primary-dark: #1d4ed8;
+            --color-primary-light: #dbeafe;
+            
+            --color-success: #22c55e;
+            --color-success-light: #dcfce7;
+            
+            --color-warning: #f59e0b;
+            --color-warning-light: #fef3c7;
+            
+            --color-danger: #ef4444;
+            --color-danger-light: #fee2e2;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            
+            --sidebar-width: 16rem;
+            --header-height: 4rem;
+            --radius: 0.5rem;
+            
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .dark {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #171717;
+            --bg-sidebar: #141414;
+            --bg-hover: rgba(255, 255, 255, 0.05);
+            --bg-active: rgba(255, 255, 255, 0.1);
+            
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --text-tertiary: #737373;
+            
+            --border-color: #262626;
+            --border-card: #292929;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .page {
+            display: block;
+            animation: fadeIn 0.2s;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb a {
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .page-header h2 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-header span {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .stat-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon-danger {
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+        }
+
+        .stat-icon-warning {
+            background: var(--color-warning-light);
+            color: var(--color-warning);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 2rem;
+            height: fit-content;
+            position: sticky;
+            top: 5rem;
+        }
+
+        .form-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-label.required::after {
+            content: ' *';
+            color: var(--color-danger);
+        }
+
+        .form-select,
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .form-select:focus,
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            background: var(--bg-card);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-help {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+            text-decoration: none;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
+            padding: 0.5rem;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .list-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-danger {
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+        }
+
+        th {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        tbody tr {
+            transition: background-color 0.15s;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert-success {
+            background: var(--color-success-light);
+            color: var(--color-success);
+            border: 1px solid var(--color-success);
+        }
+
+        .alert-danger {
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+            border: 1px solid var(--color-danger);
+        }
+
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            color: var(--text-tertiary);
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 1200px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-card {
+                position: static;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .content {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            th, td {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+
+    <div class="app">
+        <div class="main-content">
+            <header class="header">
+                <div class="header-title">Chiqimlar</div>
+            </header>
+
+            <main class="content">
+                <div class="page">
+                    <div class="page-header">
+                        <div class="breadcrumb">
+                            <a href="/">Bosh sahifa</a>
+                            <span>/</span>
+                            <span>Chiqimlar</span>
+                        </div>
+                        <h2>Chiqimlarni boshqarish</h2>
+                        <p>Xomashyo va boshqa chiqimlarni ro'yxatga olish</p>
+                    </div>
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }}">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    {% if message.tags == 'success' %}
+                                        <path d="M7 10l3 3 6-6"/>
+                                        <circle cx="10" cy="10" r="8"/>
+                                    {% else %}
+                                        <path d="M10 6v4m0 4h.01"/>
+                                        <circle cx="10" cy="10" r="8"/>
+                                    {% endif %}
+                                </svg>
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span>Bugungi chiqimlar</span>
+                                <div class="stat-icon stat-icon-danger">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10 14v-4m0-4h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ bugungi_chiqim|intcomma }} so'm</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span>Bu oylik chiqimlar</span>
+                                <div class="stat-icon stat-icon-warning">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="14" height="13" rx="2"/>
+                                        <path d="M3 8h14M7 4v3M13 4v3"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ oylik_chiqim|intcomma }} so'm</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span>Jami chiqimlar</span>
+                                <div class="stat-icon stat-icon-danger">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 3v14a2 2 0 0 0 2 2h14"/>
+                                        <path d="M7 13v-3M12 13V8M17 13V6"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ jami_chiqim|intcomma }} so'm</div>
+                        </div>
+                    </div>
+
+                    <div class="content-grid">
+                        <div class="form-card">
+                            <h3>Yangi chiqim qo'shish</h3>
+                            <form method="post" action="{% url 'xomashyo:chiqim_qoshish' %}">
+                                {% csrf_token %}
+                                
+                                <div class="form-group">
+                                    <label class="form-label required">Chiqim turi</label>
+                                    <select name="chiqim_turi" id="chiqimTuri" class="form-select" required>
+                                        <option value="">Tanlang...</option>
+                                        <option value="xomashyo">Xomashyo</option>
+                                        <option value="boshqa">Boshqa chiqim</option>
+                                    </select>
+                                </div>
+
+                                <div id="xomashyoFields" style="display: none;">
+                                    <div class="form-group">
+                                        <label class="form-label required">Xomashyo</label>
+                                        <select name="xomashyo" id="xomashyoSelect" class="form-select">
+                                            <option value="">Tanlang...</option>
+                                            {% for xomashyo in xomashyolar %}
+                                                <option value="{{ xomashyo.id }}" 
+                                                        data-narx="{{ xomashyo.narxi }}"
+                                                        data-olchov="{{ xomashyo.get_olchov_birligi_display }}">
+                                                    {{ xomashyo.nomi }} - {{ xomashyo.narxi|intcomma }} so'm / {{ xomashyo.get_olchov_birligi_display }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label required">Miqdori</label>
+                                        <input type="number" name="miqdor" id="miqdorInput" class="form-input" step="0.01" min="0.01">
+                                        <span class="form-help" id="olchovBirligi">Xomashyo miqdorini kiriting</span>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label">Yetkazib beruvchi</label>
+                                        <select name="yetkazib_beruvchi" class="form-select">
+                                            <option value="">Tanlang...</option>
+                                            {% for yb in yetkazib_beruvchilar %}
+                                                <option value="{{ yb.id }}">{{ yb.nomi }} - {{ yb.telefon }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label">Narxi (so'm)</label>
+                                        <input type="number" name="xomashyo_narx" id="narxInput" class="form-input" min="0">
+                                        <span class="form-help" id="narxHisob">Bo'sh qoldirilsa avtomatik hisoblanadi</span>
+                                    </div>
+                                </div>
+
+                                <div id="boshqaFields" style="display: none;">
+                                    <div class="form-group">
+                                        <label class="form-label required">Chiqim nomi</label>
+                                        <input type="text" name="name" class="form-input" placeholder="Masalan: Elektr to'lovi">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label">Kategoriya</label>
+                                        <select name="category" class="form-select">
+                                            <option value="">Kategoriyasiz</option>
+                                            {% for tur in chiqim_turlari %}
+                                                <option value="{{ tur.id }}">{{ tur.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label required">Narxi (so'm)</label>
+                                        <input type="number" name="price" class="form-input" min="0">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Izoh</label>
+                                    <textarea name="izoh" class="form-textarea" placeholder="Qo'shimcha ma'lumot..."></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M8 3v10M3 8h10"/>
+                                    </svg>
+                                    Chiqim qo'shish
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="list-card">
+                            <div class="card-header">
+                                <h3>So'nggi chiqimlar</h3>
+                                <span class="badge badge-danger">{{ chiqimlar.count }} ta</span>
+                            </div>
+                            
+                            {% if chiqimlar %}
+                                <div class="table-container">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Nomi</th>
+                                                <th>Kategoriya</th>
+                                                <th>Narxi</th>
+                                                <th>Sana</th>
+                                                <th>Amal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for chiqim in chiqimlar %}
+                                            <tr>
+                                                <td>{{ chiqim.name }}</td>
+                                                <td>
+                                                    {% if chiqim.category %}
+                                                        {{ chiqim.category.name }}
+                                                    {% else %}
+                                                        <span style="color: var(--text-tertiary);">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td><strong>{{ chiqim.price|intcomma }} so'm</strong></td>
+                                                <td>{{ chiqim.created|date:"d.m.Y" }}</td>
+                                                <td>
+                                                    <form method="post" action="{% url 'xomashyo:chiqim_ochirish' chiqim.id %}" style="display: inline;">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-danger" onclick="return confirm('Rostdan ham o\'chirmoqchimisiz?')">
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5M4 4h8v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="empty-state">
+                                    <div class="empty-icon">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 8v8m-4-4h8"/>
+                                            <circle cx="12" cy="12" r="10"/>
+                                        </svg>
+                                    </div>
+                                    <h4 class="empty-title">Chiqimlar yo'q</h4>
+                                    <p class="empty-description">Hozircha hech qanday chiqim ro'yxatga olinmagan</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const chiqimTuri = document.getElementById('chiqimTuri');
+        const xomashyoFields = document.getElementById('xomashyoFields');
+        const boshqaFields = document.getElementById('boshqaFields');
+        const xomashyoSelect = document.getElementById('xomashyoSelect');
+        const miqdorInput = document.getElementById('miqdorInput');
+        const narxInput = document.getElementById('narxInput');
+        const olchovBirligi = document.getElementById('olchovBirligi');
+        const narxHisob = document.getElementById('narxHisob');
+
+        // Chiqim turi o'zgarganda
+        chiqimTuri.addEventListener('change', function() {
+            const value = this.value;
+            
+            xomashyoFields.style.display = 'none';
+            boshqaFields.style.display = 'none';
+            
+            // Reset required attributes
+            xomashyoFields.querySelectorAll('select, input').forEach(el => {
+                el.removeAttribute('required');
+            });
+            boshqaFields.querySelectorAll('select, input').forEach(el => {
+                el.removeAttribute('required');
+            });
+            
+            if (value === 'xomashyo') {
+                xomashyoFields.style.display = 'block';
+                xomashyoSelect.setAttribute('required', 'required');
+                miqdorInput.setAttribute('required', 'required');
+            } else if (value === 'boshqa') {
+                boshqaFields.style.display = 'block';
+                boshqaFields.querySelector('input[name="name"]').setAttribute('required', 'required');
+                boshqaFields.querySelector('input[name="price"]').setAttribute('required', 'required');
+            }
+        });
+
+        // Xomashyo tanlanganda o'lchov birligini ko'rsatish
+        if (xomashyoSelect) {
+            xomashyoSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const olchov = selectedOption.getAttribute('data-olchov');
+                
+                if (olchov) {
+                    olchovBirligi.textContent = `Miqdorni ${olchov} da kiriting`;
+                }
+                
+                // Narxni hisoblash
+                calculatePrice();
+            });
+        }
+
+        // Miqdor o'zgarganda narxni hisoblash
+        if (miqdorInput) {
+            miqdorInput.addEventListener('input', calculatePrice);
+        }
+
+        // Narx avtomatik hisoblash funksiyasi
+        function calculatePrice() {
+            if (!xomashyoSelect || !miqdorInput) return;
+            
+            const selectedOption = xomashyoSelect.options[xomashyoSelect.selectedIndex];
+            const narx = parseFloat(selectedOption.getAttribute('data-narx'));
+            const miqdor = parseFloat(miqdorInput.value);
+            
+            if (narx && miqdor && miqdor > 0) {
+                const jamiNarx = (narx * miqdor).toFixed(2);
+                narxHisob.textContent = `Avtomatik hisoblangan: ${parseInt(jamiNarx).toLocaleString()} so'm`;
+                narxHisob.style.color = 'var(--color-success)';
+            } else {
+                narxHisob.textContent = 'Bo\'sh qoldirilsa avtomatik hisoblanadi';
+                narxHisob.style.color = 'var(--text-secondary)';
+            }
+        }
+    </script>
+{% endblock content %}

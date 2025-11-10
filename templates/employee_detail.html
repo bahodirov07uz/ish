@@ -1,0 +1,598 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<style>
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f9fa;
+        --bg-card: #ffffff;
+        --bg-sidebar: #f5f5f7;
+        --bg-hover: rgba(0, 0, 0, 0.04);
+        --bg-active: rgba(0, 0, 0, 0.08);
+
+        --text-primary: #1a1a1a;
+        --text-secondary: #6b7280;
+        --text-tertiary: #9ca3af;
+
+        --border-color: #e5e7eb;
+        --border-card: #e5e7eb;
+
+        --color-primary: #2563eb;
+        --color-primary-dark: #1d4ed8;
+        --color-primary-light: #dbeafe;
+
+        --color-success: #22c55e;
+        --color-success-light: #dcfce7;
+
+        --color-warning: #f59e0b;
+        --color-warning-light: #fef3c7;
+
+        --color-danger: #ef4444;
+        --color-danger-light: #fee2e2;
+
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+        --sidebar-width: 16rem;
+        --header-height: 4rem;
+        --radius: 0.5rem;
+
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .dark {
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --bg-card: #171717;
+        --bg-sidebar: #141414;
+        --bg-hover: rgba(255, 255, 255, 0.05);
+        --bg-active: rgba(255, 255, 255, 0.1);
+
+        --text-primary: #f5f5f5;
+        --text-secondary: #a3a3a3;
+        --text-tertiary: #737373;
+
+        --border-color: #262626;
+        --border-card: #292929;
+
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+    }
+
+
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: var(--font-sans);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .app {
+        display: flex;
+        min-height: 100vh;
+    }
+
+    .main-content {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header {
+        height: var(--header-height);
+        background: var(--bg-primary);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.5rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    .header-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .content {
+        flex: 1;
+        padding: 2rem;
+        overflow-y: auto;
+    }
+
+    .page {
+        display: block;
+        animation: fadeIn 0.2s;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+    }
+
+    .breadcrumb a {
+        color: var(--color-primary);
+        text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
+    .page-header h2 {
+        font-size: 1.875rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .worker-grid {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .worker-info-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-card);
+        border-radius: var(--radius);
+        padding: 2rem;
+        height: fit-content;
+    }
+
+    .worker-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2.5rem;
+        font-weight: 600;
+        color: white;
+    }
+
+    .worker-name {
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .worker-type {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        font-size: 0.875rem;
+    }
+
+    .worker-details {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
+    }
+
+    .detail-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.375rem;
+        background: var(--color-primary-light);
+        color: var(--color-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.125rem;
+    }
+
+    .detail-value {
+        font-weight: 500;
+    }
+
+    .salary-card {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+        border-radius: var(--radius);
+        padding: 2rem;
+        color: white;
+        margin-top: 1.5rem;
+    }
+
+    .salary-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+    }
+
+    .salary-amount {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+
+    .salary-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: none;
+        text-decoration: none;
+        width: 100%;
+    }
+
+    .btn-success {
+        background: var(--color-success);
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #16a34a;
+    }
+
+    .btn-primary {
+        background: white;
+        color: var(--color-primary);
+    }
+
+    .btn-primary:hover {
+        background: #f0f9ff;
+    }
+
+    .work-history-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-card);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .card-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: var(--color-primary-light);
+        color: var(--color-primary);
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: var(--bg-secondary);
+    }
+
+    th {
+        padding: 1rem 1.5rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        white-space: nowrap;
+    }
+
+    td {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    tbody tr {
+        transition: background-color 0.15s;
+    }
+
+    tbody tr:hover {
+        background: var(--bg-hover);
+    }
+
+    .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-icon {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        background: var(--bg-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        color: var(--text-tertiary);
+    }
+
+    .empty-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-description {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    @media (max-width: 1024px) {
+        .worker-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            margin-left: 0;
+        }
+
+        .content {
+            padding: 1rem;
+        }
+
+        .worker-info-card {
+            padding: 1.5rem;
+        }
+
+        .worker-avatar {
+            width: 100px;
+            height: 100px;
+            font-size: 2rem;
+        }
+
+        th,
+        td {
+            padding: 0.75rem 1rem;
+        }
+
+        .salary-card {
+            padding: 1.5rem;
+        }
+    }
+</style>
+
+<div class="app">
+    <div class="main-content">
+        <header class="header">
+            <div class="header-title">Ishchi tafsilotlari</div>
+        </header>
+
+        <main class="content">
+            <div class="page">
+                <div class="page-header">
+                    <div class="breadcrumb">
+                        <a href="/">Bosh sahifa</a>
+                        <span>/</span>
+                        <a href="{% url 'main:employee' %}">Ishchilar</a>
+                        <span>/</span>
+                        <span>{{ ishchi.ism }} {{ ishchi.familiya }}</span>
+                    </div>
+                    <h2>Ishchi ma'lumotlari</h2>
+                </div>
+
+                <div class="worker-grid">
+                    <div class="worker-info-card">
+                        <div class="worker-avatar">
+                            {{ ishchi.ism|slice:":1"|upper }}
+                        </div>
+                        <h3 class="worker-name">{{ ishchi.ism }} {{ ishchi.familiya }}</h3>
+                        <p class="worker-type">{{ ishchi.turi.nomi }}</p>
+
+                        <div class="worker-details">
+                            <div class="detail-item">
+                                <div class="detail-icon">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M2 5c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V5z" />
+                                        <path d="M2 5l6 4 6-4" />
+                                    </svg>
+                                </div>
+                                <div class="detail-content">
+                                    <div class="detail-label">Telefon raqami</div>
+                                    <div class="detail-value">{{ ishchi.telefon }}</div>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="detail-icon">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="2" y="3" width="12" height="10" rx="1" />
+                                        <path d="M2 7h12" />
+                                    </svg>
+                                </div>
+                                <div class="detail-content">
+                                    <div class="detail-label">Lavozim</div>
+                                    <div class="detail-value">{{ ishchi.turi.nomi }}</div>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="detail-icon">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="4" width="10" height="9" rx="1" />
+                                        <path d="M3 7h10M6 4v3M10 4v3" />
+                                    </svg>
+                                </div>
+                                <div class="detail-content">
+                                    <div class="detail-label">Holati</div>
+                                    <div class="detail-value">
+                                        {% if ishchi.is_oylik_open %}
+                                        <span style="color: var(--color-success)">Faol</span>
+                                        {% else %}
+                                        <span style="color: var(--text-secondary)">Yopilgan</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="salary-card">
+                            <div class="salary-label">Joriy oylik</div>
+                            <div class="salary-amount">{{ ishchi.umumiy_oylik|intcomma }} so'm</div>
+
+                            <div class="salary-actions">
+                                {% if ishchi.is_oylik_open %}
+                                <form method="post" action="{% url 'main:oylik_yopish' ishchi.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M3 8l3 3 7-7" />
+                                        </svg>
+                                        Oylikni yopish
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="post" action="{% url 'main:yangi_oy' ishchi.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M8 3v10M3 8h10" />
+                                        </svg>
+                                        Yangi oyni boshlash
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="work-history-card">
+                        <div class="card-header">
+                            <h3>Bu oydagi ishlar</h3>
+                            <span class="badge">{{ object.ishlar.count }} ta ish obyekti topildi</span>
+                        </div>
+
+                        {% if object.ishlar.all %}
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Mahsulot</th>
+                                        <th>Soni</th>
+                                        <th>Narxi</th>
+                                        <th>Sana</th>
+                                        <th>Jami</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ish in object.ishlar.all %}
+                                    <tr>
+                                        <td>{{ ish.mahsulot.nomi }}</td>
+                                        <td>{{ ish.soni }}</td>
+                                        <td>{{ ish.narxi|intcomma }} so'm</td>
+                                        <td>{{ ish.sana|date:"d.m.Y" }}</td>
+                                        <td><strong>{{ ish.narxi|intcomma }} so'm</strong></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M9 11l3 3L22 4" />
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                                </svg>
+                            </div>
+                            <h4 class="empty-title">Hali ishlar yo'q</h4>
+                            <p class="empty-description">Bu oyda hali birorta ish ro'yxatga olinmagan</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,6 @@
+.env
+__pycache__
+uv.lock
+pyproject.toml
+static
+media

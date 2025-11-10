@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border-color: #e5e7eb;
+            --color-primary: #2563eb;
+            --color-primary-dark: #1d4ed8;
+            --color-success: #22c55e;
+            --color-success-light: #dcfce7;
+            --color-danger: #ef4444;
+            --color-danger-light: #fee2e2;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --sidebar-width: 16rem;
+            --radius: 0.5rem;
+        }
+
+        .dark {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #171717;
+            --bg-hover: rgba(255, 255, 255, 0.05);
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --text-tertiary: #737373;
+            --border-color: #262626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 4rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-title { font-size: 1.25rem; font-weight: 600; }
+
+        .content { flex: 1; padding: 2rem; overflow-y: auto; }
+
+        .page {
+            max-width: 1600px;
+            margin: 0 auto;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .breadcrumb {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb a {
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .page-header h2 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-header span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .stat-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon-success {
+            background: var(--color-success-light);
+            color: var(--color-success);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-card, .list-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 2rem;
+        }
+
+        .form-card {
+            height: fit-content;
+            position: sticky;
+            top: 5rem;
+        }
+
+        .form-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-label.required::after {
+            content: ' *';
+            color: var(--color-danger);
+        }
+
+        .form-select, .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .form-select:focus, .form-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
+            padding: 0.5rem;
+        }
+
+        .card-header {
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .filter-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert-success {
+            background: var(--color-success-light);
+            color: var(--color-success);
+        }
+
+        .alert-danger {
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+        }
+
+        @media (max-width: 1200px) {
+            .content-grid { grid-template-columns: 1fr; }
+            .form-card { position: static; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content { margin-left: 0; }
+            .content { padding: 1rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-title">Sotuvlar</div>
+        </header>
+
+        <main class="content">
+            <div class="page">
+                <div class="breadcrumb">
+                    <a href="/">Bosh sahifa</a>
+                    <span>/</span>
+                    <span>Sotuvlar</span>
+                </div>
+
+                <div class="page-header">
+                    <h2>Mahsulot sotish</h2>
+                    <p>Xaridorlarga mahsulot sotish va kirimlarni boshqarish</p>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                {% if message.tags == 'success' %}
+                                    <path d="M7 10l3 3 6-6"/><circle cx="10" cy="10" r="8"/>
+                                {% else %}
+                                    <path d="M10 6v4m0 4h.01"/><circle cx="10" cy="10" r="8"/>
+                                {% endif %}
+                            </svg>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Bugungi sotuv</span>
+                            <div class="stat-icon stat-icon-success">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ bugungi_sotuv|intcomma }} so'm</div>
+                        <small style="color: var(--text-secondary)">{{ bugungi_soni }} ta sotuv</small>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Bu oylik sotuv</span>
+                            <div class="stat-icon stat-icon-success">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="14" height="13" rx="2"/>
+                                    <path d="M3 8h14M7 4v3M13 4v3"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ oylik_sotuv|intcomma }} so'm</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Jami sotuv</span>
+                            <div class="stat-icon stat-icon-success">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3v14a2 2 0 0 0 2 2h14"/>
+                                    <path d="M7 13V8M12 13V6M17 13v-3"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ jami_sotuv|intcomma }} so'm</div>
+                    </div>
+                </div>
+
+                <div class="content-grid">
+                    <div class="form-card">
+                        <h3>Yangi sotuv</h3>
+                        <form method="post" action="{% url 'main:sotuv_qoshish' %}">
+                            {% csrf_token %}
+                            
+                            <div class="form-group">
+                                <label class="form-label required">Mahsulot</label>
+                                <select name="mahsulot" id="mahsulotSelect" class="form-select" required>
+                                    <option value="">Tanlang...</option>
+                                    {% for mahsulot in mahsulotlar %}
+                                        <option value="{{ mahsulot.id }}" 
+                                                data-narx="{{ mahsulot.narxi }}"
+                                                data-soni="{{ mahsulot.soni }}">
+                                            {{ mahsulot.nomi }} - {{ mahsulot.narxi|intcomma }} so'm ({{ mahsulot.soni }} ta)
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label required">Miqdor</label>
+                                <input type="number" name="miqdor" id="miqdorInput" class="form-input" min="1" required>
+                                <small id="mavjudSoni" style="color: var(--text-secondary); font-size: 0.75rem;"></small>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label required">Xaridor</label>
+                                <select name="xaridor_turi" id="xaridorTuri" class="form-select" required>
+                                    <option value="mavjud">Mavjud xaridor</option>
+                                    <option value="yangi">Yangi xaridor</option>
+                                </select>
+                            </div>
+
+                            <div id="mavjudXaridor" class="form-group">
+                                <select name="xaridor" class="form-select">
+                                    <option value="">Tanlang...</option>
+                                    {% for xaridor in xaridorlar %}
+                                        <option value="{{ xaridor.id }}">
+                                            {{ xaridor.ism }}{% if xaridor.telefon %} - {{ xaridor.telefon }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div id="yangiXaridor" style="display: none;">
+                                <div class="form-group">
+                                    <input type="text" name="xaridor_ism" class="form-input" placeholder="Ism">
+                                </div>
+                                <div class="form-group">
+                                    <input type="tel" name="xaridor_telefon" class="form-input" placeholder="Telefon">
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" name="xaridor_manzil" class="form-input" placeholder="Manzil">
+                                </div>
+                            </div>
+
+                            <div id="umumiySumma" style="padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius); margin-bottom: 1.25rem; display: none;">
+                                <small style="color: var(--text-secondary)">Umumiy summa:</small>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-success);" id="summaText">0 so'm</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3v10M3 8h10"/>
+                                </svg>
+                                Sotish
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="list-card">
+                        <div class="card-header">
+                            <h3>So'nggi sotuvlar</h3>
+                        </div>
+                        
+                        <div class="filters">
+                            <a href="?date=bugun" class="filter-btn {% if request.GET.date == 'bugun' %}active{% endif %}">Bugun</a>
+                            <a href="?date=hafta" class="filter-btn {% if request.GET.date == 'hafta' %}active{% endif %}">Hafta</a>
+                            <a href="?date=oy" class="filter-btn {% if request.GET.date == 'oy' %}active{% endif %}">Oy</a>
+                            <a href="{% url 'main:sotuvlar' %}" class="filter-btn {% if not request.GET.date %}active{% endif %}">Barchasi</a>
+                        </div>
+
+                        {% if sotuvlar %}
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Xaridor</th>
+                                        <th>Mahsulot</th>
+                                        <th>Miqdor</th>
+                                        <th>Summa</th>
+                                        <th>Sana</th>
+                                        <th>Amal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sotuv in sotuvlar %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'main:xaridor_detail' sotuv.xaridor.id %}" style="color: var(--color-primary);">
+                                                {{ sotuv.xaridor.ism }}
+                                            </a>
+                                        </td>
+                                        <td>{{ sotuv.mahsulot.nomi }}</td>
+                                        <td>{{ sotuv.miqdor }} ta</td>
+                                        <td><strong>{{ sotuv.umumiy_summa|intcomma }} so'm</strong></td>
+                                        <td>{{ sotuv.sana|date:"d.m.Y H:i" }}</td>
+                                        <td>
+                                            <form method="post" action="{% url 'main:sotuv_ochirish' sotuv.id %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-danger" onclick="return confirm('O\'chirmoqchimisiz?')">
+                                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali sotuvlar yo'q</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const xaridorTuri = document.getElementById('xaridorTuri');
+        const mavjudXaridor = document.getElementById('mavjudXaridor');
+        const yangiXaridor = document.getElementById('yangiXaridor');
+        const mahsulotSelect = document.getElementById('mahsulotSelect');
+        const miqdorInput = document.getElementById('miqdorInput');
+        const mavjudSoni = document.getElementById('mavjudSoni');
+        const umumiySumma = document.getElementById('umumiySumma');
+        const summaText = document.getElementById('summaText');
+
+        xaridorTuri.addEventListener('change', function() {
+            if (this.value === 'yangi') {
+                mavjudXaridor.style.display = 'none';
+                yangiXaridor.style.display = 'block';
+                mavjudXaridor.querySelector('select').removeAttribute('required');
+                yangiXaridor.querySelector('input[name="xaridor_ism"]').setAttribute('required', 'required');
+            } else {
+                mavjudXaridor.style.display = 'block';
+                yangiXaridor.style.display = 'none';
+                mavjudXaridor.querySelector('select').setAttribute('required', 'required');
+                yangiXaridor.querySelector('input[name="xaridor_ism"]').removeAttribute('required');
+            }
+        });
+
+        function calculateSumma() {
+            const selectedOption = mahsulotSelect.options[mahsulotSelect.selectedIndex];
+            const narx = parseFloat(selectedOption.getAttribute('data-narx'));
+            const soni = parseInt(selectedOption.getAttribute('data-soni'));
+            const miqdor = parseInt(miqdorInput.value);
+
+            if (soni) {
+                mavjudSoni.textContent = `Mavjud: ${soni} ta`;
+                if (miqdor > soni) {
+                    mavjudSoni.style.color = 'var(--color-danger)';
+                } else {
+                    mavjudSoni.style.color = 'var(--text-secondary)';
+                }
+            }
+
+            if (narx && miqdor && miqdor > 0) {
+                const jami = narx * miqdor;
+                summaText.textContent = jami.toLocaleString() + ' so\'m';
+                umumiySumma.style.display = 'block';
+            } else {
+                umumiySumma.style.display = 'none';
+            }
+        }
+
+        mahsulotSelect.addEventListener('change', calculateSumma);
+        miqdorInput.addEventListener('input', calculateSumma);
+    </script>
+{% endblock content %}

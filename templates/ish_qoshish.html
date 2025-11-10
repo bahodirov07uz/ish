@@ -1,0 +1,630 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-sidebar: #f5f5f7;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --bg-active: rgba(0, 0, 0, 0.08);
+            
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            
+            --border-color: #e5e7eb;
+            --border-card: #e5e7eb;
+            
+            --color-primary: #2563eb;
+            --color-primary-dark: #1d4ed8;
+            --color-primary-light: #dbeafe;
+            
+            --color-success: #22c55e;
+            --color-success-light: #dcfce7;
+            
+            --color-warning: #f59e0b;
+            --color-warning-light: #fef3c7;
+            
+            --color-danger: #ef4444;
+            --color-danger-light: #fee2e2;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            
+            --sidebar-width: 16rem;
+            --header-height: 4rem;
+            --radius: 0.5rem;
+            
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .dark {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #171717;
+            --bg-sidebar: #141414;
+            --bg-hover: rgba(255, 255, 255, 0.05);
+            --bg-active: rgba(255, 255, 255, 0.1);
+            
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --text-tertiary: #737373;
+            
+            --border-color: #262626;
+            --border-card: #292929;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .page {
+            display: block;
+            animation: fadeIn 0.2s;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb a {
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .page-header h2 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .workers-table-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .search-box {
+            position: relative;
+            width: 300px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.625rem 0.75rem 0.625rem 2.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.15s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            background: var(--bg-card);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-tertiary);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+        }
+
+        th {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        tbody tr {
+            transition: background-color 0.15s;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .worker-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .worker-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .worker-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .worker-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .worker-phone {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .badge-primary {
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+        }
+
+        .badge-success {
+            background: var(--color-success-light);
+            color: var(--color-success);
+        }
+
+        .badge-warning {
+            background: var(--color-warning-light);
+            color: var(--color-warning);
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-select,
+        .form-input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.15s;
+        }
+
+        .form-select {
+            min-width: 150px;
+        }
+
+        .form-input {
+            width: 80px;
+            text-align: center;
+        }
+
+        .form-select:focus,
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: var(--color-success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            color: var(--text-tertiary);
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert-success {
+            background: var(--color-success-light);
+            color: var(--color-success);
+            border: 1px solid var(--color-success);
+        }
+
+        .alert-danger {
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+            border: 1px solid var(--color-danger);
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .content {
+                padding: 1rem;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .card-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            th, td {
+                padding: 0.75rem;
+            }
+
+            .form-group {
+                flex-wrap: wrap;
+            }
+
+            .form-select,
+            .form-input {
+                font-size: 0.8125rem;
+            }
+        }
+    </style>
+
+    <div class="app">
+        <div class="main-content">
+            <header class="header">
+                <div class="header-title">Ish qo'shish</div>
+            </header>
+
+            <main class="content">
+                <div class="page">
+                    <div class="page-header">
+                        <div class="breadcrumb">
+                            <a href="/">Bosh sahifa</a>
+                            <span>/</span>
+                            <a href="">Ishlar</a>
+                            <span>/</span>
+                            <span>Yangi ish qo'shish</span>
+                        </div>
+                        <h2>Ish qo'shish</h2>
+                        <p>Ishchilarga yangi ish biriktirish</p>
+                    </div>
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }}">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    {% if message.tags == 'success' %}
+                                        <path d="M7 10l3 3 6-6"/>
+                                        <circle cx="10" cy="10" r="8"/>
+                                    {% else %}
+                                        <path d="M10 6v4m0 4h.01"/>
+                                        <circle cx="10" cy="10" r="8"/>
+                                    {% endif %}
+                                </svg>
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="workers-table-card">
+                        <div class="card-header">
+                            <h3>Ishchilar ro'yxati</h3>
+                            <div class="search-box">
+                                <span class="search-icon">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="7" cy="7" r="5"/>
+                                        <path d="M11 11l3 3"/>
+                                    </svg>
+                                </span>
+                                <input type="text" id="searchInput" placeholder="Ishchi qidirish...">
+                            </div>
+                        </div>
+                        
+                        {% if ishchilar %}
+                            <div class="table-container">
+                                <table id="workersTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Ishchi</th>
+                                            <th>Lavozim</th>
+                                            <th>Mahsulot</th>
+                                            <th>Soni</th>
+                                            <th>Amal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ishchi in ishchilar %}
+                                        <tr class="worker-row">
+                                            <td>
+                                                <div class="worker-info">
+                                                    <div class="worker-avatar">{{ ishchi.ism|slice:":1"|upper }}</div>
+                                                    <div class="worker-details">
+                                                        <span class="worker-name">{{ ishchi.ism }} {{ ishchi.familiya }}</span>
+                                                        <span class="worker-phone">{{ ishchi.telefon }}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-primary">{{ ishchi.turi.nomi }}</span>
+                                            </td>
+                                            <td>
+                                                <form method="post" class="work-form">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="ishchi" value="{{ ishchi.id }}">
+                                                    <div class="form-group">
+                                                        <select name="mahsulot" class="form-select" required>
+                                                            <option value="">Tanlang...</option>
+                                                            {% for mahsulot in mahsulotlar %}
+                                                                <option value="{{ mahsulot.id }}">{{ mahsulot.nomi }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                            </td>
+                                            <td>
+                                                        <input type="number" name="soni" class="form-input" placeholder="0" min="1" required>
+                                            </td>
+                                            <td>
+                                                        <button type="submit" class="btn btn-success">
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M8 3v10M3 8h10"/>
+                                                            </svg>
+                                                            Qo'shish
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="8" r="5"/>
+                                        <path d="M3 21c0-5 4-9 9-9s9 4 9 9"/>
+                                    </svg>
+                                </div>
+                                <h4 class="empty-title">Ishchilar topilmadi</h4>
+                                <p class="empty-description">Hozircha hech qanday ishchi ro'yxatga olinmagan</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const workerRows = document.querySelectorAll('.worker-row');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                
+                workerRows.forEach(row => {
+                    const workerName = row.querySelector('.worker-name').textContent.toLowerCase();
+                    const workerPhone = row.querySelector('.worker-phone').textContent.toLowerCase();
+                    const workerType = row.querySelector('.badge').textContent.toLowerCase();
+                    
+                    if (workerName.includes(searchTerm) || 
+                        workerPhone.includes(searchTerm) || 
+                        workerType.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Form validation
+        const workForms = document.querySelectorAll('.work-form');
+        workForms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const mahsulotSelect = form.querySelector('select[name="mahsulot"]');
+                const soniInput = form.querySelector('input[name="soni"]');
+                
+                if (!mahsulotSelect.value) {
+                    e.preventDefault();
+                    alert('Iltimos mahsulot tanlang!');
+                    return false;
+                }
+                
+                if (!soniInput.value || soniInput.value < 1) {
+                    e.preventDefault();
+                    alert('Iltimos to\'g\'ri son kiriting!');
+                    return false;
+                }
+            });
+        });
+    </script>
+{% endblock content %}
