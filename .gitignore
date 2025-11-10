@@ -4,3 +4,4 @@ uv.lock
 pyproject.toml
 static
 media
+db.sqlite
