@@ -1,0 +1,503 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load custom_filters %}
+{% block content %}
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --color-primary: #2563eb;
+            --color-success: #22c55e;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+            --color-info: #3b82f6;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --sidebar-width: 16rem;
+            --radius: 0.5rem;
+        }
+
+        .dark {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #171717;
+            --bg-hover: rgba(255, 255, 255, 0.05);
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --border-color: #262626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 4rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-title { font-size: 1.25rem; font-weight: 600; }
+
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .content { flex: 1; padding: 2rem; overflow-y: auto; }
+
+        .page {
+            max-width: 1600px;
+            margin: 0 auto;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .breadcrumb {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb a {
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-header h2 {
+            font-size: 1.875rem;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-header span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .stat-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon.success { background: #dcfce7; color: var(--color-success); }
+        .stat-icon.warning { background: #fef3c7; color: var(--color-warning); }
+        .stat-icon.info { background: #dbeafe; color: var(--color-info); }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .filter-btn, .search-box {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+
+        .filter-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            cursor: text;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        tbody tr {
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: var(--color-success);
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: var(--color-warning);
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: var(--color-danger);
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: var(--color-info);
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-hover);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 9999px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--color-success);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: var(--color-warning);
+        }
+
+        .progress-fill.danger {
+            background: var(--color-danger);
+        }
+
+        @media (max-width: 768px) {
+            .main-content { margin-left: 0; }
+            .content { padding: 1rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; }
+            .search-box { width: 100%; }
+        }
+    </style>
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-title">Xomashyolar</div>
+            <a href="/admin/xomashyo/xomashyo/add/" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3v10M3 8h10"/>
+                </svg>
+                Xomashyo qo'shish
+            </a>
+        </header>
+
+        <main class="content">
+            <div class="page">
+                <div class="breadcrumb">
+                    <a href="/">Bosh sahifa</a>
+                    <span>/</span>
+                    <span>Xomashyolar</span>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Jami xomashyolar</span>
+                            <div class="stat-icon success">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="14" height="14" rx="2"/>
+                                    <path d="M7 10l2 2 4-4"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ jami_xomashyolar }}</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Kam qolganlar</span>
+                            <div class="stat-icon warning">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 6v4m0 4h.01M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ kam_qolganlar }}</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Muddati o'tganlar</span>
+                            <div class="stat-icon" style="background: #fee2e2; color: var(--color-danger)">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="10" cy="10" r="7"/>
+                                    <path d="M10 5v5l3 3"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ muddati_otganlar }}</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Jami qiymati</span>
+                            <div class="stat-icon info">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 4v4m0 4h.01"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value">{{ jami_qiymat|floatformat:0|intcomma }} so'm</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Xomashyolar ro'yxati</h3>
+                    </div>
+                    
+                    <div class="filters">
+                        <a href="?category=all" class="filter-btn {% if not request.GET.category or request.GET.category == 'all' %}active{% endif %}">Barchasi</a>
+                        {% for cat in categories %}
+                            <a href="?category={{ cat.id }}" class="filter-btn {% if request.GET.category == cat.id|stringformat:'s' %}active{% endif %}">{{ cat.name }}</a>
+                        {% endfor %}
+                        <input type="text" class="search-box" placeholder="Qidirish..." id="searchInput">
+                    </div>
+
+                    {% if xomashyolar %}
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nomi</th>
+                                    <th>Kategoriya</th>
+                                    <th>Miqdor</th>
+                                    <th>Minimal</th>
+                                    <th>Holati</th>
+                                    <th>Narx</th>
+                                    <th>Jami</th>
+                                    <th>Amallar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for xomashyo in xomashyolar %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'xomashyo:xomashyo_detail' xomashyo.id %}" style="color: var(--color-primary); font-weight: 500;">
+                                            {{ xomashyo.nomi }}
+                                        </a>
+                                    </td>
+                                    <td>{{ xomashyo.category.name }}</td>
+                                    <td>
+                                        <strong>{{ xomashyo.miqdori }} {{ xomashyo.get_olchov_birligi_display }}</strong>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill {% if xomashyo.miqdori < xomashyo.minimal_miqdor %}danger{% elif xomashyo.miqdori < xomashyo.minimal_miqdor|add:'10' %}warning{% endif %}" 
+                                                 style="width: {% widthratio xomashyo.miqdori xomashyo.minimal_miqdor|add:'20' 100 %}%">
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ xomashyo.minimal_miqdor }} {{ xomashyo.get_olchov_birligi_display }}</td>
+                                    <td>
+                                        {% if xomashyo.holati == 'active' %}
+                                            <span class="badge badge-success">Faol</span>
+                                        {% elif xomashyo.holati == 'deactive' %}
+                                            <span class="badge badge-warning">Nofaol</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Muddati o'tgan</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ xomashyo.narxi|intcomma }} so'm</td>
+                                    <td><strong>{{ xomashyo.miqdori|mul:xomashyo.narxi|intcomma }} so'm</strong></td>
+                                    <td>
+                                        <strong style="color: var(--color-danger);">
+                                            {{ xomashyo.jami_chiqim|default:"0" }} {{ xomashyo.get_olchov_birligi_display }}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <div class="action-btns">
+                                            <a href="{% url 'xomashyo:xomashyo_detail' xomashyo.id %}" class="btn-icon" title="Ko'rish">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z"/>
+                                                    <circle cx="8" cy="8" r="2"/>
+                                                </svg>
+                                            </a>
+                                            
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali xomashyolar yo'q</p>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Qidiruv funksiyasi
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchValue = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchValue) ? '' : 'none';
+            });
+        });
+    </script>
+{% endblock content %}

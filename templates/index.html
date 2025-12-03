@@ -77,29 +77,7 @@
             transition: background-color 0.2s, color 0.2s;
         }
 
-        .app {
-            display: flex;
-            min-height: 100vh;
-        }
 
-        .sidebar {
-            width: var(--sidebar-width);
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            height: 100vh;
-            left: 0;
-            top: 0;
-            transition: transform 0.3s ease;
-            z-index: 100;
-        }
-
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
 
         .logo {
             display: flex;
@@ -170,42 +148,7 @@
             border-top: 1px solid var(--border-color);
         }
 
-        .theme-toggle,
-        .theme-toggle-mobile {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            background: var(--bg-card);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: background-color 0.15s;
-        }
 
-        .theme-toggle:hover,
-        .theme-toggle-mobile:hover {
-            background: var(--bg-hover);
-        }
-
-        .sun-icon {
-            display: block;
-        }
-
-        .moon-icon {
-            display: none;
-        }
-
-        .dark .sun-icon {
-            display: none;
-        }
-
-        .dark .moon-icon {
-            display: block;
-        }
 
         .main-content {
             flex: 1;
@@ -495,6 +438,19 @@
                             </div>
                             <div class="stat-value" id="activeEmployees">{{employees}}</div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span>Berilishi kerak (ishchilarga)</span>
+                                <div class="stat-icon stat-icon-success">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="10" cy="10" r="8"/>
+                                        <path d="M7 10l2 2 4-4"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-value" id="activeEmployees">{{salary_sum}}</div>
+                        </div>
+
                     </div>
                 </div>
             </main>

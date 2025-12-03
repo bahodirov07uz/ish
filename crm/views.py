@@ -10,10 +10,11 @@ from django.http import JsonResponse, HttpResponseForbidden
 from datetime import date, timedelta
 from decimal import Decimal
 from django.utils import timezone
+from django.db import transaction
 
 from crm import models as m
 from crm.models import Chiqim, ChiqimTuri
-from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi
+from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,Teri
 
 
 # ==================== PERMISSION HELPERS ====================
@@ -75,11 +76,11 @@ class HomeView(LoginRequiredMixin, ListView):
             )
         )
         total_profit = monthly_sales.aggregate(total=Sum('profit'))['total'] or 0
-        
+        context['salary_sum'] = m.Ish.objects.aggregate(umumiy=Sum('narxi'))['umumiy'] or 0
         context['monthly_outlays'] = monthly_outlays.aggregate(total=Sum('price'))['total'] or 0
         context['monthly_sales'] = monthly_sales
         context['total_profit'] = total_profit
-        context['products'] = m.Product.objects.all().count()
+        context['products'] = m.Product.objects.all().aggregate(total_son=Sum('soni'))['total_son']
         context['employees'] = m.Ishchi.objects.filter(is_active=True).count()
         
         return context
@@ -220,9 +221,11 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        ishchi = self.object
+        context['oy_stat'] = ishchi.oy_mahsulotlar()
+        context['ish_soni'] = m.Ish.objects.filter(ishchi=ishchi).aggregate(total=Sum('soni'))
         context['is_admin'] = is_admin(self.request.user)
         return context
-
 
 # ==================== PRODUCTS ====================
 
@@ -239,7 +242,6 @@ class ProductsView(LoginRequiredMixin, ListView):
         return context
 
 
-# ==================== ISH QOSHISH ====================
 
 class IshQoshishView(AdminRequiredMixin, View):
     """Ishchiga ish biriktirish - FAQAT ADMIN"""
@@ -247,8 +249,18 @@ class IshQoshishView(AdminRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         context = {
-            'ishchilar': m.Ishchi.objects.filter(is_oylik_open=True),
-            'mahsulotlar': m.Product.objects.all()
+            'ishchilar': m.Ishchi.objects.filter(is_oylik_open=True).select_related('turi'),
+            'mahsulotlar': m.Product.objects.all(),
+            'terilar': Xomashyo.objects.filter(
+                category__name__iexact='teri',
+                holati='active',
+                miqdori__gt=0
+            ).order_by('nomi'),
+            'astarlar': Xomashyo.objects.filter(
+                category__name__iexact='astar',
+                holati='active',
+                miqdori__gt=0
+            ).order_by('nomi')
         }
         return render(request, self.template_name, context)
 
@@ -258,22 +270,134 @@ class IshQoshishView(AdminRequiredMixin, View):
         soni = request.POST.get('soni')
         
         try:
-            ishchi = m.Ishchi.objects.get(id=ishchi_id)
-            mahsulot = m.Product.objects.get(id=mahsulot_id)
-            
-            m.Ish.objects.create(
-                ishchi=ishchi,
-                mahsulot=mahsulot,
-                soni=int(soni)
-            )
-            
-            messages.success(request, f"✅ {ishchi.ism}ga {mahsulot.nomi} qo'shildi!")
+            with transaction.atomic():
+                # 1. Asosiy obyektlarni olish
+                ishchi = m.Ishchi.objects.select_related('turi').get(id=ishchi_id)
+                mahsulot = m.Product.objects.get(id=mahsulot_id)
+                soni_int = int(soni)
+                
+                if soni_int < 1:
+                    raise ValueError("❌ Son 1 dan katta bo'lishi kerak!")
+                
+                # 2. Ishchi turini aniqlash
+                ishchi_turi = ishchi.turi.nomi.lower() if ishchi.turi else None
+                
+                # 3. KROY UCHUN MAXSUS LOGIKA
+                if ishchi_turi == 'kroy':
+                    teri_id = request.POST.get('teri')
+                    teri_miqdori_str = m.Product.objects.get(id=mahsulot_id).teri_sarfi
+                    astar_id = request.POST.get('astar')  # ixtiyoriy
+                    astar_miqdori_str = m.Product.objects.get(id=mahsulot_id).astar_sarfi  # ixtiyoriy
+                    
+                    # TERI MAJBURIY
+                    if not teri_id :
+                        raise ValueError("❌ Kroy uchun teri va teri miqdorini kiriting!")
+                    
+                    teri = Xomashyo.objects.get(
+                        id=teri_id,
+                        category__name__iexact='teri',
+                        holati='active'
+                    )
+                    teri_miqdori = Decimal(teri_miqdori_str)
+                    
+                    if teri_miqdori <= 0:
+                        raise ValueError("❌ Teri miqdori 0 dan katta bo'lishi kerak!")
+                    
+                    # Teri yetarliligini tekshirish
+                    if teri.miqdori < teri_miqdori:
+                        raise ValueError(
+                            f"❌ Omborda yetarli {teri.nomi} yo'q! "
+                            f"Kerak: {teri_miqdori} {teri.get_olchov_birligi_display()}, "
+                            f"Mavjud: {teri.miqdori} {teri.get_olchov_birligi_display()}"
+                        )
+                    
+                    # ASTAR (ixtiyoriy)
+                    astar = None
+                    astar_miqdori = Decimal('0')
+                    if astar_id and astar_miqdori_str:
+                        try:
+                            astar = Xomashyo.objects.get(
+                                id=astar_id,
+                                category__name__iexact='astar',
+                                holati='active'
+                            )
+                            astar_miqdori = Decimal(astar_miqdori_str)
+                            
+                            if astar_miqdori > 0:
+                                # Astar yetarliligini tekshirish
+                                if astar.miqdori < astar_miqdori:
+                                    raise ValueError(
+                                        f"❌ Omborda yetarli {astar.nomi} yo'q! "
+                                        f"Kerak: {astar_miqdori} {astar.get_olchov_birligi_display()}, "
+                                        f"Mavjud: {astar.miqdori} {astar.get_olchov_birligi_display()}"
+                                    )
+                        except Xomashyo.DoesNotExist:
+                            raise ValueError("❌ Tanlangan astar topilmadi!")
+                    
+                    # 4. ISH YARATISH
+                    ish = m.Ish.objects.create(
+                        ishchi=ishchi,
+                        mahsulot=mahsulot,
+                        soni=soni_int
+                    )
+                    
+                    # 5. TERI CHIQIMI (XomashyoHarakat)
+                    XomashyoHarakat.objects.create(
+                        xomashyo=teri,
+                        harakat_turi='chiqim',
+                        miqdori=teri_miqdori*soni_int,
+                        narxi=teri.narxi * teri_miqdori,
+                        izoh=f"Kroy ishiga sarflandi: {mahsulot.nomi} x{soni_int} ({ishchi.ism})",
+                        foydalanuvchi=request.user
+                    )
+                    
+                    # 6. ASTAR CHIQIMI (agar tanlangan bo'lsa)
+                    if astar and astar_miqdori > 0:
+                        XomashyoHarakat.objects.create(
+                            xomashyo=astar,
+                            harakat_turi='chiqim',
+                            miqdori=astar_miqdori*soni_int,
+                            narxi=astar.narxi * astar_miqdori,
+                            izoh=f"Kroy ishiga sarflandi: {mahsulot.nomi} x{soni_int} ({ishchi.ism})",
+                            foydalanuvchi=request.user
+                        )
+                    
+                    # Muvaffaqiyatli xabar
+                    success_msg = (
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} qo'shildi!\n"
+                        f" Teri: {teri.nomi} ({teri_miqdori*soni_int} {teri.get_olchov_birligi_display()})"
+                    )
+                    if astar and astar_miqdori > 0:
+                        success_msg += f"\n🔶 Astar: {astar.nomi} ({astar_miqdori} {astar.get_olchov_birligi_display()})"
+                    
+                    messages.success(request, success_msg)
+                
+                else:
+                    # 4. ODDIY ISH (kroy emas)
+                    ish = m.Ish.objects.create(
+                        ishchi=ishchi,
+                        mahsulot=mahsulot,
+                        soni=soni_int
+                    )
+                    
+                    messages.success(
+                        request,
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} qo'shildi!"
+                    )
+                
+        except m.Ishchi.DoesNotExist:
+            messages.error(request, "❌ Ishchi topilmadi!")
+        except m.Product.DoesNotExist:
+            messages.error(request, "❌ Mahsulot topilmadi!")
+        except Xomashyo.DoesNotExist:
+            messages.error(request, "❌ Xomashyo topilmadi!")
+        except ValueError as e:
+            messages.error(request, str(e))
         except Exception as e:
             messages.error(request, f"❌ Xatolik: {str(e)}")
         
         return redirect('main:ish_qoshish')
-
-
+    
 # ==================== SOTUVLAR ====================
 
 class SotuvListView(LoginRequiredMixin, ListView):
@@ -758,3 +882,12 @@ def chiqim_ochirish(request, pk):
             messages.error(request, f'❌ Xatolik: {str(e)}')
     
     return redirect('xomashyo:chiqimlar')
+
+
+from rest_framework import generics
+from .serializers import ProductSerializer
+
+class ProductCreateView(generics.CreateAPIView):
+    queryset = m.Product.objects.all()
+    serializer_class = ProductSerializer
+

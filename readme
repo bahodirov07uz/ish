@@ -1,0 +1,132 @@
+settings.ACCOUNT_USERNAME_REQUIRED is deprecated, use: settings.ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
+It is impossible to add a non-nullable field 'category' to xomashyo without specifying a default. This is because the database needs something to populate existing row
+s.
+Please select a fix:
+ 1) Provide a one-off default now (will be set on all existing rows with a null value for this column)
+ 2) Quit and manually define a default value in models.py.
+Select an option: 1
+Please enter the default value as valid Python.
+The datetime and django.utils.timezone modules are available, so it is possible to provide e.g. timezone.now as a value.
+Type 'exit' to exit this prompt
+>>> 1
+Migrations for 'crm':
+  crm/migrations/0005_alter_category_options_alter_chiqim_options_and_more.py
+    ~ Change Meta options on category
+    ~ Change Meta options on chiqim
+    ~ Change Meta options on chiqimturi
+    ~ Change Meta options on eskiish
+    ~ Change Meta options on ish
+    ~ Change Meta options on ishchi
+    ~ Change Meta options on ishchicategory
+    ~ Change Meta options on kirim
+    ~ Change Meta options on oyliklar
+    ~ Change Meta options on product
+    ~ Change Meta options on productvariant
+    ~ Change Meta options on sotuv
+    ~ Change Meta options on xaridor
+    + Add field user to ishchi
+    + Add field astar_sarfi to product
+    + Add field teri_sarfi to product
+    ~ Alter field description on category
+    ~ Alter field name on category
+    ~ Alter field slug on category
+    ~ Alter field category on chiqim
+    ~ Alter field created on chiqim
+    ~ Alter field name on chiqim
+    ~ Alter field price on chiqim
+    ~ Alter field name on chiqimturi
+    ~ Alter field ishchi on eskiish
+    ~ Alter field ishchi_oylik on eskiish
+    ~ Alter field mahsulot on eskiish
+    ~ Alter field narxi on eskiish
+    ~ Alter field sana on eskiish
+    ~ Alter field soni on eskiish
+    ~ Alter field ishchi on ish
+    ~ Alter field mahsulot on ish
+    ~ Alter field narxi on ish
+    ~ Alter field sana on ish
+    ~ Alter field soni on ish
+    ~ Alter field current_oylik on ishchi
+    ~ Alter field eski_ishlar on ishchi
+    ~ Alter field familiya on ishchi
+    ~ Alter field is_active on ishchi
+    ~ Alter field is_oylik_open on ishchi
+    ~ Alter field ism on ishchi
+    ~ Alter field maosh on ishchi
+    ~ Alter field oylik_yopilgan_sana on ishchi
+    ~ Alter field telefon on ishchi
+    ~ Alter field turi on ishchi
+    ~ Alter field yangi_oylik on ishchi
+    ~ Alter field nomi on ishchicategory
+    ~ Alter field mahsulot on kirim
+    ~ Alter field sana on kirim
+    ~ Alter field sotuv on kirim
+    ~ Alter field summa on kirim
+    ~ Alter field xaridor on kirim
+    ~ Alter field ishchi on oyliklar
+    ~ Alter field ishlari on oyliklar
+    ~ Alter field oylik on oyliklar
+    ~ Alter field sana on oyliklar
+    ~ Alter field yopilgan on oyliklar
+    ~ Alter field avg_profit on product
+    ~ Alter field category on product
+    ~ Alter field created_at on product
+    ~ Alter field description on product
+    ~ Alter field image on product
+    ~ Alter field narx_kosib on product
+    ~ Alter field narx_kroy on product
+    ~ Alter field narx_pardoz on product
+    ~ Alter field narx_zakatovka on product
+    ~ Alter field narxi on product
+    ~ Alter field nomi on product
+    ~ Alter field soni on product
+    ~ Alter field status on product
+    ~ Alter field color on productvariant
+    ~ Alter field image on productvariant
+    ~ Alter field price on productvariant
+    ~ Alter field product on productvariant
+    ~ Alter field size on productvariant
+    ~ Alter field stock on productvariant
+    ~ Alter field mahsulot on sotuv
+    ~ Alter field miqdor on sotuv
+    ~ Alter field sana on sotuv
+    ~ Alter field stock on productvariant
+    ~ Alter field mahsulot on sotuv
+    ~ Alter field miqdor on sotuv
+    ~ Alter field sana on sotuv
+    ~ Alter field umumiy_summa on sotuv
+    ~ Alter field xaridor on sotuv
+    ~ Alter field created_at on xaridor
+    ~ Alter field ism on xaridor
+    ~ Alter field izoh on xaridor
+    ~ Alter field manzil on xaridor
+    ~ Alter field telefon on xaridor
+Migrations for 'xomashyo':
+  xomashyo/migrations/0002_teri_xomashyocategory_alter_xomashyo_options_and_more.py
+    + Create model Teri
+    + Create model XomashyoCategory
+    ~ Change Meta options on xomashyo
+    ~ Change Meta options on xomashyoharakat
+    ~ Change Meta options on yetkazibberuvchi
+    ~ Alter field amal_qilish_muddati on xomashyo
+    ~ Alter field holati on xomashyo
+    ~ Alter field minimal_miqdor on xomashyo
+    ~ Alter field miqdori on xomashyo
+    ~ Alter field narxi on xomashyo
+    ~ Alter field nomi on xomashyo
+    ~ Alter field olchov_birligi on xomashyo
+    ~ Alter field qabul_qilingan_sana on xomashyo
+    ~ Alter field qr_code on xomashyo
+    ~ Alter field yetkazib_beruvchi on xomashyo
+    ~ Alter field foydalanuvchi on xomashyoharakat
+    ~ Alter field harakat_turi on xomashyoharakat
+    ~ Alter field izoh on xomashyoharakat
+    ~ Alter field miqdori on xomashyoharakat
+    ~ Alter field narxi on xomashyoharakat
+    ~ Alter field sana on xomashyoharakat
+    ~ Alter field xomashyo on xomashyoharakat
+    ~ Alter field yetkazib_beruvchi on xomashyoharakat
+    ~ Alter field inn on yetkazibberuvchi
+    ~ Alter field manzil on yetkazibberuvchi
+    ~ Alter field nomi on yetkazibberuvchi
+    ~ Alter field qisqacha_tavsif on yetkazibberuvchi

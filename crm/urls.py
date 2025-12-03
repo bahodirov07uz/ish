@@ -29,7 +29,8 @@ urlpatterns = [
     
     # Kirimlar
     path('kirimlar/', views.KirimListView.as_view(), name='kirimlar'),
-    
+    path("api/products/create/", views.ProductCreateView.as_view()),
+
     # Xaridorlar
     path('xaridorlar/', views.XaridorListView.as_view(), name='xaridorlar'),
     path('xaridorlar/<int:pk>/', views.XaridorDetailView.as_view(), name='xaridor_detail'),

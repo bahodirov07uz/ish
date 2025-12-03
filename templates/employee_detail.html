@@ -593,6 +593,35 @@
                 </div>
             </div>
         </main>
+        <div style="width: 90%; padding: 10px;justify-content: center; margin-left: 5%; margin-bottom: 50px;" class="work-history-card ">
+            <div class="" style="margin-bottom: 2px;">
+                <h3 style="margin-bottom: 15px;">Joriy oy bo‘yicha umumiy mahsulotlar {{ish_soni.total}} ta</h3>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Mahsulot</th>
+                            <th>Soni</th>
+                            <th>Summa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in oy_stat %}
+                        <tr>
+                            <td>{{ item.mahsulot__nomi }}</td>
+                            <td>{{ item.jami_soni }}</td>
+                            <td>{{ item.jami_summa }} so'm</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3">Bu oyda ish yo‘q</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock content %}

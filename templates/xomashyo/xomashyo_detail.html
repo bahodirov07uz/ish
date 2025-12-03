@@ -1,0 +1,679 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load custom_filters %}
+{% block content %}
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --color-primary: #2563eb;
+            --color-success: #22c55e;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+            --color-info: #3b82f6;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --sidebar-width: 16rem;
+            --radius: 0.5rem;
+        }
+
+        .dark {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #171717;
+            --bg-hover: rgba(255, 255, 255, 0.05);
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --border-color: #262626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 4rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .back-btn {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .header-title { font-size: 1.25rem; font-weight: 600; }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--color-success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .content { flex: 1; padding: 2rem; overflow-y: auto; }
+
+        .page {
+            max-width: 1600px;
+            margin: 0 auto;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .breadcrumb {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb a {
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .info-grid {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: var(--color-success);
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: var(--color-warning);
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: var(--color-danger);
+        }
+
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+        }
+
+        .qr-container img {
+            max-width: 200px;
+            border-radius: var(--radius);
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+
+        .filter-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .harakat-icon {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .harakat-icon.kirim {
+            background: #dcfce7;
+            color: var(--color-success);
+        }
+
+        .harakat-icon.chiqim {
+            background: #fee2e2;
+            color: var(--color-danger);
+        }
+
+        .harakat-icon.inventarizatsiya {
+            background: #dbeafe;
+            color: var(--color-info);
+        }
+
+        .harakat-icon.qaytarish {
+            background: #fef3c7;
+            color: var(--color-warning);
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            border: 1px solid var(--color-warning);
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            border: 1px solid var(--color-danger);
+            color: #991b1b;
+        }
+
+        .progress-wrapper {
+            margin-top: 1rem;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--color-success);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: var(--color-warning);
+        }
+
+        .progress-fill.danger {
+            background: var(--color-danger);
+        }
+
+        @media (max-width: 1200px) {
+            .content-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content { margin-left: 0; }
+            .content { padding: 1rem; }
+            .header-actions { flex-direction: column; }
+        }
+    </style>
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-left">
+                <a href="{% url 'xomashyo:xomashyolar' %}" class="back-btn">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 12L6 8l4-4"/>
+                    </svg>
+                </a>
+                <div class="header-title">{{ xomashyo.nomi }}</div>
+            </div>
+            <div class="header-actions">
+                <a href="" class="btn btn-success">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3v10M3 8h10"/>
+                    </svg>
+                    Harakat qo'shish
+                </a>
+                <a href="/admin/xomashyo/xomashyo/{{xomashyo.id}}/change/" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 2l3 3-9 9H2v-3l9-9z"/>
+                    </svg>
+                    Tahrirlash
+                </a>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="page">
+                <div class="breadcrumb">
+                    <a href="/">Bosh sahifa</a>
+                    <span>/</span>
+                    <a href="{% url 'xomashyo:xomashyolar' %}">Xomashyolar</a>
+                    <span>/</span>
+                    <span>{{ xomashyo.nomi }}</span>
+                </div>
+
+                {% if xomashyo.holati == 'expired' %}
+                    <div class="alert alert-danger">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 6v4m0 4h.01M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/>
+                        </svg>
+                        <span><strong>Diqqat!</strong> Bu xomashyoning amal qilish muddati tugagan.</span>
+                    </div>
+                {% elif xomashyo.miqdori < xomashyo.minimal_miqdor %}
+                    <div class="alert alert-warning">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 6v4m0 4h.01M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/>
+                        </svg>
+                        <span><strong>Ogohlantirish!</strong> Xomashyo miqdori minimal darajadan past.</span>
+                    </div>
+                {% endif %}
+
+                <div class="content-grid">
+                    <div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Asosiy ma'lumotlar</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <span class="info-label">Nomi</span>
+                                        <span class="info-value">{{ xomashyo.nomi }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Kategoriya</span>
+                                        <span class="info-value">{{ xomashyo.category.name }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Joriy miqdor</span>
+                                        <span class="info-value">
+                                            <strong style="font-size: 1.125rem;">{{ xomashyo.miqdori }} {{ xomashyo.get_olchov_birligi_display }}</strong>
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Minimal miqdor</span>
+                                        <span class="info-value">{{ xomashyo.minimal_miqdor }} {{ xomashyo.get_olchov_birligi_display }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Birlik narxi</span>
+                                        <span class="info-value">{{ xomashyo.narxi|intcomma }} so'm</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Jami qiymati</span>
+                                        <span class="info-value">
+                                            <strong style="color: var(--color-success); font-size: 1.125rem;">
+                                                {{ xomashyo.miqdori|mul:xomashyo.narxi|intcomma }} so'm
+                                            </strong>
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Holati</span>
+                                        <span class="info-value">
+                                            {% if xomashyo.holati == 'active' %}
+                                                <span class="badge badge-success">Faol</span>
+                                            {% elif xomashyo.holati == 'deactive' %}
+                                                <span class="badge badge-warning">Nofaol</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Muddati o'tgan</span>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Yetkazib beruvchi</span>
+                                        <span class="info-value">{{ xomashyo.yetkazib_beruvchi.nomi }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Qabul qilingan</span>
+                                        <span class="info-value">{{ xomashyo.qabul_qilingan_sana|date:"d.m.Y" }}</span>
+                                    </div>
+                                    {% if xomashyo.amal_qilish_muddati %}
+                                    <div class="info-item">
+                                        <span class="info-label">Amal qilish muddati</span>
+                                        <span class="info-value">{{ xomashyo.amal_qilish_muddati|date:"d.m.Y" }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="progress-wrapper">
+                                    <div class="progress-label">
+                                        <span>Zaxira holati</span>
+                                        <span>{% widthratio xomashyo.miqdori xomashyo.minimal_miqdor|add:'20' 100 %}%</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill {% if xomashyo.miqdori < xomashyo.minimal_miqdor %}danger{% elif xomashyo.miqdori < xomashyo.minimal_miqdor|add:'10' %}warning{% endif %}" 
+                                             style="width: {% widthratio xomashyo.miqdori xomashyo.minimal_miqdor|add:'20' 100 %}%">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Xomashyo harakatlari</h3>
+                            </div>
+                            
+                            <div class="filters">
+                                <a href="?harakat=all" class="filter-btn {% if not request.GET.harakat or request.GET.harakat == 'all' %}active{% endif %}">Barchasi</a>
+                                <a href="?harakat=kirim" class="filter-btn {% if request.GET.harakat == 'kirim' %}active{% endif %}">Kirim</a>
+                                <a href="?harakat=chiqim" class="filter-btn {% if request.GET.harakat == 'chiqim' %}active{% endif %}">Chiqim</a>
+                                <a href="?harakat=inventarizatsiya" class="filter-btn {% if request.GET.harakat == 'inventarizatsiya' %}active{% endif %}">Inventarizatsiya</a>
+                                <a href="?harakat=qaytarish" class="filter-btn {% if request.GET.harakat == 'qaytarish' %}active{% endif %}">Qaytarish</a>
+                            </div>
+
+                            {% if harakatlar %}
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Tur</th>
+                                            <th>Miqdor</th>
+                                            <th>Narx</th>
+                                            <th>Yetkazib beruvchi</th>
+                                            <th>Izoh</th>
+                                            <th>Sana</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for harakat in harakatlar %}
+                                        <tr>
+                                            <td>
+                                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                                    <div class="harakat-icon {{ harakat.harakat_turi }}">
+                                                        {% if harakat.harakat_turi == 'kirim' %}
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M8 12V4m0 0L4 8m4-4l4 4"/>
+                                                            </svg>
+                                                        {% elif harakat.harakat_turi == 'chiqim' %}
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M8 4v8m0 0l4-4m-4 4L4 8"/>
+                                                            </svg>
+                                                        {% elif harakat.harakat_turi == 'inventarizatsiya' %}
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M2 8h12M8 2v12"/>
+                                                            </svg>
+                                                        {% else %}
+                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M14 8a6 6 0 1 1-12 0"/>
+                                                                <path d="M2 8l3-3m-3 3l3 3"/>
+                                                            </svg>
+                                                        {% endif %}
+                                                    </div>
+                                                    <span style="text-transform: capitalize;">{{ harakat.get_harakat_turi_display }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong {% if harakat.harakat_turi == 'kirim' %}style="color: var(--color-success)"{% else %}style="color: var(--color-danger)"{% endif %}>
+                                                    {% if harakat.harakat_turi != 'kirim' %}-{% endif %}{{ harakat.miqdori }} {{ xomashyo.get_olchov_birligi_display }}
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                {% if harakat.narxi %}
+                                                    {{ harakat.narxi|intcomma }} so'm
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if harakat.yetkazib_beruvchi %}
+                                                    {{ harakat.yetkazib_beruvchi.nomi }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ harakat.izoh|default:"-" }}</td>
+                                            <td>{{ harakat.sana|date:"d.m.Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali harakatlar yo'q</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div>
+                        {% if xomashyo.qr_code %}
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>QR kod</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="qr-container">
+                                    <img src="{{ MEDIA_URL }}{{ xomashyo.qr_code }}" alt="QR kod">
+                                </div>
+                                <p style="text-align: center; color: var(--text-secondary); font-size: 0.875rem; margin-top: 1rem;">
+                                    QR kodni skanerlang
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Statistika</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <span class="info-label">Jami kirim</span>
+                                        <span class="info-value" style="color: var(--color-success);">
+                                            {{ jami_kirim }} {{ xomashyo.get_olchov_birligi_display }}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Jami chiqim</span>
+                                        <span class="info-value" style="color: var(--color-danger);">
+                                            {{ jami_chiqim }} {{ xomashyo.get_olchov_birligi_display }}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Harakatlar soni</span>
+                                        <span class="info-value">{{ harakatlar_soni }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Yetkazib beruvchi</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <span class="info-label">Nomi</span>
+                                        <span class="info-value">{{ xomashyo.yetkazib_beruvchi.nomi }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Telefon</span>
+                                        <span class="info-value">{{ xomashyo.yetkazib_beruvchi.telefon }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Manzil</span>
+                                        <span class="info-value" style="text-align: right; max-width: 200px;">
+                                            {{ xomashyo.yetkazib_beruvchi.manzil }}
+                                        </span>
+                                    </div>
+                                    {% if xomashyo.yetkazib_beruvchi.inn %}
+                                    <div class="info-item">
+                                        <span class="info-label">INN</span>
+                                        <span class="info-value">{{ xomashyo.yetkazib_beruvchi.inn }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+{% endblock content %}

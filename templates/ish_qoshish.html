@@ -453,7 +453,54 @@
                 font-size: 0.8125rem;
             }
         }
-    </style>
+
+        .kroy-extra-fields {
+            display: none;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 2px solid var(--color-warning-light);
+        }
+
+        .kroy-extra-fields.show {
+            display: block;
+        }
+
+        .extra-field {
+            margin-bottom: 0.5rem;
+        }
+
+        .extra-field label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .sarflar-info {
+            font-size: 0.7rem;
+            color: var(--color-warning);
+            font-weight: 500;
+            margin-top: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--color-warning-light);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .teri-select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-card);
+            font-size: 0.875rem;
+        }
+        
+</style>
+
 
     <div class="app">
         <div class="main-content">
@@ -520,7 +567,7 @@
                                     </thead>
                                     <tbody>
                                         {% for ishchi in ishchilar %}
-                                        <tr class="worker-row">
+                                        <tr class="worker-row" data-turi="{{ ishchi.turi.nomi|lower }}">
                                             <td>
                                                 <div class="worker-info">
                                                     <div class="worker-avatar">{{ ishchi.ism|slice:":1"|upper }}</div>
@@ -531,24 +578,36 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="badge badge-primary">{{ ishchi.turi.nomi }}</span>
+                                                <span class="badge {% if ishchi.turi.nomi|lower == 'kroy' %}badge-warning{% else %}badge-primary{% endif %}">
+                                                    {{ ishchi.turi.nomi }}
+                                                </span>
                                             </td>
-                                            <td>
-                                                <form method="post" class="work-form">
+                                            <td colspan="3">
+                                                <form method="post" class="work-form" data-ishchi-turi="{{ ishchi.turi.nomi|lower }}">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="ishchi" value="{{ ishchi.id }}">
+                                                    
                                                     <div class="form-group">
-                                                        <select name="mahsulot" class="form-select" required>
-                                                            <option value="">Tanlang...</option>
+                                                        <!-- Mahsulot -->
+                                                        <select name="mahsulot" class="form-select mahsulot-select" required 
+                                                                data-row="{{ forloop.counter }}"
+                                                                data-ishchi-turi="{{ ishchi.turi.nomi|lower }}">
+                                                            <option value="">Mahsulot...</option>
                                                             {% for mahsulot in mahsulotlar %}
-                                                                <option value="{{ mahsulot.id }}">{{ mahsulot.nomi }}</option>
+                                                                <option value="{{ mahsulot.id }}" 
+                                                                        data-teri-sarfi="{{ mahsulot.teri_sarfi }}"
+                                                                        data-astar-sarfi="{{ mahsulot.astar_sarfi }}">
+                                                                    {{ mahsulot.nomi }}
+                                                                </option>
                                                             {% endfor %}
                                                         </select>
-                                            </td>
-                                            <td>
-                                                        <input type="number" name="soni" class="form-input" placeholder="0" min="1" required>
-                                            </td>
-                                            <td>
+
+                                                        <!-- Soni -->
+                                                        <input type="number" name="soni" class="form-input soni-input" 
+                                                               placeholder="Soni" min="1" required
+                                                               data-row="{{ forloop.counter }}">
+
+                                                        <!-- Submit button -->
                                                         <button type="submit" class="btn btn-success">
                                                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
                                                                 <path d="M8 3v10M3 8h10"/>
@@ -556,6 +615,61 @@
                                                             Qo'shish
                                                         </button>
                                                     </div>
+
+                                                    <!-- KROY UCHUN QO'SHIMCHA MAYDONLAR -->
+                                                    {% if ishchi.turi.nomi|lower == 'kroy' %}
+                                                    <div class="kroy-extra-fields" id="kroy-fields-{{ forloop.counter }}">
+                                                        
+                                                        <!-- TERI -->
+                                                        <div class="extra-field">
+                                                            <label>
+                                                                🔷 Teri (majburiy):
+                                                            </label>
+                                                            <div style="display: flex; gap: 0.5rem;">
+                                                                <select name="teri" class="teri-select" required style="flex: 2;">
+                                                                    <option value="">Teri tanlang...</option>
+                                                                    {% for teri in terilar %}
+                                                                        <option value="{{ teri.id }}" data-mavjud="{{ teri.miqdori }}">
+                                                                            {{ teri.nomi }} - {{ teri.miqdori }} {{ teri.get_olchov_birligi_display }} ({{ teri.narxi|floatformat:0 }} so'm)
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                                
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- ASTAR (ixtiyoriy) -->
+                                                        <div class="extra-field">
+                                                            <label>
+                                                                🔶 Astar (ixtiyoriy):
+                                                            </label>
+                                                            <div style="display: flex; gap: 0.5rem;">
+                                                                <select name="astar" class="teri-select" style="flex: 2;">
+                                                                    <option value="">Astar kerak emas</option>
+                                                                    {% for astar in astarlar %}
+                                                                        <option value="{{ astar.id }}" data-mavjud="{{ astar.miqdori }}">
+                                                                            {{ astar.nomi }} - {{ astar.miqdori }} {{ astar.get_olchov_birligi_display }} ({{ astar.narxi|floatformat:0 }} so'm)
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                                <input type="number" 
+                                                                       name="astar_miqdori" 
+                                                                       class="form-input" 
+                                                                       placeholder="Miqdor" 
+                                                                       step="0.01" 
+                                                                       min="0"
+                                                                       style="width: 100px;">
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="extra-field">
+                                                            <div class="sarflar-info" id="sarflar-{{ forloop.counter }}">
+                                                                ⚠️ Mahsulot va sonini tanlang
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+
                                                 </form>
                                             </td>
                                         </tr>
@@ -580,6 +694,7 @@
             </main>
         </div>
     </div>
+
 
     <script>
         // Search functionality
@@ -606,25 +721,99 @@
             });
         }
 
+        // Kroy uchun sarflarni hisoblash
+        document.querySelectorAll('.mahsulot-select').forEach(select => {
+            const rowNum = select.dataset.row;
+            const ishchiTuri = select.dataset.ishchiTuri;
+            
+            if (ishchiTuri === 'kroy') {
+                const soniInput = document.querySelector(`.soni-input[data-row="${rowNum}"]`);
+                const kroyFields = document.getElementById(`kroy-fields-${rowNum}`);
+                const sarflarInfo = document.getElementById(`sarflar-${rowNum}`);
+                
+                // Mahsulot tanlanganda
+                select.addEventListener('change', function() {
+                    updateKroySarflar(this, soniInput, kroyFields, sarflarInfo);
+                });
+                
+                // Soni o'zgarganda
+                if (soniInput) {
+                    soniInput.addEventListener('input', function() {
+                        updateKroySarflar(select, this, kroyFields, sarflarInfo);
+                    });
+                }
+            }
+        });
+
+        function updateKroySarflar(mahsulotSelect, soniInput, kroyFields, sarflarInfo) {
+            const selectedOption = mahsulotSelect.options[mahsulotSelect.selectedIndex];
+            
+            if (!selectedOption.value) {
+                kroyFields.classList.remove('show');
+                return;
+            }
+
+            kroyFields.classList.add('show');
+            
+            const teriSarfi = parseFloat(selectedOption.dataset.teriSarfi) || 0;
+            const astarSarfi = parseFloat(selectedOption.dataset.astarSarfi) || 0;
+            const soni = parseInt(soniInput.value) || 0;
+            
+            if (soni > 0 && (teriSarfi > 0 || astarSarfi > 0)) {
+                const teriJami = (teriSarfi * soni).toFixed(2);
+                const astarJami = (astarSarfi * soni).toFixed(2);
+                
+                let sarfText = '';
+                if (teriSarfi > 0) {
+                    sarfText += `🔷 Teri sarfi: ${teriJami} kg`;
+                }
+                if (astarSarfi > 0) {
+                    if (sarfText) sarfText += ' | ';
+                    sarfText += `🔶 Astar sarfi: ${astarJami} m`;
+                }
+                
+                sarflarInfo.innerHTML = sarfText || '⚠️ Sarflar belgilanmagan';
+                sarflarInfo.style.background = 'var(--color-warning-light)';
+                sarflarInfo.style.color = 'var(--color-warning)';
+            } else {
+                sarflarInfo.innerHTML = '⚠️ Sonini kiriting';
+                sarflarInfo.style.background = 'var(--bg-secondary)';
+                sarflarInfo.style.color = 'var(--text-secondary)';
+            }
+        }
+
         // Form validation
-        const workForms = document.querySelectorAll('.work-form');
-        workForms.forEach(form => {
+        document.querySelectorAll('.work-form').forEach(form => {
             form.addEventListener('submit', function(e) {
                 const mahsulotSelect = form.querySelector('select[name="mahsulot"]');
                 const soniInput = form.querySelector('input[name="soni"]');
+                const ishchiTuri = form.dataset.ishchiTuri;
                 
+                // Mahsulot tekshiruvi
                 if (!mahsulotSelect.value) {
                     e.preventDefault();
-                    alert('Iltimos mahsulot tanlang!');
+                    alert('❌ Iltimos mahsulot tanlang!');
                     return false;
                 }
                 
+                // Soni tekshiruvi
                 if (!soniInput.value || soniInput.value < 1) {
                     e.preventDefault();
-                    alert('Iltimos to\'g\'ri son kiriting!');
+                    alert('❌ Iltimos to\'g\'ri son kiriting!');
                     return false;
+                }
+                
+                // Kroy uchun teri tekshiruvi
+                if (ishchiTuri === 'kroy') {
+                    const teriSelect = form.querySelector('select[name="teri"]');
+                    if (!teriSelect || !teriSelect.value) {
+                        e.preventDefault();
+                        alert('❌ Kroy uchun teri tanlash majburiy!');
+                        return false;
+                    }
                 }
             });
         });
     </script>
+
 {% endblock content %}

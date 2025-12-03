@@ -1,17 +1,17 @@
 #xomashyo app
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.views.generic import ListView
+from django.views.generic import ListView,DetailView
 from django.urls import reverse_lazy
-from django.db.models import Sum
+from django.db.models import Sum,F
 from datetime import date
 from decimal import Decimal
 
 from crm.models import Chiqim, ChiqimTuri
-from .models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi
+from .models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory
+from crm.views import AdminRequiredMixin
 
-
-class ChiqimListView(ListView):
+class ChiqimListView(AdminRequiredMixin,ListView):
     """Chiqimlar ro'yxati va yangi chiqim qo'shish"""
     model = Chiqim
     template_name = 'chiqim.html'
@@ -158,3 +158,81 @@ def chiqim_ochirish(request, pk):
             messages.error(request, f'❌ Xatolik: {str(e)}')
     
     return redirect('xomashyo:chiqimlar')
+
+class XomashyolarListView(AdminRequiredMixin,ListView):
+    model = Xomashyo
+    template_name = 'xomashyo/xomashyo.html'
+    context_object_name = 'xomashyolar'
+
+    def get_queryset(self):
+        queryset = Xomashyo.objects.select_related('category', 'yetkazib_beruvchi').all()
+        category_filter = self.request.GET.get('category')
+
+        if category_filter and category_filter != 'all':
+            queryset = queryset.filter(category_id=category_filter)
+
+        # Har bir xomashyo uchun jami chiqimni qo'shish
+        xomashyolar_with_chiqim = []
+        for xomashyo in queryset:
+            jami_chiqim = XomashyoHarakat.objects.filter(
+                xomashyo=xomashyo,
+                harakat_turi='chiqim'
+            ).aggregate(total=Sum('miqdori'))['total'] or 0
+            xomashyo.jami_chiqim = jami_chiqim
+            xomashyolar_with_chiqim.append(xomashyo)
+
+        return xomashyolar_with_chiqim
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        queryset = Xomashyo.objects.all()
+
+        context['categories'] = XomashyoCategory.objects.all()
+        context['jami_xomashyolar'] = queryset.count()
+        context['kam_qolganlar'] = queryset.filter(
+            miqdori__lt=F('minimal_miqdor')
+        ).count()
+        context['muddati_otganlar'] = queryset.filter(holati='expired').count()
+        context['jami_qiymat'] = sum(x.miqdori * x.narxi for x in queryset)
+
+        # Agar filter ishlashini xohlasangiz
+        category_filter = self.request.GET.get('category')
+        context['selected_category'] = category_filter or 'all'
+
+        return context
+
+class XomashyoDetailView(AdminRequiredMixin,DetailView):
+    model = Xomashyo
+    template_name = 'xomashyo/xomashyo_detail.html'
+    context_object_name = 'xomashyo'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        xomashyo = self.object
+
+        harakat_filter = self.request.GET.get('harakat')
+        harakatlar = XomashyoHarakat.objects.filter(xomashyo=xomashyo).select_related(
+            'yetkazib_beruvchi', 'foydalanuvchi'
+        )
+        if harakat_filter and harakat_filter != 'all':
+            harakatlar = harakatlar.filter(harakat_turi=harakat_filter)
+
+        jami_kirim = XomashyoHarakat.objects.filter(
+            xomashyo=xomashyo, harakat_turi='kirim'
+        ).aggregate(total=Sum('miqdori'))['total'] or 0
+
+        jami_chiqim = XomashyoHarakat.objects.filter(
+            xomashyo=xomashyo, harakat_turi='chiqim'
+        ).aggregate(total=Sum('miqdori'))['total'] or 0
+
+        harakatlar_soni = harakatlar.count()
+
+        context.update({
+            'harakatlar': harakatlar.order_by('-sana'),
+            'harakatlar_soni': harakatlar_soni,
+            'jami_kirim': jami_kirim,
+            'jami_chiqim': jami_chiqim,
+            'harakat_filter': harakat_filter or 'all',
+        })
+
+        return context
