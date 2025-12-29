@@ -1,9 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from import_export.admin import ImportExportModelAdmin
 from .models import (
-    Category, Product, ProductVariant, IshchiCategory, Ishchi, 
-    Oyliklar, EskiIsh, Ish, ChiqimTuri, Chiqim, Xaridor, Sotuv, Kirim
+    Category, Product, ProductVariant, IshchiCategory, Ishchi,
+    Oyliklar, EskiIsh, Ish, ChiqimTuri, Chiqim, Xaridor, Sotuv, Kirim,IshXomashyo
 )
+
+from resources import IshchiResource,ProductResource,ProductVariantResource
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -13,7 +16,8 @@ class CategoryAdmin(admin.ModelAdmin):
     list_per_page = 20
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(ImportExportModelAdmin):
+    resource_class = ProductResource
     list_display = ('nomi', 'category', 'narxi', 'soni', 'status', 'created_at')
     list_filter = ('category', 'status', 'created_at')
     search_fields = ('nomi', 'description')
@@ -35,10 +39,12 @@ class ProductAdmin(admin.ModelAdmin):
     list_per_page = 20
 
 @admin.register(ProductVariant)
-class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ('product', 'size', 'color', 'stock', 'price')
-    list_filter = ('product', 'size', 'color')
-    search_fields = ('product__nomi', 'size', 'color')
+class ProductVariantAdmin(ImportExportModelAdmin):
+    
+    resource_class = ProductVariantResource
+    list_display = ('product', 'stock', 'price',)
+    list_filter = ('product',)
+    search_fields = ('product__nomi',)
     list_per_page = 20
 
 @admin.register(IshchiCategory)
@@ -48,7 +54,9 @@ class IshchiCategoryAdmin(admin.ModelAdmin):
     list_per_page = 20
 
 @admin.register(Ishchi)
-class IshchiAdmin(admin.ModelAdmin):
+class IshchiAdmin(ImportExportModelAdmin):
+    resource_class = IshchiResource
+    
     list_display = ('ism', 'familiya', 'turi', 'maosh', 'telefon', 'is_active')
     list_filter = ('turi', 'is_active', 'is_oylik_open')
     search_fields = ('ism', 'familiya', 'telefon')
@@ -111,6 +119,11 @@ class KirimAdmin(admin.ModelAdmin):
     readonly_fields = ('summa', 'sana')
     list_per_page = 20
 
+@admin.register(IshXomashyo)
+class IshXomashyoAdmin(admin.ModelAdmin):
+    list_display = ("ish","variant","miqdor")
+
+    list_per_page = 20
 # Admin sahifasini sozlash
 admin.site.site_header = "CRM Tizimi"
 admin.site.site_title = "CRM Admin"

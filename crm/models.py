@@ -1,11 +1,12 @@
 # crm/models
-from django.db import models
+from django.db import models,transaction
 from django.conf import settings
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from datetime import date
 from django.utils import timezone
+from xomashyo.models import XomashyoVariant,Xomashyo,XomashyoHarakat
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name="Nomi")
@@ -82,12 +83,29 @@ class Product(models.Model):
             return self.narx_pardoz
 
 class ProductVariant(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants", verbose_name="Mahsulot")
-    size = models.CharField(max_length=10, null=True, verbose_name="O'lcham")
-    color = models.CharField(max_length=50, null=True, verbose_name="Rangi")
+    product = models.ForeignKey(
+        Product, 
+        on_delete=models.CASCADE, 
+        related_name="variants", 
+        verbose_name="Mahsulot"
+    )
     stock = models.PositiveIntegerField(default=0, null=True, verbose_name="Qoldiq")
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, verbose_name="Narxi")
     image = models.ImageField(upload_to='product/', null=True, verbose_name="Rasm")
+    
+    # YANGI FIELDLAR
+    rang = models.CharField(
+        max_length=50, 
+        blank=True, 
+        default='', 
+        verbose_name="Rang"
+    )
+    razmer = models.CharField(
+        max_length=20, 
+        blank=True, 
+        default='', 
+        verbose_name="Razmer"
+    )
 
     class Meta:
         verbose_name = "Mahsulot varianti"
@@ -95,18 +113,29 @@ class ProductVariant(models.Model):
 
     def clean(self):
         """Variant miqdorini tekshirish."""
-        if self.stock > self.product.soni:
+        if self.stock and self.product and self.stock > self.product.soni:
             raise ValidationError(
-                f"Variant miqdori ({self.stock}) mahsulotning umumiy miqdoridan ({self.product.update_total_quantity}) oshib ketdi."
+                f"Variant miqdori ({self.stock}) mahsulotning umumiy miqdoridan ({self.product.soni}) oshib ketdi."
             )
 
     def __str__(self):
-        return f"{self.product.nomi} - {self.size} - {self.color}"
+        parts = [self.product.nomi]
+        if self.rang:
+            parts.append(f"Rang: {self.rang}")
+        if self.razmer:
+            parts.append(f"Razmer: {self.razmer}")
+        return " | ".join(parts)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Variant o'zgarganda Product.soni ni yangilash
+        self.product.update_total_quantity()
+    
     def delete(self, *args, **kwargs):
         """Variant o'chirilganda mahsulotning umumiy miqdorini yangilash."""
+        product = self.product
         super().delete(*args, **kwargs)
-        self.product.update_total_quantity()
+        product.update_total_quantity()
 
 class IshchiCategory(models.Model):
     nomi = models.CharField(max_length=50, verbose_name="Nomi")
@@ -152,14 +181,7 @@ class EskiIsh(models.Model):
         return f"{self.ishchi.ism} - {self.mahsulot}"
 
 class Ishchi(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='ishchi_profile',
-        verbose_name="Foydalanuvchi"
-    )
+
     ism = models.CharField(max_length=50, verbose_name="Ism")
     familiya = models.CharField(max_length=50, verbose_name="Familiya")
     maosh = models.IntegerField(verbose_name="Maosh")
@@ -183,7 +205,7 @@ class Ishchi(models.Model):
 
     def umumiy_oylik(self):
         umumiy_summa = sum(
-            ish.narxi for ish in self.ishlar.all()
+            ish.narxi for ish in self.ishlar.filter(status='yangi')
         )
         return umumiy_summa
 
@@ -195,7 +217,7 @@ class Ishchi(models.Model):
     def oy_mahsulotlar(self):
         """Joriy oyda ishchi har bir mahsulotdan qancha ishlab bergan"""
         current_month = now().month
-        qs = self.ishlar.all()
+        qs = self.ishlar.filter(status='yangi')
 
         return qs.values(
             'mahsulot__nomi'
@@ -203,17 +225,170 @@ class Ishchi(models.Model):
             jami_soni=Sum('soni'),
             jami_summa=Sum('narxi')
         ).order_by('mahsulot__nomi')
+       
+class IshXomashyo(models.Model):
+    """
+    Ish va Xomashyo orasidagi bog'lanish
+    Variant bilan ishlash imkonini beradi
+    """
+    
+    ish = models.ForeignKey(
+        'Ish',
+        on_delete=models.CASCADE,
+        related_name='ish_xomashyolar',
+        verbose_name="Ish"
+    )
+    
+    xomashyo = models.ForeignKey(
+        Xomashyo,
+        on_delete=models.PROTECT,
+        related_name='ish_xomashyolar',
+        verbose_name="Xomashyo"
+    )
+    
+    # Variant (ixtiyoriy)
+    variant = models.ForeignKey(
+        XomashyoVariant,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='ish_xomashyolar',
+        verbose_name="Variant"
+    )
+    
+    miqdor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Miqdor"
+    )
+    
+    birlik_narx = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Birlik narxi",
+        null=True,
+        blank=True
+    )
+    
+    qoshilgan_sana = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Ish xomashyosi"
+        verbose_name_plural = "Ish xomashyolari"
+        ordering = ['-qoshilgan_sana']
+    
+    def __str__(self):
+        if self.variant:
+            return f"{self.ish} → {self.variant} ({self.miqdor})"
+        return f"{self.ish} → {self.xomashyo.nomi} ({self.miqdor})"
+    
+    @property
+    def jami_narx(self):
+        """Ushbu xomashyo uchun umumiy narx"""
+        if self.birlik_narx > 0:
+            return self.miqdor * self.birlik_narx
         
+        if self.variant:
+            return self.miqdor * self.variant.narxi
+        return self.miqdor * self.xomashyo.narxi
+    
+    def clean(self):
+        """Validatsiya"""
+        # Miqdorni tekshirish
+        if self.miqdor <= 0:
+            raise ValidationError("Miqdor musbat son bo'lishi kerak!")
         
+        # Variant xomashyoga tegishli bo'lishi kerak
+        if self.variant and self.variant.xomashyo != self.xomashyo:
+            raise ValidationError("Variant tanlangan xomashyoga tegishli emas!")
+        
+        # FAQAT REAL XOMASHYOLAR UCHUN miqdorni tekshirish
+        # Jarayon xomashyolar (zakatovka, kroy, kosib) uchun tekshirish KERAK EMAS
+        if hasattr(self.xomashyo, 'is_jarayon_xomashyo') and self.xomashyo.is_jarayon_xomashyo:
+            # Jarayon xomashyo - validatsiya kerak emas
+            return
+        
+        # Real xomashyo uchun miqdorni tekshirish
+        if self.variant:
+            # Variant orqali
+            if self.miqdor > self.variant.miqdori:
+                raise ValidationError(
+                    f"Variantda yetarli miqdor yo'q! "
+                    f"Mavjud: {self.variant.miqdori}, Talab: {self.miqdor}"
+                )
+        else:
+            # Oddiy xomashyo
+            if self.miqdor > self.xomashyo.miqdori:
+                raise ValidationError(
+                    f"Omborda yetarli miqdor yo'q! "
+                    f"Mavjud: {self.xomashyo.miqdori}, Talab: {self.miqdor}"
+                )
+    
+    def save(self, *args, **kwargs):
+        """
+        Saqlashda xomashyo/variant miqdorini kamaytirish
+        DIQQAT: Faqat real xomashyolar uchun!
+        """
+        # Agar birlik_narx bo'sh bo'lsa, avtomatik to'ldirish
+        if not self.birlik_narx or self.birlik_narx == 0:
+            if self.variant:
+                self.birlik_narx = self.variant.narxi
+            else:
+                self.birlik_narx = self.xomashyo.narxi
+        
+        # Validatsiya
+        self.clean()
+        
+        is_new = self._state.adding
+        
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            
+            # Faqat yangi yozuv uchun
+            if not is_new:
+                return
+            
+            # FAQAT REAL XOMASHYOLAR uchun miqdorni kamaytirish
+            # Jarayon xomashyolar (zakatovka, kroy, kosib) view'da kamaytiriladi
+            is_jarayon = hasattr(self.xomashyo, 'is_jarayon_xomashyo') and self.xomashyo.is_jarayon_xomashyo
+            
+            if not is_jarayon:
+                # Real xomashyo
+                if self.variant:
+                    # Variant miqdorini kamaytirish
+                    # View'da allaqachon kamaytirilgan bo'lishi mumkin
+                    # Shuning uchun hech narsa qilmaymiz
+                    pass
+                else:
+                    # Oddiy xomashyo miqdorini kamaytirish
+                    self.xomashyo.miqdori -= self.miqdor
+                    self.xomashyo.save(update_fields=['miqdori', 'updated_at'])
+
 class Ish(models.Model):
+    STATUS_CHOICES = [
+        ('yangi','Yangi'),
+        ('yopilgan','Yopilgan'),
+        
+    ]
     mahsulot = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Mahsulot")
     soni = models.IntegerField(null=True, verbose_name="Soni")
     sana = models.DateField(null=True, auto_now_add=True, verbose_name="Sana")
     narxi = models.IntegerField(null=True, blank=True, verbose_name="Narxi")
+    status = models.CharField(max_length=30,choices=STATUS_CHOICES,null=True,blank=True)
     ishchi = models.ForeignKey(
-        Ishchi, on_delete=models.CASCADE, null=True, related_name='ishlar', verbose_name="Ishchi"
+        Ishchi, on_delete=models.CASCADE, null=True,blank=True, related_name='ishlar', verbose_name="Ishchi"
+        
     )
 
+    # Xomashyolar bilan bog'lanish (Through model orqali)
+    xomashyolar = models.ManyToManyField(
+        Xomashyo,
+        through='IshXomashyo',
+        related_name='ishlar',
+        verbose_name="Xomashyolar"
+    )
+    
     class Meta:
         verbose_name = "Ish"
         verbose_name_plural = "Ishlar"

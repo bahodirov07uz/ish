@@ -1,0 +1,562 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load custom_filters %}
+
+{% block content %}
+<style>
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f9fa;
+        --bg-card: #ffffff;
+        --bg-hover: rgba(0, 0, 0, 0.04);
+        --text-primary: #1a1a1a;
+        --text-secondary: #6b7280;
+        --border-color: #e5e7eb;
+        --color-primary: #2563eb;
+        --color-success: #22c55e;
+        --color-warning: #f59e0b;
+        --color-danger: #ef4444;
+        --color-info: #3b82f6;
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --sidebar-width: 16rem;
+        --radius: 0.5rem;
+    }
+
+    .dark {
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --bg-card: #171717;
+        --bg-hover: rgba(255, 255, 255, 0.05);
+        --text-primary: #f5f5f5;
+        --text-secondary: #a3a3a3;
+        --border-color: #262626;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Inter', -apple-system, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+
+    .main-content {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header {
+        height: 4rem;
+        background: var(--bg-primary);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.5rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    .header-title { 
+        font-size: 1.25rem; 
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .content { flex: 1; padding: 2rem; overflow-y: auto; }
+
+    .page {
+        max-width: 1600px;
+        margin: 0 auto;
+        animation: fadeIn 0.2s;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .breadcrumb {
+        display: flex;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+    }
+
+    .breadcrumb a {
+        color: var(--color-primary);
+        text-decoration: none;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+    }
+
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .stat-header span {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+
+    .stat-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .stat-icon.success { background: #dcfce7; color: var(--color-success); }
+    .stat-icon.warning { background: #fef3c7; color: var(--color-warning); }
+    .stat-icon.danger { background: #fee2e2; color: var(--color-danger); }
+    .stat-icon.info { background: #dbeafe; color: var(--color-info); }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+
+    .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .filter-btn, .date-input {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        text-decoration: none;
+    }
+
+    .filter-btn {
+        cursor: pointer;
+    }
+
+    .filter-btn.active {
+        background: var(--color-primary);
+        color: white;
+        border-color: var(--color-primary);
+    }
+
+    .date-input {
+        cursor: text;
+    }
+
+    .btn-apply {
+        padding: 0.5rem 1rem;
+        background: var(--color-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.875rem;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: var(--bg-secondary);
+    }
+
+    th {
+        padding: 1rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+    }
+
+    td {
+        padding: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    tbody tr {
+        transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+        background: var(--bg-hover);
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-success {
+        background: #dcfce7;
+        color: var(--color-success);
+    }
+
+    .badge-info {
+        background: #dbeafe;
+        color: var(--color-info);
+    }
+
+    .badge-danger {
+        background: #fee2e2;
+        color: var(--color-danger);
+    }
+
+    .expandable-row {
+        background: var(--bg-secondary);
+        display: none;
+    }
+
+    .expandable-row.show {
+        display: table-row;
+    }
+
+    .expandable-content {
+        padding: 1.5rem;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 1.5rem;
+    }
+
+    .timeline-item:before {
+        content: '';
+        position: absolute;
+        left: -2rem;
+        top: 0.5rem;
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        background: var(--color-primary);
+    }
+
+    .timeline-item:after {
+        content: '';
+        position: absolute;
+        left: -1.65rem;
+        top: 1.25rem;
+        width: 2px;
+        height: calc(100% - 1rem);
+        background: var(--border-color);
+    }
+
+    .timeline-item:last-child:after {
+        display: none;
+    }
+
+    .timeline-date {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .timeline-content {
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .main-content { margin-left: 0; }
+        .content { padding: 1rem; }
+        .stats-grid { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: 1fr; }
+        .filters { flex-direction: column; }
+    }
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+                <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+                <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            Jarayon Xomashyolari Hisoboti
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <div class="breadcrumb">
+                <a href="/">Bosh sahifa</a>
+                <span>/</span>
+                <a href="{% url 'xomashyo:xomashyolar' %}">Xomashyolar</a>
+                <span>/</span>
+                <span>Jarayon hisoboti</span>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Jami xomashyolar</span>
+                        <div class="stat-icon info">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="14" height="14" rx="2"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="stat-value">{{ jami_xomashyolar }}</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Jami kirim</span>
+                        <div class="stat-icon success">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 15V5m0 0l-4 4m4-4l4 4"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="stat-value">{{ jami_kirim|floatformat:2 }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Jami chiqim</span>
+                        <div class="stat-icon danger">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 5v10m0 0l4-4m-4 4l-4-4"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="stat-value">{{ jami_chiqim|floatformat:2 }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Jami qoldiq</span>
+                        <div class="stat-icon warning">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 7h16M4 12h16M4 17h16"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="stat-value">{{ jami_qoldiq|floatformat:2 }}</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Eng ko'p ishlatilgan</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Xomashyo</th>
+                                <th>Chiqim</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in eng_kop_ishlatilgan %}
+                            <tr>
+                                <td>{{ item.xomashyo.nomi }}</td>
+                                <td><strong style="color: var(--color-danger);">{{ item.chiqim|floatformat:2 }} {{ item.xomashyo.get_olchov_birligi_display }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Kategoriyalar</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kategoriya</th>
+                                <th>Soni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in jarayon_categories %}
+                            <tr>
+                                <td>{{ cat.name }}</td>
+                                <td><span class="badge badge-info">{{ cat.xomashyolar.count }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Jarayon xomashyolari</h3>
+                </div>
+                
+                <form method="get" class="filters">
+                    <div class="filter-group">
+                        <a href="?category=all" class="filter-btn {% if selected_category == 'all' %}active{% endif %}">Barchasi</a>
+                        {% for cat in jarayon_categories %}
+                            <a href="?category={{ cat.id }}" class="filter-btn {% if selected_category == cat.id|stringformat:'s' %}active{% endif %}">{{ cat.name }}</a>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="filter-group">
+                        <input type="date" name="date_from" class="date-input" value="{{ date_from }}" placeholder="Dan">
+                        <input type="date" name="date_to" class="date-input" value="{{ date_to }}" placeholder="Gacha">
+                        <button type="submit" class="btn-apply">Qo'llash</button>
+                    </div>
+                </form>
+
+                {% if xomashyo_list %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Xomashyo</th>
+                                <th>Kategoriya</th>
+                                <th>Mahsulot</th>
+                                <th>Kirim</th>
+                                <th>Chiqim</th>
+                                <th>Qoldiq</th>
+                                <th>Jami summa</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in xomashyo_list %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'xomashyo:xomashyo_detail' item.xomashyo.id %}" style="color: var(--color-primary); font-weight: 500;">
+                                        {{ item.xomashyo.nomi }}
+                                    </a>
+                                </td>
+                                <td><span class="badge badge-info">{{ item.xomashyo.category.name }}</span></td>
+                                <td>{{ item.xomashyo.mahsulot.nomi|default:"-" }}</td>
+                                <td><strong style="color: var(--color-success);">{{ item.kirim|floatformat:2 }}</strong></td>
+                                <td><strong style="color: var(--color-danger);">{{ item.chiqim|floatformat:2 }}</strong></td>
+                                <td><strong>{{ item.qoldiq|floatformat:2 }} {{ item.xomashyo.get_olchov_birligi_display }}</strong></td>
+                                <td><strong>{{ item.jami_summa|floatformat:0|intcomma }} so'm</strong></td>
+                                <td>
+                                    <button class="btn-icon" onclick="toggleDetails({{ item.xomashyo.id }})" title="Harakatlar">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 9 12 9 12 15 6 15 6 9"/>
+                                            <line x1="9" y1="9" x2="9" y2="1"/>
+                                            <polyline points="6 3 9 1 12 3"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="expandable-row" id="details-{{ item.xomashyo.id }}">
+                                <td colspan="8">
+                                    <div class="expandable-content">
+                                        <h4 style="margin-bottom: 1rem;">Oxirgi harakatlar</h4>
+                                        {% if item.oxirgi_harakatlar %}
+                                            <div class="timeline">
+                                                {% for harakat in item.oxirgi_harakatlar %}
+                                                <div class="timeline-item">
+                                                    <div class="timeline-date">{{ harakat.sana|date:"d.m.Y H:i" }}</div>
+                                                    <div class="timeline-content">
+                                                        <strong>{{ harakat.get_harakat_turi_display }}</strong>: 
+                                                        {{ harakat.miqdori }} {{ item.xomashyo.get_olchov_birligi_display }}
+                                                        {% if harakat.foydalanuvchi %}
+                                                        <span style="color: var(--text-secondary);">- {{ harakat.foydalanuvchi.get_full_name }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <p style="color: var(--text-secondary);">Harakatlar topilmadi</p>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Jarayon xomashyolari topilmadi</p>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    function toggleDetails(id) {
+        const row = document.getElementById('details-' + id);
+        row.classList.toggle('show');
+    }
+</script>
+{% endblock content %}

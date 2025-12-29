@@ -551,7 +551,7 @@
                             <span class="badge">{{ object.ishlar.count }} ta ish obyekti topildi</span>
                         </div>
 
-                        {% if object.ishlar.all %}
+                        {% if ishlar %}
                         <div class="table-container">
                             <table>
                                 <thead>
@@ -564,7 +564,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for ish in object.ishlar.all %}
+                                    {% for ish in ishlar %}
                                     <tr>
                                         <td>{{ ish.mahsulot.nomi }}</td>
                                         <td>{{ ish.soni }}</td>

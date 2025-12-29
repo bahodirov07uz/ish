@@ -15,6 +15,7 @@ urlpatterns = [
     path('xomashyolar/', views.XomashyolarListView.as_view(), name='xomashyolar'),
     path('xomashyo/<int:pk>/', views.XomashyoDetailView.as_view(), name='xomashyo_detail'),
 
+    path('jarayon-hisobot/', views.jarayon_xomashyo_hisobot, name='jarayon_hisobot'),
 
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

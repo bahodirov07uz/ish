@@ -3,10 +3,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views.generic import ListView,DetailView
 from django.urls import reverse_lazy
-from django.db.models import Sum,F
-from datetime import date
+from django.db.models import Sum,F,DecimalField, ExpressionWrapper,Q
+from datetime import date,datetime, timedelta
 from decimal import Decimal
 
+from django.db.models.functions import Coalesce
 from crm.models import Chiqim, ChiqimTuri
 from .models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory
 from crm.views import AdminRequiredMixin
@@ -193,7 +194,7 @@ class XomashyolarListView(AdminRequiredMixin,ListView):
             miqdori__lt=F('minimal_miqdor')
         ).count()
         context['muddati_otganlar'] = queryset.filter(holati='expired').count()
-        context['jami_qiymat'] = sum(x.miqdori * x.narxi for x in queryset)
+        context['jami_qiymat'] = sum(x.miqdori * (x.narxi or 0) for x in queryset)
 
         # Agar filter ishlashini xohlasangiz
         category_filter = self.request.GET.get('category')
@@ -212,7 +213,7 @@ class XomashyoDetailView(AdminRequiredMixin,DetailView):
 
         harakat_filter = self.request.GET.get('harakat')
         harakatlar = XomashyoHarakat.objects.filter(xomashyo=xomashyo).select_related(
-            'yetkazib_beruvchi', 'foydalanuvchi'
+            'foydalanuvchi'
         )
         if harakat_filter and harakat_filter != 'all':
             harakatlar = harakatlar.filter(harakat_turi=harakat_filter)
@@ -236,3 +237,97 @@ class XomashyoDetailView(AdminRequiredMixin,DetailView):
         })
 
         return context
+
+
+def jarayon_xomashyo_hisobot(request):
+    """
+    Kroy, Zakatovka, Kosib kabi jarayon xomashyolari uchun hisob-kitob sahifasi
+    """
+    # Faqat jarayon tipidagi kategoriyalarni olish
+    jarayon_categories = XomashyoCategory.objects.filter(turi='process')
+    
+    # Filtrlash
+    selected_category = request.GET.get('category', 'all')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # Asosiy query
+    xomashyolar = Xomashyo.objects.filter(
+        category__turi='process'
+    ).select_related('category', 'yetkazib_beruvchi')
+    
+    if selected_category != 'all':
+        xomashyolar = xomashyolar.filter(category_id=selected_category)
+    
+    # Har bir xomashyo uchun hisob
+    xomashyo_list = []
+    jami_kirim = 0
+    jami_chiqim = 0
+    jami_qoldiq = 0
+    
+    for xomashyo in xomashyolar:
+        # Harakatlar query
+        harakatlar_query = XomashyoHarakat.objects.filter(
+            Q(xomashyo=xomashyo) | Q(xomashyo_variant__xomashyo=xomashyo)
+        )
+        
+        # Sana filtri
+        if date_from:
+            harakatlar_query = harakatlar_query.filter(
+                sana__gte=datetime.strptime(date_from, '%Y-%m-%d')
+            )
+        if date_to:
+            harakatlar_query = harakatlar_query.filter(
+                sana__lte=datetime.strptime(date_to, '%Y-%m-%d')
+            )
+        
+        # Kirim va chiqim hisoblash
+        kirim = harakatlar_query.filter(
+            harakat_turi='kirim'
+        ).aggregate(
+            jami=Coalesce(Sum('miqdori'), 0, output_field=DecimalField())
+        )['jami']
+        
+        chiqim = harakatlar_query.filter(
+            harakat_turi='chiqim'
+        ).aggregate(
+            jami=Coalesce(Sum('miqdori'), 0, output_field=DecimalField())
+        )['jami']
+        
+        qoldiq = xomashyo.miqdori
+        jami_summa = qoldiq * (xomashyo.narxi or 0)
+        
+        xomashyo_list.append({
+            'xomashyo': xomashyo,
+            'kirim': kirim,
+            'chiqim': chiqim,
+            'qoldiq': qoldiq,
+            'jami_summa': jami_summa,
+            'oxirgi_harakatlar': harakatlar_query.order_by('-sana')[:5]
+        })
+        
+        jami_kirim += kirim
+        jami_chiqim += chiqim
+        jami_qoldiq += qoldiq
+    
+    # Eng ko'p ishlatiladigan
+    eng_kop_ishlatilgan = sorted(
+        xomashyo_list, 
+        key=lambda x: x['chiqim'], 
+        reverse=True
+    )[:5]
+    
+    context = {
+        'jarayon_categories': jarayon_categories,
+        'selected_category': selected_category,
+        'date_from': date_from,
+        'date_to': date_to,
+        'xomashyo_list': xomashyo_list,
+        'jami_kirim': jami_kirim,
+        'jami_chiqim': jami_chiqim,
+        'jami_qoldiq': jami_qoldiq,
+        'eng_kop_ishlatilgan': eng_kop_ishlatilgan,
+        'jami_xomashyolar': len(xomashyo_list),
+    }
+    
+    return render(request, 'xomashyo/jarayon_hisobot.html', context)

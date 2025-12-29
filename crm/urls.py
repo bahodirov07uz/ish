@@ -4,7 +4,7 @@ from django.urls import path,include
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
-
+from . import checker
 app_name = "main"
 
 urlpatterns = [
@@ -29,12 +29,27 @@ urlpatterns = [
     
     # Kirimlar
     path('kirimlar/', views.KirimListView.as_view(), name='kirimlar'),
-    path("api/products/create/", views.ProductCreateView.as_view()),
 
     # Xaridorlar
     path('xaridorlar/', views.XaridorListView.as_view(), name='xaridorlar'),
     path('xaridorlar/<int:pk>/', views.XaridorDetailView.as_view(), name='xaridor_detail'),
     path('xaridorlar/qoshish/', views.xaridor_qoshish, name='xaridor_qoshish'),
     path('xaridorlar/<int:pk>/tahrirlash/', views.xaridor_tahrirlash, name='xaridor_tahrirlash'),
+    
+    # Checking
+    
+    path(
+        'api/mahsulot/<int:mahsulot_id>/zakatovka-xomashyolar/',
+        checker.get_zakatovka_xomashyolar_api,
+        name='api_zakatovka_xomashyolar'
+    ),
+    path(
+        'api/xomashyo/<int:xomashyo_id>/variants/',
+        checker.get_xomashyo_variants_api,
+        name='api_xomashyo_variants'
+    ),
+    path('api/mahsulot/<int:mahsulot_id>/kroy-xomashyolar/', 
+        checker.get_kroy_xomashyolar_api, 
+        name='get_kroy_xomashyolar'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

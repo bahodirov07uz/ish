@@ -13,8 +13,8 @@ from django.utils import timezone
 from django.db import transaction
 
 from crm import models as m
-from crm.models import Chiqim, ChiqimTuri
-from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,Teri
+from crm.models import Chiqim, ChiqimTuri,IshXomashyo
+from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
 
 
 # ==================== PERMISSION HELPERS ====================
@@ -50,7 +50,6 @@ class StaffRequiredMixin(UserPassesTestMixin):
         return redirect('account_login')
 
 
-# ==================== HOME ====================
 
 class HomeView(LoginRequiredMixin, ListView):
     model = m.Ishchi
@@ -123,7 +122,9 @@ def oylik_yopish(request, pk):
         ishchi.is_oylik_open = False
         ishchi.save()
 
-        m.Ish.objects.filter(ishchi=ishchi).delete()
+        m.Ish.objects.update(
+            status='yopilgan'
+        )
         messages.success(request, f'✅ {ishchi.ism} uchun oylik yopildi!')
 
     return redirect('main:employee_detail', pk=pk)
@@ -223,9 +224,11 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         ishchi = self.object
         context['oy_stat'] = ishchi.oy_mahsulotlar()
-        context['ish_soni'] = m.Ish.objects.filter(ishchi=ishchi).aggregate(total=Sum('soni'))
+        context['ish_soni'] = m.Ish.objects.filter(ishchi=ishchi,status='yangi').aggregate(total=Sum('soni'))
+        context['ishlar'] = m.Ish.objects.filter(ishchi=ishchi,status='yangi')
         context['is_admin'] = is_admin(self.request.user)
         return context
+    
 
 # ==================== PRODUCTS ====================
 
@@ -243,28 +246,61 @@ class ProductsView(LoginRequiredMixin, ListView):
 
 
 
-class IshQoshishView(AdminRequiredMixin, View):
-    """Ishchiga ish biriktirish - FAQAT ADMIN"""
+class IshQoshishView(AdminRequiredMixin,View):  # AdminRequiredMixin qo'shing
+    """Ishchiga ish biriktirish"""
     template_name = 'ish_qoshish.html'
 
     def get(self, request, *args, **kwargs):
+        """GET so'rov - forma ko'rsatish"""
+        
+        # REAL XOMASHYOLAR
+        terilar = Xomashyo.objects.filter(
+            category__name__iexact='teri',
+            category__turi='real',
+            holati='active',
+            miqdori__gt=0
+        ).select_related('category').prefetch_related('variantlar').order_by('nomi')
+        
+        astarlar = Xomashyo.objects.filter(
+            category__name__iexact='astar',
+            category__turi='real',
+            holati='active',
+            miqdori__gt=0
+        ).select_related('category').prefetch_related('variantlar').order_by('nomi')
+        
+        padojlar = Xomashyo.objects.filter(
+            category__name__iexact='padoj',
+            category__turi='real',
+            holati='active',
+            miqdori__gt=0
+        ).select_related('category').prefetch_related('variantlar').order_by('nomi')
+        
+        # KROY XOMASHYOLAR (zakatovka uchun)
+        kroy_xomashyolar = Xomashyo.objects.filter(
+            category__name__iexact='kroy',
+            category__turi='process',
+            holati='active',
+            miqdori__gt=0
+        ).select_related('mahsulot').order_by('-qabul_qilingan_sana')
+        
         context = {
-            'ishchilar': m.Ishchi.objects.filter(is_oylik_open=True).select_related('turi'),
-            'mahsulotlar': m.Product.objects.all(),
-            'terilar': Xomashyo.objects.filter(
-                category__name__iexact='teri',
-                holati='active',
-                miqdori__gt=0
-            ).order_by('nomi'),
-            'astarlar': Xomashyo.objects.filter(
-                category__name__iexact='astar',
-                holati='active',
-                miqdori__gt=0
-            ).order_by('nomi')
+            'ishchilar': m.Ishchi.objects.filter(
+                is_oylik_open=True
+            ).select_related('turi').order_by('ism'),
+            
+            'mahsulotlar': m.Product.objects.all().order_by('nomi'),
+            
+            'terilar': terilar,
+            'astarlar': astarlar,
+            'padojlar': padojlar,
+            'kroy_xomashyolar': kroy_xomashyolar,  # YANGI!
         }
+        
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
+        """POST so'rov - ish yaratish"""
+        
         ishchi_id = request.POST.get('ishchi')
         mahsulot_id = request.POST.get('mahsulot')
         soni = request.POST.get('soni')
@@ -282,102 +318,376 @@ class IshQoshishView(AdminRequiredMixin, View):
                 # 2. Ishchi turini aniqlash
                 ishchi_turi = ishchi.turi.nomi.lower() if ishchi.turi else None
                 
-                # 3. KROY UCHUN MAXSUS LOGIKA
-                if ishchi_turi == 'kroy':
-                    teri_id = request.POST.get('teri')
-                    teri_miqdori_str = m.Product.objects.get(id=mahsulot_id).teri_sarfi
-                    astar_id = request.POST.get('astar')  # ixtiyoriy
-                    astar_miqdori_str = m.Product.objects.get(id=mahsulot_id).astar_sarfi  # ixtiyoriy
+                if not ishchi_turi:
+                    raise ValueError("❌ Ishchi turi ko'rsatilmagan!")
+                
+                # ============================================================
+                # 3. ZAKATOVKA - KROY XOMASHYOSINI ISHLATADI
+                # ============================================================
+                if ishchi_turi == 'zakatovka':
+                    kroy_xomashyo_id = request.POST.get('kroy_xomashyo')
                     
-                    # TERI MAJBURIY
-                    if not teri_id :
-                        raise ValueError("❌ Kroy uchun teri va teri miqdorini kiriting!")
+                    if not kroy_xomashyo_id:
+                        raise ValueError("❌ Zakatovka uchun kroy xomashyosi tanlanishi kerak!")
                     
-                    teri = Xomashyo.objects.get(
-                        id=teri_id,
-                        category__name__iexact='teri',
-                        holati='active'
-                    )
-                    teri_miqdori = Decimal(teri_miqdori_str)
+                    # Kroy xomashyosini olish
+                    try:
+                        kroy_xomashyo = Xomashyo.objects.get(
+                            id=kroy_xomashyo_id,
+                            category__name__iexact='kroy',
+                            category__turi='process',
+                            holati='active'
+                        )
+                    except Xomashyo.DoesNotExist:
+                        raise ValueError("❌ Tanlangan kroy xomashyosi topilmadi!")
                     
-                    if teri_miqdori <= 0:
-                        raise ValueError("❌ Teri miqdori 0 dan katta bo'lishi kerak!")
-                    
-                    # Teri yetarliligini tekshirish
-                    if teri.miqdori < teri_miqdori:
+                    # Kroy xomashyo yetarlimi?
+                    if kroy_xomashyo.miqdori < soni_int:
                         raise ValueError(
-                            f"❌ Omborda yetarli {teri.nomi} yo'q! "
-                            f"Kerak: {teri_miqdori} {teri.get_olchov_birligi_display()}, "
-                            f"Mavjud: {teri.miqdori} {teri.get_olchov_birligi_display()}"
+                            f"❌ Yetarli kroy xomashyo yo'q! "
+                            f"Kerak: {soni_int}, Mavjud: {kroy_xomashyo.miqdori}"
                         )
                     
-                    # ASTAR (ixtiyoriy)
-                    astar = None
-                    astar_miqdori = Decimal('0')
-                    if astar_id and astar_miqdori_str:
+                    # ISH YARATISH
+                    ish = m.Ish.objects.create(
+                        ishchi=ishchi,
+                        mahsulot=mahsulot,
+                        soni=soni_int,
+                        status='yangi'
+                    )
+                    
+                    # KROY XOMASHYO CHIQIMI
+                    kroy_xomashyo.miqdori -= Decimal(soni_int)
+                    kroy_xomashyo.save(update_fields=['miqdori', 'updated_at'])
+                    
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=kroy_xomashyo,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    # ZAKATOVKA JARAYON XOMASHYO YARATISH
+                    zakatovka_xomashyo = self._get_or_create_jarayon_xomashyo(
+                        mahsulot=mahsulot,
+                        category_name='zakatovka',
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    # Zakatovka xomashyoni ishga biriktirish
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=zakatovka_xomashyo,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    messages.success(
+                        request,
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} (Zakatovka) qo'shildi!\n"
+                        f"🔶 Ishlatildi: {kroy_xomashyo.nomi} (-{soni_int} dona)"
+                    )
+                
+                # ============================================================
+                # 4. KROY
+                # ============================================================
+                elif ishchi_turi == 'kroy':
+                    teri_xomashyo_id = request.POST.get('teri_xomashyo')
+                    teri_variant_id = request.POST.get('teri_variant')
+                    
+                    if not teri_xomashyo_id:
+                        raise ValueError("❌ Kroy uchun teri tanlanishi kerak!")
+                    
+                    try:
+                        teri_xomashyo = Xomashyo.objects.get(
+                            id=teri_xomashyo_id,
+                            category__name__iexact='teri',
+                            holati='active'
+                        )
+                    except Xomashyo.DoesNotExist:
+                        raise ValueError("❌ Tanlangan teri topilmadi!")
+                    
+                    teri_sarfi = mahsulot.teri_sarfi * soni_int
+                    
+                    if teri_sarfi <= 0:
+                        raise ValueError("❌ Mahsulotda teri sarfi ko'rsatilmagan!")
+                    
+                    # Teri variant
+                    teri_variant = None
+                    if teri_variant_id:
                         try:
-                            astar = Xomashyo.objects.get(
-                                id=astar_id,
+                            teri_variant = XomashyoVariant.objects.get(
+                                id=teri_variant_id,
+                                xomashyo=teri_xomashyo
+                            )
+                            
+                            if teri_variant.miqdori < teri_sarfi:
+                                raise ValueError(
+                                    f"❌ Variantda yetarli teri yo'q! "
+                                    f"Kerak: {teri_sarfi}, Mavjud: {teri_variant.miqdori}"
+                                )
+                            
+                            teri_variant.miqdori -= teri_sarfi
+                            teri_variant.save(update_fields=['miqdori', 'updated_at'])
+                            
+                        except XomashyoVariant.DoesNotExist:
+                            raise ValueError("❌ Tanlangan teri varianti topilmadi!")
+                    else:
+                        if teri_xomashyo.miqdori < teri_sarfi:
+                            raise ValueError(
+                                f"❌ Omborda yetarli {teri_xomashyo.nomi} yo'q! "
+                                f"Kerak: {teri_sarfi}, Mavjud: {teri_xomashyo.miqdori}"
+                            )
+                    
+                    # Astar
+                    astar_xomashyo_id = request.POST.get('astar_xomashyo')
+                    astar_variant_id = request.POST.get('astar_variant')
+                    astar_sarfi = Decimal('0')
+                    astar_xomashyo = None
+                    astar_variant = None
+                    
+                    if astar_xomashyo_id:
+                        try:
+                            astar_xomashyo = Xomashyo.objects.get(
+                                id=astar_xomashyo_id,
                                 category__name__iexact='astar',
                                 holati='active'
                             )
-                            astar_miqdori = Decimal(astar_miqdori_str)
                             
-                            if astar_miqdori > 0:
-                                # Astar yetarliligini tekshirish
-                                if astar.miqdori < astar_miqdori:
-                                    raise ValueError(
-                                        f"❌ Omborda yetarli {astar.nomi} yo'q! "
-                                        f"Kerak: {astar_miqdori} {astar.get_olchov_birligi_display()}, "
-                                        f"Mavjud: {astar.miqdori} {astar.get_olchov_birligi_display()}"
+                            astar_sarfi = mahsulot.astar_sarfi * soni_int
+                            
+                            if astar_sarfi > 0:
+                                if astar_variant_id:
+                                    astar_variant = XomashyoVariant.objects.get(
+                                        id=astar_variant_id,
+                                        xomashyo=astar_xomashyo
                                     )
+                                    
+                                    if astar_variant.miqdori < astar_sarfi:
+                                        raise ValueError(
+                                            f"❌ Astar variantida yetarli miqdor yo'q! "
+                                            f"Kerak: {astar_sarfi}, Mavjud: {astar_variant.miqdori}"
+                                        )
+                                    
+                                    astar_variant.miqdori -= astar_sarfi
+                                    astar_variant.save(update_fields=['miqdori', 'updated_at'])
+                                else:
+                                    if astar_xomashyo.miqdori < astar_sarfi:
+                                        raise ValueError(
+                                            f"❌ Omborda yetarli {astar_xomashyo.nomi} yo'q! "
+                                            f"Kerak: {astar_sarfi}, Mavjud: {astar_xomashyo.miqdori}"
+                                        )
+                        
                         except Xomashyo.DoesNotExist:
                             raise ValueError("❌ Tanlangan astar topilmadi!")
+                        except XomashyoVariant.DoesNotExist:
+                            raise ValueError("❌ Tanlangan astar varianti topilmadi!")
                     
-                    # 4. ISH YARATISH
+                    # ISH YARATISH
                     ish = m.Ish.objects.create(
                         ishchi=ishchi,
                         mahsulot=mahsulot,
-                        soni=soni_int
+                        soni=soni_int,
+                        status='yangi'
                     )
                     
-                    # 5. TERI CHIQIMI (XomashyoHarakat)
-                    XomashyoHarakat.objects.create(
-                        xomashyo=teri,
-                        harakat_turi='chiqim',
-                        miqdori=teri_miqdori*soni_int,
-                        narxi=teri.narxi * teri_miqdori,
-                        izoh=f"Kroy ishiga sarflandi: {mahsulot.nomi} x{soni_int} ({ishchi.ism})",
-                        foydalanuvchi=request.user
+                    # TERI CHIQIMI
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=teri_xomashyo,
+                        variant=teri_variant,
+                        miqdor=teri_sarfi
                     )
                     
-                    # 6. ASTAR CHIQIMI (agar tanlangan bo'lsa)
-                    if astar and astar_miqdori > 0:
-                        XomashyoHarakat.objects.create(
-                            xomashyo=astar,
-                            harakat_turi='chiqim',
-                            miqdori=astar_miqdori*soni_int,
-                            narxi=astar.narxi * astar_miqdori,
-                            izoh=f"Kroy ishiga sarflandi: {mahsulot.nomi} x{soni_int} ({ishchi.ism})",
-                            foydalanuvchi=request.user
+                    # ASTAR CHIQIMI
+                    if astar_xomashyo and astar_sarfi > 0:
+                        IshXomashyo.objects.create(
+                            ish=ish,
+                            xomashyo=astar_xomashyo,
+                            variant=astar_variant,
+                            miqdor=astar_sarfi
                         )
                     
-                    # Muvaffaqiyatli xabar
-                    success_msg = (
-                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} qo'shildi!\n"
-                        f" Teri: {teri.nomi} ({teri_miqdori*soni_int} {teri.get_olchov_birligi_display()})"
+                    # KROY JARAYON XOMASHYO
+                    kroy_xomashyo = self._get_or_create_jarayon_xomashyo(
+                        mahsulot=mahsulot,
+                        category_name='kroy',
+                        miqdor=Decimal(soni_int),
+                        rang=teri_xomashyo.rang,
                     )
-                    if astar and astar_miqdori > 0:
-                        success_msg += f"\n🔶 Astar: {astar.nomi} ({astar_miqdori} {astar.get_olchov_birligi_display()})"
+                    
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=kroy_xomashyo,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    success_msg = (
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} (Kroy) qo'shildi!\n"
+                        f"🔶 Teri: {teri_xomashyo.nomi} (-{teri_sarfi} {teri_xomashyo.get_olchov_birligi_display()})"
+                    )
+                    if astar_xomashyo and astar_sarfi > 0:
+                        success_msg += (
+                            f"\n🔶 Astar: {astar_xomashyo.nomi} (-{astar_sarfi} {astar_xomashyo.get_olchov_birligi_display()})"
+                        )
                     
                     messages.success(request, success_msg)
                 
-                else:
-                    # 4. ODDIY ISH (kroy emas)
+                # ============================================================
+                # 5. KOSIB
+                # ============================================================
+                elif ishchi_turi == 'kosib':
+                    zakatovka_xomashyo_id = request.POST.get('zakatovka_xomashyo')
+                    padoj_xomashyo_id = request.POST.get('padoj_xomashyo')
+                    padoj_variant_id = request.POST.get('padoj_variant')
+                    
+                    if not zakatovka_xomashyo_id or not padoj_xomashyo_id:
+                        raise ValueError("❌ Kosib uchun zakatovka va padoj tanlanishi kerak!")
+                    
+                    # ZAKATOVKA
+                    try:
+                        zakatovka = Xomashyo.objects.get(
+                            id=zakatovka_xomashyo_id,
+                            category__name__iexact='zakatovka',
+                            mahsulot=mahsulot,
+                            holati='active'
+                        )
+                    except Xomashyo.DoesNotExist:
+                        raise ValueError(
+                            f"❌ {mahsulot.nomi} uchun zakatovka topilmadi! "
+                            f"Avval zakatovka ishi qo'shilishi kerak."
+                        )
+                    
+                    if zakatovka.miqdori < soni_int:
+                        raise ValueError(
+                            f"❌ Yetarli zakatovka yo'q! "
+                            f"Kerak: {soni_int}, Mavjud: {zakatovka.miqdori}"
+                        )
+                    
+                    # PADOJ
+                    try:
+                        padoj = Xomashyo.objects.get(
+                            id=padoj_xomashyo_id,
+                            holati='active'
+                        )
+                    except Xomashyo.DoesNotExist:
+                        raise ValueError("❌ Tanlangan padoj topilmadi!")
+                    
+                    padoj_variant = None
+                    if padoj_variant_id:
+                        try:
+                            padoj_variant = XomashyoVariant.objects.get(
+                                id=padoj_variant_id,
+                                xomashyo=padoj
+                            )
+                            
+                            if padoj_variant.miqdori < soni_int:
+                                raise ValueError(
+                                    f"❌ Padoj variantida yetarli miqdor yo'q! "
+                                    f"Kerak: {soni_int}, Mavjud: {padoj_variant.miqdori}"
+                                )
+                            
+                            padoj_variant.miqdori -= Decimal(soni_int)
+                            padoj_variant.save(update_fields=['miqdori', 'updated_at'])
+                            
+                        except XomashyoVariant.DoesNotExist:
+                            raise ValueError("❌ Tanlangan padoj varianti topilmadi!")
+                    else:
+                        if padoj.miqdori < soni_int:
+                            raise ValueError(
+                                f"❌ Yetarli {padoj.nomi} yo'q! "
+                                f"Kerak: {soni_int}, Mavjud: {padoj.miqdori}"
+                            )
+                    
+                    # ISH YARATISH
                     ish = m.Ish.objects.create(
                         ishchi=ishchi,
                         mahsulot=mahsulot,
-                        soni=soni_int
+                        soni=soni_int,
+                        status='yangi'
+                    )
+                    
+                    # ZAKATOVKA CHIQIMI
+                    zakatovka.miqdori -= Decimal(soni_int)
+                    zakatovka.save(update_fields=['miqdori', 'updated_at'])
+                    
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=zakatovka,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    # PADOJ CHIQIMI
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=padoj,
+                        variant=padoj_variant,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    # PRODUCT VARIANT
+                    variant_rang = request.POST.get('variant_rang', '')
+                    variant_razmer = request.POST.get('variant_razmer', '')
+                    
+                    variant, created = m.ProductVariant.objects.get_or_create(
+                        product=mahsulot,
+                        rang=variant_rang,
+                        razmer=variant_razmer,
+                        defaults={
+                            'stock': soni_int,
+                            'price': mahsulot.narxi
+                        }
+                    )
+                    
+                    if not created:
+                        variant.stock += soni_int
+                        variant.save()
+                    
+                    # KOSIB JARAYON XOMASHYO
+                    kosib_xomashyo = self._get_or_create_jarayon_xomashyo(
+                        mahsulot=mahsulot,
+                        category_name='kosib',
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    IshXomashyo.objects.create(
+                        ish=ish,
+                        xomashyo=kosib_xomashyo,
+                        miqdor=Decimal(soni_int)
+                    )
+                    
+                    mahsulot.refresh_from_db()
+                    messages.success(
+                        request,
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} (Kosib) qo'shildi!\n"
+                        f"🔶 Zakatovka: -{soni_int} dona\n"
+                        f"🔶 {padoj.nomi}: -{soni_int} dona\n"
+                        f"✅ Product.soni: {mahsulot.soni} dona"
+                    )
+                
+                # ============================================================
+                # 6. PARDOZ
+                # ============================================================
+                elif ishchi_turi in ['pardoz', 'pardozchi']:
+                    ish = m.Ish.objects.create(
+                        ishchi=ishchi,
+                        mahsulot=mahsulot,
+                        soni=soni_int,
+                        status='yangi'
+                    )
+                    
+                    messages.success(
+                        request,
+                        f"✅ {ishchi.ism}ga {mahsulot.nomi} x{soni_int} (Pardoz) qo'shildi!"
+                    )
+                
+                # ============================================================
+                # 7. BOSHQA TURLAR
+                # ============================================================
+                else:
+                    ish = m.Ish.objects.create(
+                        ishchi=ishchi,
+                        mahsulot=mahsulot,
+                        soni=soni_int,
+                        status='yangi'
                     )
                     
                     messages.success(
@@ -391,13 +701,55 @@ class IshQoshishView(AdminRequiredMixin, View):
             messages.error(request, "❌ Mahsulot topilmadi!")
         except Xomashyo.DoesNotExist:
             messages.error(request, "❌ Xomashyo topilmadi!")
+        except XomashyoVariant.DoesNotExist:
+            messages.error(request, "❌ Xomashyo varianti topilmadi!")
         except ValueError as e:
             messages.error(request, str(e))
         except Exception as e:
             messages.error(request, f"❌ Xatolik: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
         
         return redirect('main:ish_qoshish')
     
+
+    @staticmethod
+    def _get_or_create_jarayon_xomashyo(mahsulot: m.Product, category_name: str, miqdor: Decimal, rang: str | None = None) -> Xomashyo:
+        """Jarayon xomashyosini yaratish/yangilash"""
+        category, _ = XomashyoCategory.objects.get_or_create(
+            name=category_name,
+            defaults={'turi': 'process'}
+        )
+
+        # Rang va olchov birligi bo‘yicha mavjud xomashyoni tekshirish
+        filters = {
+            'mahsulot': mahsulot,
+            'category': category,
+            'olchov_birligi': 'dona'
+        }
+        if rang:
+            filters['rang'] = rang
+
+        xomashyo = Xomashyo.objects.filter(**filters).first()
+
+        if xomashyo:
+            xomashyo.miqdori += miqdor
+            xomashyo.save(update_fields=['miqdori', 'updated_at'])
+        else:
+            xomashyo = Xomashyo.objects.create(
+                mahsulot=mahsulot,
+                category=category,
+                nomi=f"{mahsulot.nomi} - {category_name.title()}",
+                miqdori=miqdor,
+                olchov_birligi='dona',
+                holati='active',
+                rang=rang
+            )
+
+        return xomashyo
+
+
+
 # ==================== SOTUVLAR ====================
 
 class SotuvListView(LoginRequiredMixin, ListView):
@@ -883,11 +1235,4 @@ def chiqim_ochirish(request, pk):
     
     return redirect('xomashyo:chiqimlar')
 
-
-from rest_framework import generics
-from .serializers import ProductSerializer
-
-class ProductCreateView(generics.CreateAPIView):
-    queryset = m.Product.objects.all()
-    serializer_class = ProductSerializer
 
