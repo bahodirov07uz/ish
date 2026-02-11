@@ -1,0 +1,685 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    <style>
+/* Taminlash sahifasi uchun maxsus CSS */
+.taminlash-page {
+    padding: 2rem;
+    max-width: 1200px;
+    /* margin: 0 auto; */
+}
+
+.page-header {
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+}
+
+/* Stats kartlari */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-card.primary { border-left: 4px solid var(--color-primary); }
+.stat-card.success { border-left: 4px solid var(--color-success); }
+.stat-card.warning { border-left: 4px solid var(--color-warning); }
+.stat-card.danger { border-left: 4px solid var(--color-danger); }
+
+/* Filtrlar */
+.filters-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.main-content,.app,.content{
+    width: 98%;
+}
+.filter-group label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.filter-input,
+.filter-select {
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.filter-input:focus,
+.filter-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.filter-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--color-primary-dark);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+}
+
+.btn-success {
+    background: var(--color-success);
+    color: white;
+}
+
+.btn-danger {
+    background: var(--color-danger);
+    color: white;
+}
+
+.btn-warning {
+    background: var(--color-warning);
+    color: white;
+}
+
+/* Table */
+.table-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.table-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-header h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background: var(--bg-secondary);
+}
+
+th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+tr:hover {
+    background: var(--bg-hover);
+}
+
+/* Badge */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.badge-success {
+    background: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.badge-warning {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+}
+
+.badge-primary {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.badge-danger {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+}
+
+/* Dropdown */
+.items-dropdown {
+    position: relative;
+}
+
+.items-summary {
+    cursor: pointer;
+    color: var(--color-primary);
+    font-weight: 500;
+    user-select: none;
+}
+
+.items-summary:hover {
+    text-decoration: underline;
+}
+
+.items-list {
+    display: none;
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+}
+
+.items-list.show {
+    display: block;
+}
+
+.item-row {
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.item-row:last-child {
+    border-bottom: none;
+}
+
+.item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.item-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.item-stat {
+    color: var(--text-secondary);
+}
+
+.item-stat strong {
+    color: var(--text-primary);
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-body {
+    margin-bottom: 1.5rem;
+    color: var(--text-secondary);
+}
+
+.modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    color: var(--text-tertiary);
+}
+
+.empty-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-description {
+    color: var(--text-secondary);
+}
+    </style>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/index.css' %}">
+    <div class="app">
+        <div class="content">
+            <div class="main-content">
+                <div class="taminlash-page">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <div style="display: flex;
+                                    justify-content: space-between;
+                                    align-items: center">
+                            <div>
+                                <h1>📦 Ta'minlashlar</h1>
+                                <p>Ishchilarga berilgan xomashyolarni boshqaring</p>
+                            </div>
+                            <a href="{% url 'xomashyo:taminlash_qoshish' %}" class="btn btn-primary">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M8 3v10M3 8h10" />
+                                </svg>
+                                Yangi ta'minlash
+                            </a>
+                        </div>
+                    </div>
+                    <!-- Messages -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }}"
+                                 style="margin-bottom: 1.5rem;
+                                        padding: 1rem;
+                                        border-radius: var(--radius);
+                                        background: var(--color-{{ message.tags }}-light);
+                                        color: var(--color-{{ message.tags }});
+                                        border-left: 4px solid var(--color-{{ message.tags }})">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    <!-- Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-label">Jami ta'minlashlar</div>
+                            <div class="stat-value">{{ stats.jami }}</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-label">Aktiv</div>
+                            <div class="stat-value">{{ stats.aktiv }}</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-label">Qaytarilgan</div>
+                            <div class="stat-value">{{ stats.qaytarilgan }}</div>
+                        </div>
+                        <div class="stat-card danger">
+                            <div class="stat-label">Yakunlangan</div>
+                            <div class="stat-value">{{ stats.yakunlangan }}</div>
+                        </div>
+                    </div>
+                    <!-- Filters -->
+                    <div class="filters-card">
+                        <form method="get">
+                            <div class="filters-grid">
+                                <div class="filter-group">
+                                    <label>Ishchi</label>
+                                    <select name="ishchi" class="filter-select">
+                                        <option value="">Barchasi</option>
+                                        {% for ishchi in ishchilar %}
+                                            <option value="{{ ishchi.id }}"
+                                                    {% if filters.ishchi_id == ishchi.id|stringformat:"s" %}selected{% endif %}>
+                                                {{ ishchi.ism }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Status</label>
+                                    <select name="status" class="filter-select">
+                                        <option value="">Barchasi</option>
+                                        <option value="aktiv" {% if filters.status == 'aktiv' %}selected{% endif %}>Aktiv</option>
+                                        <option value="qaytarilgan"
+                                                {% if filters.status == 'qaytarilgan' %}selected{% endif %}>
+                                            Qaytarilgan
+                                        </option>
+                                        <option value="yakunlangan"
+                                                {% if filters.status == 'yakunlangan' %}selected{% endif %}>
+                                            Yakunlangan
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Sana (dan)</label>
+                                    <input type="date"
+                                           name="sana_from"
+                                           class="filter-input"
+                                           value="{{ filters.sana_from }}">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Sana (gacha)</label>
+                                    <input type="date"
+                                           name="sana_to"
+                                           class="filter-input"
+                                           value="{{ filters.sana_to }}">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Qidiruv</label>
+                                    <input type="text"
+                                           name="search"
+                                           class="filter-input"
+                                           placeholder="Ishchi, xomashyo..."
+                                           value="{{ filters.search }}">
+                                </div>
+                            </div>
+                            <div class="filter-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <svg width="16"
+                                         height="16"
+                                         viewBox="0 0 16 16"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="2">
+                                        <circle cx="7" cy="7" r="5" />
+                                        <path d="M11 11l3 3" />
+                                    </svg>
+                                    Qidirish
+                                </button>
+                                <a href="{% url 'xomashyo:taminlash' %}" class="btn btn-secondary">Tozalash</a>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- Table -->
+                    <div class="table-card">
+                        <div class="table-header">
+                            <h3>Ta'minlashlar ro'yxati</h3>
+                            <span style="color: var(--text-secondary); font-size: 0.875rem;">Jami: {{ taminlashlar.count }}</span>
+                        </div>
+                        {% if taminlashlar %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Ishchi</th>
+                                            <th>Sana</th>
+                                            <th>Xomashyolar</th>
+                                            <th>Status</th>
+                                            <th>Yaratuvchi</th>
+                                            <th>Amallar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for taminlash in taminlashlar %}
+                                            <tr>
+                                                <td>
+                                                    <strong>#{{ taminlash.id }}</strong>
+                                                </td>
+                                                <td>
+                                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                        <div style="width: 32px;
+                                                                    height: 32px;
+                                                                    border-radius: 50%;
+                                                                    background: var(--color-primary-light);
+                                                                    color: var(--color-primary);
+                                                                    display: flex;
+                                                                    align-items: center;
+                                                                    justify-content: center;
+                                                                    font-weight: 600;
+                                                                    font-size: 0.875rem">
+                                                            {{ taminlash.ishchi.ism|slice:":1"|upper }}
+                                                        </div>
+                                                        <div>
+                                                            <div style="font-weight: 600;"><a href="{% url 'xomashyo:taminlash_detail' taminlash.id %}">{{ taminlash.ishchi.ism }}</a></div>
+                                                            <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ taminlash.ishchi.turi.nomi }}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style="font-weight: 500;">{{ taminlash.sana|date:"d.m.Y" }}</div>
+                                                    {% if taminlash.qaytarilgan_sana %}
+                                                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                                            Qaytarilgan: {{ taminlash.qaytarilgan_sana|date:"d.m.Y H:i" }}
+                                                        </div>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <div class="items-dropdown">
+                                                        <div class="items-summary" onclick="toggleItems({{ taminlash.id }})">📦 {{ taminlash.items.count }} ta xomashyo</div>
+                                                        <div class="items-list" id="items-{{ taminlash.id }}">
+                                                            {% for item in taminlash.items.all %}
+                                                                <div class="item-row">
+                                                                    <div class="item-name">{{ item.xomashyo.nomi }}</div>
+                                                                    <div class="item-stats">
+                                                                        <div class="item-stat">
+                                                                            Berilgan: <strong>{{ item.miqdor }} {{ item.xomashyo.get_olchov_birligi_display }}</strong>
+                                                                        </div>
+                                                                        <div class="item-stat">
+                                                                            Ishlatilgan: <strong>{{ item.ishlatilgan }} {{ item.xomashyo.get_olchov_birligi_display }}</strong>
+                                                                        </div>
+                                                                        <div class="item-stat">
+                                                                            Qolgan: <strong>{{ item.qolgan }} {{ item.xomashyo.get_olchov_birligi_display }}</strong>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {% if taminlash.status == 'aktiv' %}
+                                                        <span class="badge badge-success">✅ Aktiv</span>
+                                                    {% elif taminlash.status == 'qaytarilgan' %}
+                                                        <span class="badge badge-warning">🔄 Qaytarilgan</span>
+                                                    {% elif taminlash.status == 'yakunlangan' %}
+                                                        <span class="badge badge-primary">✔️ Yakunlangan</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <div style="font-size: 0.8125rem; color: var(--text-secondary);">{{ taminlash.yaratuvchi.username|default:"—" }}</div>
+                                                </td>
+                                                <td>
+                                                    {% if taminlash.status == 'aktiv' %}
+                                                        <button onclick="confirmQaytarish({{ taminlash.id }}, '{{ taminlash.ishchi.ism }}')"
+                                                                class="btn btn-warning"
+                                                                style="padding: 0.5rem 0.75rem;
+                                                                       font-size: 0.8125rem">🔄 Qaytarish</button>
+                                                    {% else %}
+                                                        <span style="color: var(--text-tertiary); font-size: 0.8125rem;">—</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="64"
+                                         height="64"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <h4 class="empty-title">Ta'minlashlar topilmadi</h4>
+                                <p class="empty-description">Hozircha hech qanday ta'minlash yo'q yoki filtr bo'yicha natija topilmadi</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Qaytarish Modal -->
+                <div class="modal" id="qaytarish-modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>🔄 Ta'minlashni qaytarish</h3>
+                        </div>
+                        <div class="modal-body">
+                            <p id="modal-message">
+                                Ishchi <strong id="modal-ishchi-name"></strong>ning ta'minlashini qaytarishni xohlaysizmi?
+                            </p>
+                            <p style="margin-top: 1rem;
+                                      font-size: 0.875rem;
+                                      color: var(--text-secondary)">
+                                ⚠️ Qolgan barcha xomashyolar omborga qaytariladi va ta'minlash "Qaytarilgan" statusga o'tadi.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button onclick="closeModal()" class="btn btn-secondary">Bekor qilish</button>
+                            <form id="qaytarish-form" method="post" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-warning">🔄 Ha, qaytarish</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+function toggleItems(taminlashId) {
+    const itemsList = document.getElementById(`items-${taminlashId}`);
+    itemsList.classList.toggle('show');
+}
+
+function confirmQaytarish(taminlashId, ishchiIsm) {
+    document.getElementById('modal-ishchi-name').textContent = ishchiIsm;
+    document.getElementById('qaytarish-form').action = `/xomashyo/taminlash/${taminlashId}/qaytarish/`;
+    document.getElementById('qaytarish-modal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('qaytarish-modal').classList.remove('show');
+}
+
+// Modal tashqarisiga bosilganda yopish
+document.getElementById('qaytarish-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+    </script>
+{% endblock %}

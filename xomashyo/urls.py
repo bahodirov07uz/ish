@@ -17,6 +17,11 @@ urlpatterns = [
 
     path('jarayon-hisobot/', views.jarayon_xomashyo_hisobot, name='jarayon_hisobot'),
 
-    
+    path('taminlash/', views.TaminlashView.as_view(), name='taminlash'),
+    path('taminlash/qoshish/', views.TaminlashQushishView.as_view(), name='taminlash_qoshish'),
+    path('taminlash/<int:taminlash_id>/', views.TaminlashDetailView.as_view(), name='taminlash_detail'),
+    path('taminlash/<int:taminlash_id>/qaytarish/', views.TaminlashQaytarishView.as_view(), name='taminlash_qaytarish'),
+    path('taminlash/item/<int:item_id>/qaytarish/', views.TaminlashItemQaytarishView.as_view(), name='taminlash_item_qaytarish'),
+
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

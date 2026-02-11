@@ -1,8 +1,10 @@
 
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods,require_GET
 from django.views.decorators.csrf import csrf_exempt
-from .models import Xomashyo, XomashyoVariant
+from .models import ProductVariant
+from xomashyo.models import Xomashyo, XomashyoVariant
+
 import logging
 
 @require_http_methods(["GET"])
@@ -83,4 +85,29 @@ def get_kroy_xomashyolar_api(request, mahsulot_id):
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+@require_GET
+def get_product_variants(request, mahsulot_id):
+    """Mahsulot variantlarini olish"""
+    try:
+        variants = ProductVariant.objects.filter(
+            product_id=mahsulot_id
+        ).order_by('-stock')
+        
+        data = {
+            'success': True,
+            'variants': [
+                {
+                    'id': v.id,
+                    'rang': v.rang,
+                    'razmer': v.razmer,
+                    'stock': v.stock,
+                    'price': float(v.price),
+                }
+                for v in variants
+            ]
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 

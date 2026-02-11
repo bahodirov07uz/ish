@@ -772,3 +772,27 @@ tbody tr:hover {
         margin: 0;
     }
 }
+
+ .nav-item {
+     display: flex;
+     align-items: center;
+     gap: 0.75rem;
+     padding: 0.75rem;
+     border-radius: var(--radius);
+     color: var(--text-primary);
+     text-decoration: none;
+     font-size: 0.875rem;
+     font-weight: 500;
+     transition: background-color 0.15s;
+     margin-bottom: 0.25rem;
+}
+ .nav-item:hover {
+     background: var(--bg-hover);
+}
+ .nav-item.active {
+     background: var(--color-primary);
+     color: white;
+}
+ .nav-item svg {
+     flex-shrink: 0;
+}

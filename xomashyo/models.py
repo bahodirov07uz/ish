@@ -1,13 +1,9 @@
 # xomashyo/models
 from django.db import models
 from django.conf import settings
-from django.utils.timezone import now
 from django.core.exceptions import ValidationError
-from django.db.models import Sum
-import os
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-import qrcode
+from django.utils import timezone
+
 
 class XomashyoCategory(models.Model):
     """
@@ -136,14 +132,16 @@ class YetkazibBeruvchi(models.Model):
     qisqacha_tavsif = models.TextField(blank=True)
 
     def __str__(self):
-        return self.nomi + self.telefon
-    
+        return f"{self.nomi} {self.manzil}"
+
+ 
 class XomashyoHarakat(models.Model):
     HARAKAT_TURLARI = [
         ('kirim', 'Kirim'),
         ('chiqim', 'Chiqim'),
         ('inventarizatsiya', 'Inventarizatsiya'),
-        ('qaytarish', 'Qaytarish')
+        ('qaytarish', 'Qaytarish'),
+        ("taminlash" , "Taminlash")
     ]
     xomashyo = models.ForeignKey(Xomashyo, on_delete=models.CASCADE,null=True,blank=True, verbose_name="Xomashyo")
 
@@ -154,16 +152,19 @@ class XomashyoHarakat(models.Model):
     )
     harakat_turi = models.CharField(max_length=20, choices=HARAKAT_TURLARI)
     miqdori = models.DecimalField(max_digits=10, decimal_places=2)
+    narxi = models.DecimalField(max_digits=20,decimal_places=2,null=True,blank=True)
     sana = models.DateTimeField(auto_now_add=True)
     foydalanuvchi = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True
     )
-
+    yetkazib_beruvchi = models.ForeignKey(YetkazibBeruvchi,on_delete=models.PROTECT,null=True,blank=True)
+    izoh = models.TextField(null=True,blank=True)
     def clean(self):
-        if self.harakat_turi != 'kirim' and self.miqdori > self.xomashyo_variant.miqdori:
-            raise ValidationError("Xomashyo variantida yetarli miqdor yo‘q")
+        if self.xomashyo:
+            if self.harakat_turi != 'kirim' and self.miqdori > self.xomashyo.miqdori:
+                raise ValidationError("Xomashyo variantida yetarli miqdor yo‘q")
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -174,18 +175,159 @@ class XomashyoHarakat(models.Model):
             return
 
         if self.harakat_turi == 'kirim':
-            self.xomashyo_variant.miqdori += self.miqdori
-        else:
-            self.xomashyo_variant.miqdori -= self.miqdori
+            self.xomashyo.miqdori += self.miqdori
 
-        self.xomashyo_variant.save()
+        self.xomashyo.save()
 
+    def __str__(self):
+        return f"{self.xomashyo.nomi}| miqdor: {self.miqdori}"
 
-@receiver(post_save, sender=XomashyoHarakat)
-def update_xomashyo_miqdori(sender, instance, **kwargs):
-    if instance.harakat_turi == 'kirim':
-        instance.xomashyo.miqdori += instance.miqdori
-    else:
-        instance.xomashyo.miqdori -= instance.miqdori
-    instance.xomashyo.save()
+class Taminlash(models.Model):
+    STATUS_CHOICES = [
+        ('aktiv', 'Aktiv'),
+        ('qaytarilgan', 'Qaytarilgan'),
+        ('yakunlangan', 'Yakunlangan'),
+    ]
     
+    ishchi = models.ForeignKey(
+        'crm.Ishchi',
+        on_delete=models.CASCADE,
+        related_name='taminlashlar',
+        verbose_name="Ishchi",
+        null=True,
+        blank=True
+    )
+    sana = models.DateField(default=timezone.now, verbose_name="Sana")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='aktiv',
+        verbose_name="Status"
+    )
+    izoh = models.TextField(blank=True, null=True, verbose_name="Izoh")
+    qaytarilgan_sana = models.DateTimeField(null=True, blank=True, verbose_name="Qaytarilgan sana")
+    yaratuvchi = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='yaratilgan_taminlashlar',
+        verbose_name="Yaratuvchi"
+    )
+
+    class Meta:
+        verbose_name = "Ta'minlash"
+        verbose_name_plural = "Ta'minlashlar"
+        ordering = ['-sana', '-id']
+
+    def __str__(self):
+        return f"{self.ishchi} - {self.sana} ({self.get_status_display()})"
+    
+    def jami_summa(self):
+        """Jami summa"""
+        return sum(item.jami_summa() for item in self.items.all())
+
+
+class TaminlashItem(models.Model):
+    taminlash = models.ForeignKey(
+        Taminlash,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    xomashyo = models.ForeignKey(
+        Xomashyo,
+        on_delete=models.PROTECT,
+        related_name='taminlash_items',
+        verbose_name="Xomashyo"
+    )
+    variant = models.ForeignKey(
+        'XomashyoVariant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Variant"
+    )
+    miqdor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Berilgan miqdor"
+    )
+    ishlatilgan = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Ishlatilgan miqdor"
+    )
+    qolgan = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Qolgan miqdor"
+    )
+    narx = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Narx (ixtiyoriy)"
+    )
+    
+    class Meta:
+        verbose_name = "Ta'minlash item"
+        verbose_name_plural = "Ta'minlash itemlari"
+
+    def __str__(self):
+        return f"{self.xomashyo} - {self.miqdor}"
+    
+    def jami_summa(self):
+        """Jami summa"""
+        if self.narx:
+            return self.miqdor * self.narx
+        return 0
+    
+    def save(self, *args, **kwargs):
+        # Yangi yaratilayotgan bo'lsa
+        if not self.pk:
+            self.qolgan = self.miqdor
+            
+            # Xomashyo miqdorini kamaytirish
+            if self.variant:
+                if self.variant.miqdori < self.miqdor:
+                    raise ValueError(
+                        f"❌ Variantda yetarli {self.xomashyo.nomi} yo'q! "
+                        f"Kerak: {self.miqdor}, Mavjud: {self.variant.miqdori}"
+                    )
+                self.variant.miqdori -= self.miqdor
+                self.variant.save(update_fields=['miqdori'])
+            else:
+                if self.xomashyo.miqdori < self.miqdor:
+                    raise ValueError(
+                        f"❌ Omborda yetarli {self.xomashyo.nomi} yo'q! "
+                        f"Kerak: {self.miqdor}, Mavjud: {self.xomashyo.miqdori}"
+                    )
+                self.xomashyo.miqdori -= self.miqdor
+                self.xomashyo.save(update_fields=['miqdori', 'updated_at'])
+        
+        super().save(*args, **kwargs)
+    
+    def qaytarish(self, qaytariladigan_miqdor):
+        """
+        Taminlashni qaytarish - qolgan miqdorni omborga qaytarish
+        """
+        if qaytariladigan_miqdor > self.qolgan:
+            raise ValueError(
+                f"❌ Qaytariladigan miqdor qolgan miqdordan katta! "
+                f"Qolgan: {self.qolgan}, Qaytariladigan: {qaytariladigan_miqdor}"
+            )
+        
+        # Omborga qaytarish
+        if self.variant:
+            self.variant.miqdori += qaytariladigan_miqdor
+            self.variant.save(update_fields=['miqdori'])
+        else:
+            self.xomashyo.miqdori += qaytariladigan_miqdor
+            self.xomashyo.save(update_fields=['miqdori', 'updated_at'])
+        
+        # Ishlatilgan va qolgan miqdorni yangilash
+        self.ishlatilgan += (self.qolgan - qaytariladigan_miqdor)
+        self.qolgan = 0
+        self.save(update_fields=['ishlatilgan', 'qolgan'])

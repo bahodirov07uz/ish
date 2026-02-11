@@ -1,0 +1,653 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<!-- CSS kodingiz saqlanadi -->
+<link rel="stylesheet" href="{% static 'css/ish_qoshish.css' %}">
+
+<div class="app">
+    <div class="main-content">
+        
+
+        <main class="content">
+            <div class="page">
+                <div class="page-header">
+                    <div class="breadcrumb">
+                        <a href="/">Bosh sahifa</a>
+                        <span>/</span>
+                        <a href="">Ishlar</a>
+                        <span>/</span>
+                        <span>Yangi ish qo'shish</span>
+                    </div>
+                    <h2>Ish qo'shish</h2>
+                    <p>Ishchilarga yangi ish biriktirish</p>
+                </div>
+
+                {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        {% if message.tags == 'success' %}
+                        <path d="M7 10l3 3 6-6" />
+                        <circle cx="10" cy="10" r="8" />
+                        {% else %}
+                        <path d="M10 6v4m0 4h.01" />
+                        <circle cx="10" cy="10" r="8" />
+                        {% endif %}
+                    </svg>
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <div class="workers-table-card">
+                    <div class="card-header">
+                        <h3>Ishchilar ro'yxati</h3>
+                        <div class="search-box">
+                            <span class="search-icon">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="7" cy="7" r="5" />
+                                    <path d="M11 11l3 3" />
+                                </svg>
+                            </span>
+                            <input type="text" id="searchInput" placeholder="Ishchi qidirish...">
+                        </div>
+                    </div>
+
+                    {% if ishchilar %}
+                    <div class="table-container">
+                        <table id="workersTable">
+                            <thead>
+                                <tr>
+                                    <th>Ishchi</th>
+                                    <th>Lavozim</th>
+                                    <th>Mahsulot</th>
+                                    <th>Soni</th>
+                                    <th>Amal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ishchi in ishchilar %}
+                                <tr class="worker-row" data-turi="{{ ishchi.turi.nomi|lower }}">
+                                    <td>
+                                        <div class="worker-info">
+                                            <div class="worker-avatar">{{ ishchi.ism|slice:":1"|upper }}</div>
+                                            <div class="worker-details">
+                                                <span class="worker-name">{{ ishchi.ism }}</span>
+                                                <span class="worker-phone">{{ ishchi.telefon }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if ishchi.turi.nomi|lower == 'kroy' %}badge-warning{% elif ishchi.turi.nomi|lower == 'kosib' %}badge-success{% else %}badge-primary{% endif %}">
+                                            {{ ishchi.turi.nomi }}
+                                        </span>
+                                    </td>
+                                    <td colspan="3">
+                                        <form method="post" class="work-form" data-ishchi-turi="{{ ishchi.turi.nomi|lower }}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="ishchi" value="{{ ishchi.id }}">
+
+                                            <!-- ASOSIY FORM -->
+                                            <div class="form-group">
+                                                <select name="mahsulot" class="form-select mahsulot-select" required
+                                                    data-row="{{ forloop.counter }}"
+                                                    data-ishchi-turi="{{ ishchi.turi.nomi|lower }}">
+                                                    <option value="">Mahsulot...</option>
+                                                    {% for mahsulot in mahsulotlar %}
+                                                    <option value="{{ mahsulot.id }}"
+                                                        data-teri-sarfi="{{ mahsulot.teri_sarfi }}"
+                                                        data-astar-sarfi="{{ mahsulot.astar_sarfi }}">
+                                                        {{ mahsulot.nomi }}
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+
+                                                <input type="number" name="soni" class="form-input soni-input"
+                                                    placeholder="Soni" min="1" required data-row="{{ forloop.counter }}">
+
+                                                <button type="submit" class="btn btn-success">
+                                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M8 3v10M3 8h10" />
+                                                    </svg>
+                                                    Qo'shish
+                                                </button>
+                                            </div>
+
+                                            <!-- ZAKATOVKA UCHUN -->
+                                            {% if ishchi.turi.nomi|lower == 'zakatovka' %}
+                                            <div class="kroy-extra-fields" id="zakatovka-fields-{{ forloop.counter }}">
+                                                <div class="extra-field">
+                                                    <label class="field-label">🟦 Kroy xomashyosi (majburiy):</label>
+                                                    <select name="kroy_xomashyo" class="form-select kroy-select"
+                                                        required data-row="{{ forloop.counter }}">
+                                                        <option value="">Kroy xomashyo tanlang...</option>
+                                                    </select>
+                                                    <div class="info-badge" style="background: #dbeafe; color: #1e40af;">
+                                                        ℹ️ Kroy jarayonidan chiqqan yarim tayyor mahsulot
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- KROY UCHUN --> 
+{% if ishchi.turi.nomi|lower == 'kroy' %}
+<div class="kroy-extra-fields" id="kroy-fields-{{ forloop.counter }}">
+    <div class="row g-2"> <div class="col-md-6 border-end">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="small fw-bold text-primary">🔷 Teri xomashyo:</label>
+                <div class="sarf-badge">
+                    <input type="number" step="0.01" name="teri_sarfi_custom" 
+                           id="teri-sarf-{{ forloop.counter }}"
+                           class="odoo-style-input" 
+                           data-row="{{ forloop.counter }}"
+                           value="19.00"> <span class="small text-muted">Dm</span>
+                </div>
+            </div>
+            
+            <select name="teri_xomashyo" class="form-select form-select-sm xomashyo-select mb-1" required data-row="{{ forloop.counter }}" data-type="teri">
+                <option value="">Teri tanlang...</option>
+                {% for teri in terilar %}
+                <option value="{{ teri.id }}" data-miqdor="{{ teri.miqdori }}">{{ teri.nomi }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="variant-select-container" id="teri-variant-{{ forloop.counter }}" style="display:none;">
+                <select name="teri_variant" class="form-select form-select-sm variant-select"></select>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="small fw-bold text-warning">🔶 Astar xomashyo:</label>
+                <div class="sarf-badge">
+                    <input type="number" step="0.01" name="astar_sarfi_custom" 
+                           id="astar-sarf-{{ forloop.counter }}"
+                           class="odoo-style-input" 
+                           data-row="{{ forloop.counter }}"
+                           value="19.00">
+                    <span class="small text-muted">Dm</span>
+                </div>
+            </div>
+
+            <select name="astar_xomashyo" class="form-select form-select-sm xomashyo-select mb-1" data-row="{{ forloop.counter }}" data-type="astar">
+                <option value="">Astar kerak emas</option>
+                {% for astar in astarlar %}
+                <option value="{{ astar.id }}" data-miqdor="{{ astar.miqdori }}">{{ astar.nomi }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="variant-select-container" id="astar-variant-{{ forloop.counter }}" style="display:none;">
+                <select name="astar_variant" class="form-select form-select-sm variant-select"></select>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-1 py-1 px-2 bg-light rounded small border" id="sarflar-{{ forloop.counter }}">
+        <i class="fas fa-info-circle text-info"></i> Avtomatik hisoblash rejimi faol
+    </div>
+</div>
+{% endif %}
+
+                                            <!-- KOSIB UCHUN -->
+                                            {% if ishchi.turi.nomi|lower == 'kosib' %}
+                                            <div class="kroy-extra-fields" id="kosib-fields-{{ forloop.counter }}">
+                                                <!-- MAHSULOT VARIANT -->
+                                                <div class="extra-field">
+                                                    <label class="field-label">🎨 Mahsulot varianti:</label>
+                                                    <select name="mahsulot_variant" class="form-select variant-product-select" 
+                                                        data-row="{{ forloop.counter }}">
+                                                        <option value="">Avval mahsulot tanlang...</option>
+                                                    </select>
+                                                    
+                                                    <button type="button" class="btn-create-variant" 
+                                                        onclick="showVariantModal({{ forloop.counter }})">
+                                                        ➕ Yangi variant yaratish
+                                                    </button>
+                                                </div>
+
+                                                <!-- VARIANT MODAL -->
+                                                <div class="variant-modal" id="variant-modal-{{ forloop.counter }}">
+                                                    <div class="modal-content">
+                                                        <h4>Yangi variant yaratish</h4>
+                                                        <div class="form-group">
+                                                            <label>Rang:</label>
+                                                            <input type="text" class="form-input" 
+                                                                id="new-variant-rang-{{ forloop.counter }}" 
+                                                                placeholder="Qora, Oq, Jigarrang...">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label>Razmer:</label>
+                                                            <input type="text" class="form-input" 
+                                                                id="new-variant-razmer-{{ forloop.counter }}" 
+                                                                placeholder="38, 39, 40...">
+                                                        </div>
+                                                        <div class="modal-actions">
+                                                            <button type="button" class="btn btn-primary" 
+                                                                onclick="createNewVariant({{ forloop.counter }})">
+                                                                Yaratish
+                                                            </button>
+                                                            <button type="button" class="btn" 
+                                                                onclick="hideVariantModal({{ forloop.counter }})">
+                                                                Bekor qilish
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- ZAKATOVKA -->
+                                                <div class="extra-field">
+                                                    <label class="field-label">🟦 Zakatovka xomashyo (majburiy):</label>
+                                                    <select name="zakatovka_xomashyo" class="form-select zakatovka-select" 
+                                                        required data-row="{{ forloop.counter }}">
+                                                        <option value="">Avval mahsulot tanlang...</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- PADOJ -->
+                                                <div class="extra-field">
+                                                    <label class="field-label">🟨 Padoj xomashyo (majburiy):</label>
+                                                    <select name="padoj_xomashyo" class="form-select xomashyo-select"
+                                                        required data-row="{{ forloop.counter }}" data-type="padoj">
+                                                        <option value="">Padoj tanlang...</option>
+                                                        {% for padoj in padojlar %}
+                                                        <option value="{{ padoj.id }}"
+                                                            data-has-variants="{% if padoj.variantlar.exists %}true{% else %}false{% endif %}"
+                                                            data-miqdor="{{ padoj.miqdori }}">
+                                                            {{ padoj.nomi }} ({{ padoj.miqdori }} dona)
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+
+                                                    <div class="variant-select-container" id="padoj-variant-{{ forloop.counter }}">
+                                                        <span class="variant-label">📦 Variant tanlang:</span>
+                                                        <select name="padoj_variant" class="form-select variant-select"></select>
+                                                        <span class="variant-info-badge"></span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="info-badge" style="background: #dcfce7; color: #16a34a;">
+                                                    ✅ Product.soni va variant stock avtomatik ortadi
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="8" r="5" />
+                                <path d="M3 21c0-5 4-9 9-9s9 4 9 9" />
+                            </svg>
+                        </div>
+                        <h4 class="empty-title">Ishchilar topilmadi</h4>
+                        <p class="empty-description">Hozircha hech qanday ishchi ro'yxatga olinmagan</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ============================================================================
+    // QIDIRUV
+    // ============================================================================
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function (e) {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.worker-row').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+
+    // ============================================================================
+    // MAHSULOT O'ZGARGANDA
+    // ============================================================================
+    document.querySelectorAll('.mahsulot-select').forEach(select => {
+        select.addEventListener('change', function () {
+            const rowNum = this.dataset.row;
+            const ishchiTuri = this.dataset.ishchiTuri;
+            const mahsulotId = this.value;
+
+            const fields = document.getElementById(`${ishchiTuri}-fields-${rowNum}`);
+            if (fields) fields.classList.remove('show');
+
+            if (!mahsulotId) return;
+
+            if (ishchiTuri === 'zakatovka') {
+                const zakFields = document.getElementById(`zakatovka-fields-${rowNum}`);
+                if (zakFields) zakFields.classList.add('show');
+                loadKroyXomashyolar(mahsulotId, rowNum);
+            } else if (ishchiTuri === 'kroy') {
+                if (fields) {
+                    fields.classList.add('show');
+                    updateKroySarfInputs(this, rowNum);
+                }
+            } else if (ishchiTuri === 'kosib') {
+                if (fields) {
+                    fields.classList.add('show');
+                    loadZakatovkaXomashyolar(mahsulotId, rowNum);
+                    loadProductVariants(mahsulotId, rowNum);
+                }
+            }
+        });
+    });
+
+    // ============================================================================
+    // AJAX YUKLASH FUNKSIYALARI
+    // ============================================================================
+    function loadKroyXomashyolar(mahsulotId, rowNum) {
+        const select = document.querySelector(`.kroy-select[data-row="${rowNum}"]`);
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Yuklanmoqda...</option>';
+
+        fetch(`/uyapi/mahsulot/${mahsulotId}/kroy-xomashyolar/`)
+            .then(res => res.json())
+            .then(data => {
+                select.innerHTML = '<option value="">Kroy tanlang...</option>';
+                if (data.success && data.xomashyolar.length > 0) {
+                    data.xomashyolar.forEach(x => {
+                        select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
+                    });
+                } else {
+                    select.innerHTML = '<option value="">❌ Kroy jarayoni yo\'q</option>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                select.innerHTML = '<option value="">❌ Xatolik</option>';
+            });
+    }
+
+    function loadZakatovkaXomashyolar(mahsulotId, rowNum) {
+        const select = document.querySelector(`.zakatovka-select[data-row="${rowNum}"]`);
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Yuklanmoqda...</option>';
+
+        fetch(`/uyapi/mahsulot/${mahsulotId}/zakatovka-xomashyolar/`)
+            .then(res => res.json())
+            .then(data => {
+                select.innerHTML = '<option value="">Zakatovka tanlang...</option>';
+                if (data.success && data.xomashyolar.length > 0) {
+                    data.xomashyolar.forEach(x => {
+                        select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
+                    });
+                } else {
+                    select.innerHTML = '<option value="">❌ Zakatovka yo\'q</option>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                select.innerHTML = '<option value="">❌ Xatolik</option>';
+            });
+    }
+
+    function loadProductVariants(mahsulotId, rowNum) {
+        const variantSelect = document.querySelector(`.variant-product-select[data-row="${rowNum}"]`);
+        if (!variantSelect) return;
+
+        variantSelect.innerHTML = '<option value="">Yuklanmoqda...</option>';
+
+        fetch(`/uyapi/mahsulot/${mahsulotId}/variants/`)
+            .then(res => res.json())
+            .then(data => {
+                variantSelect.innerHTML = '<option value="">Variant tanlang...</option>';
+                if (data.success && data.variants.length > 0) {
+                    data.variants.forEach(v => {
+                        const label = `${v.rang || 'Rangsiz'} - ${v.razmer || 'Razmersiz'} (Stock: ${v.stock})`;
+                        variantSelect.innerHTML += `<option value="${v.id}" data-rang="${v.rang || ''}" data-razmer="${v.razmer || ''}">${label}</option>`;
+                    });
+                } else {
+                    variantSelect.innerHTML += '<option value="">Variant yo\'q - Yangi yarating</option>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                variantSelect.innerHTML = '<option value="">❌ Xatolik</option>';
+            });
+    }
+
+    // ============================================================================
+    // KROY SARFLAR
+    // ============================================================================
+    document.querySelectorAll('.soni-input').forEach(input => {
+        input.addEventListener('input', function() {
+            const rowNum = this.dataset.row;
+            const mahsulotSelect = document.querySelector(`.mahsulot-select[data-row="${rowNum}"][data-ishchi-turi="kroy"]`);
+            if (mahsulotSelect && mahsulotSelect.value) {
+                updateKroySarfInputs(mahsulotSelect, rowNum);
+            }
+        });
+    });
+
+    document.querySelectorAll('.teri-sarf-input, .astar-sarf-input').forEach(input => {
+        input.addEventListener('input', function() {
+            const rowNum = this.dataset.row;
+            updateSarflarDisplay(rowNum);
+        });
+    });
+
+    function updateKroySarfInputs(mahsulotSelect, rowNum) {
+        const selectedOption = mahsulotSelect.options[mahsulotSelect.selectedIndex];
+        const soniInput = document.querySelector(`.soni-input[data-row="${rowNum}"]`);
+        const teriSarfInput = document.querySelector(`.teri-sarf-input[data-row="${rowNum}"]`);
+        const astarSarfInput = document.querySelector(`.astar-sarf-input[data-row="${rowNum}"]`);
+
+        if (!selectedOption.value || !soniInput?.value) {
+            if (teriSarfInput) teriSarfInput.value = '';
+            if (astarSarfInput) astarSarfInput.value = '';
+            return;
+        }
+
+        const teriSarfiBir = parseFloat(selectedOption.dataset.teriSarfi) || 0;
+        const astarSarfiBir = parseFloat(selectedOption.dataset.astarSarfi) || 0;
+
+        if (teriSarfInput && !teriSarfInput.value) {
+            teriSarfInput.value = teriSarfiBir.toFixed(2);
+        }
+
+        if (astarSarfInput && !astarSarfInput.value && astarSarfiBir > 0) {
+            astarSarfInput.value = astarSarfiBir.toFixed(2);
+        }
+
+        updateSarflarDisplay(rowNum);
+    }
+
+    function updateSarflarDisplay(rowNum) {
+        const soniInput = document.querySelector(`.soni-input[data-row="${rowNum}"]`);
+        const teriSarfInput = document.querySelector(`.teri-sarf-input[data-row="${rowNum}"]`);
+        const astarSarfInput = document.querySelector(`.astar-sarf-input[data-row="${rowNum}"]`);
+        const sarflarInfo = document.getElementById(`sarflar-${rowNum}`);
+
+        if (!sarflarInfo) return;
+
+        const soni = parseInt(soniInput?.value) || 0;
+        const teriSarf = parseFloat(teriSarfInput?.value) || 0;
+        const astarSarf = parseFloat(astarSarfInput?.value) || 0;
+
+        if (soni > 0 && (teriSarf > 0 || astarSarf > 0)) {
+            let html = '<div style="display: grid; gap: 0.5rem;">';
+
+            if (teriSarf > 0) {
+                const teriJami = (teriSarf * soni).toFixed(2);
+                html += `<div style="display: flex; justify-content: space-between;">
+                    <span>🔷 Teri:</span>
+                    <strong style="color: var(--color-primary);">${teriSarf} kg × ${soni} = ${teriJami} kg</strong>
+                </div>`;
+            }
+
+            if (astarSarf > 0) {
+                const astarJami = (astarSarf * soni).toFixed(2);
+                html += `<div style="display: flex; justify-content: space-between;">
+                    <span>🔶 Astar:</span>
+                    <strong style="color: var(--color-warning);">${astarSarf} kg × ${soni} = ${astarJami} kg</strong>
+                </div>`;
+            }
+
+            html += '</div>';
+            sarflarInfo.innerHTML = html;
+            sarflarInfo.style.background = '#dcfce7';
+            sarflarInfo.style.borderLeft = '4px solid var(--color-success)';
+        } else {
+            sarflarInfo.innerHTML = '⚠️ Sonini va sarflarni kiriting';
+            sarflarInfo.style.background = 'var(--bg-secondary)';
+            sarflarInfo.style.borderLeft = 'none';
+        }
+    }
+
+    // ============================================================================
+    // FORM VALIDATSIYA
+    // ============================================================================
+    document.querySelectorAll('.work-form').forEach(form => {
+        form.addEventListener('submit', function (e) {
+            const ishchiTuri = form.dataset.ishchiTuri;
+            const mahsulot = form.querySelector('[name="mahsulot"]')?.value;
+            const soni = form.querySelector('[name="soni"]')?.value;
+
+            if (!mahsulot || !soni || soni < 1) {
+                e.preventDefault();
+                alert('❌ Iltimos barcha maydonlarni to\'ldiring!');
+                return;
+            }
+
+            if (ishchiTuri === 'zakatovka') {
+                const kroy = form.querySelector('[name="kroy_xomashyo"]');
+                if (!kroy?.value) {
+                    e.preventDefault();
+                    alert('❌ Zakatovka uchun kroy xomashyosi tanlash majburiy!');
+                    return;
+                }
+            }
+
+            if (ishchiTuri === 'kroy') {
+                const teri = form.querySelector('[name="teri_xomashyo"]');
+                if (!teri?.value) {
+                    e.preventDefault();
+                    alert('❌ Kroy uchun teri tanlash majburiy!');
+                    return;
+                }
+            }
+
+            if (ishchiTuri === 'kosib') {
+                const zakatovka = form.querySelector('[name="zakatovka_xomashyo"]');
+                const padoj = form.querySelector('[name="padoj_xomashyo"]');
+                if (!zakatovka?.value || !padoj?.value) {
+                    e.preventDefault();
+                    alert('❌ Kosib uchun zakatovka va padoj tanlash majburiy!');
+                    return;
+                }
+            }
+        });
+    });
+});
+
+// ============================================================================
+// VARIANT MODAL FUNKSIYALARI (Global scope)
+// ============================================================================
+function showVariantModal(rowNum) {
+    const modal = document.getElementById(`variant-modal-${rowNum}`);
+    if (modal) modal.style.display = 'flex';
+}
+
+function hideVariantModal(rowNum) {
+    const modal = document.getElementById(`variant-modal-${rowNum}`);
+    if (modal) modal.style.display = 'none';
+}
+
+function createNewVariant(rowNum) {
+    const rang = document.getElementById(`new-variant-rang-${rowNum}`).value.trim();
+    const razmer = document.getElementById(`new-variant-razmer-${rowNum}`).value.trim();
+
+    if (!rang && !razmer) {
+        alert('❌ Kamida rang yoki razmer kiriting!');
+        return;
+    }
+
+    const variantSelect = document.querySelector(`.variant-product-select[data-row="${rowNum}"]`);
+    if (variantSelect) {
+        const newOption = document.createElement('option');
+        newOption.value = 'new';
+        newOption.dataset.rang = rang;
+        newOption.dataset.razmer = razmer;
+        newOption.textContent = `🆕 Yangi: ${rang || 'Rangsiz'} - ${razmer || 'Razmersiz'}`;
+        newOption.selected = true;
+
+        variantSelect.appendChild(newOption);
+
+        const form = variantSelect.closest('form');
+
+        let rangInput = form.querySelector('input[name="variant_rang"]');
+        if (!rangInput) {
+            rangInput = document.createElement('input');
+            rangInput.type = 'hidden';
+            rangInput.name = 'variant_rang';
+            form.appendChild(rangInput);
+        }
+        rangInput.value = rang;
+
+        let razmerInput = form.querySelector('input[name="variant_razmer"]');
+        if (!razmerInput) {
+            razmerInput = document.createElement('input');
+            razmerInput.type = 'hidden';
+            razmerInput.name = 'variant_razmer';
+            form.appendChild(razmerInput);
+        }
+        razmerInput.value = razmer;
+    }
+
+    hideVariantModal(rowNum);
+
+    document.getElementById(`new-variant-rang-${rowNum}`).value = '';
+    document.getElementById(`new-variant-razmer-${rowNum}`).value = '';
+}
+</script>
+<script>document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('xomashyo-select')) {
+        const rowId = e.target.dataset.row;
+        const type = e.target.dataset.type; // 'teri' yoki 'astar'
+        const sarfInput = document.getElementById(`${type}-sarf-${rowId}`);
+        
+        // Bu yerda AJAX yoki oldindan yuklangan JSON orqali mahsulot sarfini olish mumkin
+        // Masalan, tanlangan mahsulotning default sarfi 19 bo'lsa:
+        let defaultSarf = 19.00; 
+        
+        sarfInput.value = defaultSarf.toFixed(2);
+        
+        // Effekt uchun inputni vaqtincha highlight qilish (ixtiyoriy)
+        sarfInput.style.backgroundColor = '#d4edda';
+        setTimeout(() => sarfInput.style.backgroundColor = 'transparent', 500);
+    }
+});
+
+// Input fokusdan chiqqanda qiymatni formatlash
+document.querySelectorAll('.odoo-style-input').forEach(input => {
+    input.addEventListener('blur', function() {
+        if(this.value) {
+            this.value = parseFloat(this.value).toFixed(2);
+            this.style.color = '#714B67'; // Odoo'da tahrirlangan qiymat rangi biroz o'zgarishi mumkin
+        }
+    });
+    
+    // Ustiga bosilganda matnni to'liq belgilash (tezkor tahrirlash uchun)
+    input.addEventListener('focus', function() {
+        this.select();
+    });
+});</script>
+{% endblock content %}

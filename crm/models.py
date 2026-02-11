@@ -1,12 +1,11 @@
 # crm/models
 from django.db import models,transaction
-from django.conf import settings
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
-from django.db.models import Sum
+from django.db.models import Sum,F
 from datetime import date
 from django.utils import timezone
-from xomashyo.models import XomashyoVariant,Xomashyo,XomashyoHarakat
+from xomashyo.models import Xomashyo
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name="Nomi")
@@ -28,17 +27,18 @@ class Product(models.Model):
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', verbose_name="Holati")
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="products", null=True, verbose_name="Kategoriya")
-    nomi = models.CharField(max_length=255, verbose_name="Nomi")
+    nomi = models.CharField(max_length=255, verbose_name="Nomi",unique=True)
     description = models.TextField(verbose_name="Tavsif")
     narxi = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Narxi")
-    soni = models.PositiveIntegerField(verbose_name="Ombordagi soni")
     image = models.ImageField(upload_to="products/", verbose_name="Rasm",null=True,blank=True)
     avg_profit = models.PositiveIntegerField(default=0, verbose_name="O'rtacha foyda")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan sana")
     narx_kosib = models.IntegerField(default=0, verbose_name="Kasb narxi")
     narx_zakatovka = models.IntegerField(default=0, verbose_name="Zakatovka narxi")
     narx_kroy = models.IntegerField(default=0, verbose_name="Kesish narxi")
+    narx_rezak = models.IntegerField(default=0, verbose_name="Rezak kesish narxi")
     narx_pardoz = models.IntegerField(default=0, verbose_name="Pardoza narxi")
+    soni = models.PositiveIntegerField(default=0,null=True,blank=True)
 
     teri_sarfi = models.DecimalField(
         max_digits=10, 
@@ -54,16 +54,22 @@ class Product(models.Model):
         help_text="1 ta mahsulot uchun astar sarfi (kg, m2 yoki dona)",
         verbose_name="Astar sarfi"
     )
-
     class Meta:
         verbose_name = "Mahsulot"
         verbose_name_plural = "Mahsulotlar"
+        constraints = [
+            models.UniqueConstraint(fields=["category", "nomi"], name="uniq_product_category_nomi"),
+        ]
+
+        
+    def product_total_stock(self):
+        return sum(v.stock for v in self.productvariant_set.all())
 
     def update_total_quantity(self):
         """Mahsulotning umumiy miqdorini variantlar miqdorlari yig'indisiga moslab yangilash."""
         self.soni = self.variants.aggregate(total=models.Sum('stock'))['total'] or 0
-        self.save()
-
+        Product.objects.filter(pk=self.pk).update(soni=self.soni)
+        
     @property
     def total_stock(self):
         """Umumiy mavjud mahsulot miqdorini qaytarish"""
@@ -81,7 +87,9 @@ class Product(models.Model):
             return self.narx_kroy
         elif category_name == "pardoz":
             return self.narx_pardoz
-
+        elif category_name == "rezak":
+            return self.narx_rezak
+        
 class ProductVariant(models.Model):
     product = models.ForeignKey(
         Product, 
@@ -91,7 +99,7 @@ class ProductVariant(models.Model):
     )
     stock = models.PositiveIntegerField(default=0, null=True, verbose_name="Qoldiq")
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, verbose_name="Narxi")
-    image = models.ImageField(upload_to='product/', null=True, verbose_name="Rasm")
+    image = models.ImageField(upload_to='product/', null=True,blank=True, verbose_name="Rasm")
     
     # YANGI FIELDLAR
     rang = models.CharField(
@@ -106,17 +114,15 @@ class ProductVariant(models.Model):
         default='', 
         verbose_name="Razmer"
     )
+    feature = models.ManyToManyField('Feature',null=True,blank=True)
+    sku = models.CharField(max_length=100,  blank=True, verbose_name="SKU")
+    barcode = models.CharField(max_length=100,  blank=True, verbose_name="Shtrix kod")
 
+    izoh = models.TextField(null=True,blank=True, verbose_name="izoh")
     class Meta:
         verbose_name = "Mahsulot varianti"
         verbose_name_plural = "Mahsulot variantlari"
-
-    def clean(self):
-        """Variant miqdorini tekshirish."""
-        if self.stock and self.product and self.stock > self.product.soni:
-            raise ValidationError(
-                f"Variant miqdori ({self.stock}) mahsulotning umumiy miqdoridan ({self.product.soni}) oshib ketdi."
-            )
+        unique_together = ("product", "rang","razmer")
 
     def __str__(self):
         parts = [self.product.nomi]
@@ -127,9 +133,11 @@ class ProductVariant(models.Model):
         return " | ".join(parts)
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Variant o'zgarganda Product.soni ni yangilash
-        self.product.update_total_quantity()
+        if not self.sku:
+            name_part = str(self.product.nomi).replace(" ", "").upper()
+            color_part = str(self.rang).replace(" ", "").upper()
+            self.sku = f"{name_part}-{color_part}-{self.razmer}"
+        super().save(*args, **kwargs) # Saqlash oxirida bo'lsin
     
     def delete(self, *args, **kwargs):
         """Variant o'chirilganda mahsulotning umumiy miqdorini yangilash."""
@@ -154,7 +162,6 @@ class Oyliklar(models.Model):
     )
     oylik = models.IntegerField(null=True, verbose_name="Oylik")
     yopilgan = models.BooleanField(default=False, verbose_name="Yopilgan")
-    ishlari = models.ForeignKey('EskiIsh', on_delete=models.CASCADE, null=True, related_name='oylik_ishlari', verbose_name="Ishlar")
 
     class Meta:
         verbose_name = "Oylik"
@@ -225,7 +232,7 @@ class Ishchi(models.Model):
             jami_soni=Sum('soni'),
             jami_summa=Sum('narxi')
         ).order_by('mahsulot__nomi')
-       
+
 class IshXomashyo(models.Model):
     """
     Ish va Xomashyo orasidagi bog'lanish
@@ -240,7 +247,7 @@ class IshXomashyo(models.Model):
     )
     
     xomashyo = models.ForeignKey(
-        Xomashyo,
+        'xomashyo.Xomashyo',
         on_delete=models.PROTECT,
         related_name='ish_xomashyolar',
         verbose_name="Xomashyo"
@@ -248,7 +255,7 @@ class IshXomashyo(models.Model):
     
     # Variant (ixtiyoriy)
     variant = models.ForeignKey(
-        XomashyoVariant,
+        'xomashyo.XomashyoVariant',
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -362,7 +369,6 @@ class IshXomashyo(models.Model):
                     pass
                 else:
                     # Oddiy xomashyo miqdorini kamaytirish
-                    self.xomashyo.miqdori -= self.miqdor
                     self.xomashyo.save(update_fields=['miqdori', 'updated_at'])
 
 class Ish(models.Model):
@@ -383,7 +389,7 @@ class Ish(models.Model):
 
     # Xomashyolar bilan bog'lanish (Through model orqali)
     xomashyolar = models.ManyToManyField(
-        Xomashyo,
+        'xomashyo.Xomashyo',
         through='IshXomashyo',
         related_name='ishlar',
         verbose_name="Xomashyolar"
@@ -406,6 +412,9 @@ class Ish(models.Model):
                 self.narxi = self.mahsulot.narx_kroy * int(self.soni)
             elif self.ishchi.turi.nomi == "pardozchi":
                 self.narxi = self.mahsulot.narx_pardoz * int(self.soni)
+            elif self.ishchi.turi == "rezak":
+                self.narxi = self.mahsulot.narx_rezak * int(self.soni)
+                
         super().save(*args, **kwargs)
         if self.ishchi and self.ishchi.turi and self.ishchi.turi.nomi == "kosib":
             from django.db.models import Sum
@@ -467,8 +476,10 @@ class Sotuv(models.Model):
     """Sotuvlar (xaridor mahsulot sotib olganda)"""
     xaridor = models.ForeignKey(Xaridor, on_delete=models.CASCADE, related_name="sales", verbose_name="Xaridor")
     mahsulot = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="sales", verbose_name="Mahsulot")
+    variant = models.ForeignKey(ProductVariant,on_delete=models.PROTECT,null=True,blank=True,verbose_name="Mahsulot variant")
     miqdor = models.PositiveIntegerField(verbose_name="Miqdor")
     umumiy_summa = models.DecimalField(max_digits=12, decimal_places=2, editable=False, verbose_name="Umumiy summa")
+    is_bundle = models.BooleanField(default=False, verbose_name="To'plamli sotuv?")
     sana = models.DateTimeField(default=timezone.now, verbose_name="Sana")
 
     class Meta:
@@ -476,15 +487,28 @@ class Sotuv(models.Model):
         verbose_name_plural = "Sotuvlar"
 
     def save(self, *args, **kwargs):
-        # Avtomatik umumiy summani hisoblash
-        self.umumiy_summa = self.mahsulot.narxi * self.miqdor
+        # 1. Narxni hisoblash
+        if self.is_bundle:
+            variants_in_bundle = ProductVariant.objects.filter(
+                product=self.mahsulot, rang=self.variant.rang
+            )
+            total_unit_price = sum(v.price for v in variants_in_bundle)
+            self.umumiy_summa = total_unit_price * self.miqdor
+        else:
+            self.umumiy_summa = self.variant.price * self.miqdor
+
+        # 2. Bazaga saqlash
         super().save(*args, **kwargs)
 
-        # ✅ Mahsulot sonini kamaytirish
-        self.mahsulot.soni = max(0, self.mahsulot.soni - self.miqdor)
-        self.mahsulot.save()
+        # 3. Stockni kamaytirish (F expression ishlatish eng xavfsiz yo'l)
+        if self.is_bundle:
+            variants_in_bundle.update(stock=models.F('stock') - self.miqdor)
+        else:
+            ProductVariant.objects.filter(pk=self.variant.pk).update(stock=models.F('stock') - self.miqdor)
 
-        # ✅ Shu sotuv uchun kirim yozuvi yaratish (agar mavjud bo'lmasa)
+        # 4. Umumiy sonini yangilash
+        self.mahsulot.update_total_quantity()
+
         Kirim.objects.get_or_create(
             sotuv=self,
             defaults={
@@ -493,22 +517,114 @@ class Sotuv(models.Model):
                 "summa": self.umumiy_summa,
                 "sana": self.sana,
             },
+            izoh=f"{self.miqdor} par {self.variant} sotilgan"
         )
 
     def __str__(self):
         return f"{self.xaridor.ism} - {self.mahsulot.nomi} ({self.miqdor} ta)"
 
 class Kirim(models.Model):
+    
     """Avtomatik yaratiladigan kirim yozuvi"""
     sotuv = models.OneToOneField(Sotuv, on_delete=models.CASCADE, related_name="kirim", verbose_name="Sotuv")
     xaridor = models.ForeignKey(Xaridor, on_delete=models.CASCADE, verbose_name="Xaridor")
     mahsulot = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Mahsulot")
     summa = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Summa")
     sana = models.DateTimeField(default=timezone.now, verbose_name="Sana")
-
+    izoh = models.TextField(null=True,blank=True)
     class Meta:
         verbose_name = "Kirim"
         verbose_name_plural = "Kirimlar"
 
     def __str__(self):
         return f"{self.mahsulot.nomi} - {self.summa} so'm ({self.xaridor.ism})"
+
+class Feature(models.Model):
+    name = models.CharField(max_length=300)
+    
+    def __str__(self):
+        return self.name
+      
+class Avans(models.Model):
+    
+    is_active =  models.BooleanField(default=True,null=True,blank=True, verbose_name="Aktivmi")
+    amount = models.PositiveIntegerField()
+    ishchi =  models.ForeignKey(Ishchi,on_delete=models.PROTECT)
+    created = models.DateField(default=timezone.now)    
+    ended = models.DateField(null=True,blank=True,verbose_name="yopilgan sana")
+    
+    def __str__(self):
+        return f"{self.ishchi.ism} {self.amount}"
+    
+
+class TeriSarfi(models.Model):
+    """
+    Kroy/Rezak ishchilari uchun teri sarfi
+    Har bir ish uchun bir nechta teri sarfi bo'lishi mumkin
+    """
+    ish = models.ForeignKey(
+        'Ish',
+        on_delete=models.CASCADE,
+        related_name='teri_sarflari',
+        verbose_name="Ish"
+    )
+    ishchi = models.ForeignKey(
+        'Ishchi',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='teri_sarflari',
+        verbose_name="Ishchi"
+    )
+    xomashyo = models.ForeignKey(
+        'xomashyo.Xomashyo',
+        on_delete=models.PROTECT,
+        related_name='teri_sarflari',
+        verbose_name="Teri"
+    )
+    # YANGI: Variant qo'llab-quvvatlash
+    variant = models.ForeignKey(
+        'xomashyo.XomashyoVariant',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='teri_sarflari',
+        verbose_name="Teri variant"
+    )
+    miqdor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Sarflangan miqdor"
+    )
+    sana = models.DateTimeField(default=timezone.now, verbose_name="Sana")
+
+    class Meta:
+        verbose_name = "Teri sarfi"
+        verbose_name_plural = "Teri sarflari"
+        ordering = ['-sana']
+    
+    def __str__(self):
+        variant_info = f" ({self.variant.rang})" if self.variant else ""
+        return f"{self.ish} | {self.xomashyo.nomi}{variant_info} | {self.miqdor}"
+
+    def save(self, *args, **kwargs):
+        """
+        DIQQAT: Teri sarfi faqat TeriSarfi modeliga yoziladi
+        Xomashyo miqdori KAMAYTILMAYDI (bu business logic asosida)
+        """
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """
+        TeriSarfi o'chirilsa - xomashyoga qaytarish
+        """
+        if self.variant:
+            self.variant.miqdori = F('miqdori') + self.miqdor
+            self.variant.save(update_fields=['miqdori'])
+        else:
+            self.xomashyo.miqdori = F('miqdori') + self.miqdor
+            self.xomashyo.save(update_fields=['miqdori', 'updated_at'])
+        
+        super().delete(*args, **kwargs)
+
+class testmodel(models.Model):
+    name =  models.CharField(max_length=2)

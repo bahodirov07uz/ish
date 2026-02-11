@@ -9,7 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'produtc/logo/logo.png' %}">
+
 </head>
 
 <style>
@@ -17,6 +19,41 @@
     background-color: #2563eb;
     color: #fff !important;
     border-radius: 8px;
+/* Sidebar orqasini qorong'ilatish (Overlay) */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 90; /* Sidebardan (100) pastroq bo'lishi kerak */
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed !important;
+        height: 100vh;
+        z-index: 100;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    /* Sidebar faol bo'lganda */
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Overlay faol bo'lganda */
+    .sidebar.active ~ .sidebar-overlay {
+        display: block;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+    }
+}
 }
 
 </style>
@@ -28,8 +65,6 @@
 
     {% endblock content %}
 </body>
-
-<script></script>
 
 
 

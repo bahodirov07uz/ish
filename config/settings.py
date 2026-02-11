@@ -14,10 +14,39 @@ LOGOUT_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'  
 LOGIN_URL = 'account_login'
 
-ACCOUNT_AUTHENTICATION_METHOD = "username"
-ACCOUNT_EMAIL_REQUIRED = False
-ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "none"
+
+ACCOUNT_LOGIN_METHODS = {'username'}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler', # Bu terminalga chiqaradi
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# ACCOUNT_EMAIL_REQUIRED va ACCOUNT_USERNAME_REQUIRED larni o'chirib, buni yozing:
+ACCOUNT_SIGNUP_FIELDS = ['email', 'username', 'password1', 'password2']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -36,9 +65,11 @@ INSTALLED_APPS = [
     'shop.apps.ShopConfig', 
     'xomashyo.apps.XomashyoConfig',
 ]
+
 CSRF_TRUSTED_ORIGINS = [
-    'https://f8153e1c12ee.ngrok-free.app'
+    'https://02a6e072b3a8.ngrok-free.app'
 ]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -106,9 +137,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
 LANGUAGE_CODE = 'uz'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Tashkent'
 
 USE_I18N = True
 

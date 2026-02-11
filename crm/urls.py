@@ -1,6 +1,5 @@
 
-from django.contrib import admin
-from django.urls import path,include
+from django.urls import path
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
@@ -48,6 +47,9 @@ urlpatterns = [
         checker.get_xomashyo_variants_api,
         name='api_xomashyo_variants'
     ),
+    path('api/mahsulot/<int:mahsulot_id>/variants/', 
+            checker.get_product_variants, 
+            name='get_product_variants'),
     path('api/mahsulot/<int:mahsulot_id>/kroy-xomashyolar/', 
         checker.get_kroy_xomashyolar_api, 
         name='get_kroy_xomashyolar'),

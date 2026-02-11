@@ -3,5 +3,11 @@ __pycache__
 uv.lock
 pyproject.toml
 static
+staticfiles
 media
 migrations
+db.sqlite3
+env
+readme
+*sqlite3
+.venv
