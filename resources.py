@@ -1,6 +1,6 @@
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
-from crm.models import Ishchi, IshchiCategory,Product,ProductVariant,Category,Ish,Chiqim,Kirim,ChiqimTuri,Feature
+from crm.models import Ishchi, IshchiCategory,Product,ProductVariant,Category,Ish,Chiqim,Kirim,ChiqimTuri,Sotuv,Xaridor,SotuvItem
 from xomashyo.models import Xomashyo, XomashyoCategory, YetkazibBeruvchi,XomashyoHarakat,XomashyoVariant
 from django.conf import settings
 
@@ -74,9 +74,13 @@ class ProductVariantResource(resources.ModelResource):
             'razmer',
             'stock',
             'price',
+            'type',
             'izoh'
             
         )
+        import_id_fields = ('product', 'rang', 'razmer')
+        skip_unchanged = True
+        report_skipped = True
 
 class XomashyoResource(resources.ModelResource):
     category = fields.Field(
@@ -167,3 +171,65 @@ class ChiqimResource(resources.ModelResource):
         model = Chiqim
         fields = ("id", "created", "name", "category_name", "price")
         export_order = ("id", "created", "name", "category_name", "price")
+
+class SotuvResource(resources.ModelResource):
+    xaridor_ism = fields.Field(
+        column_name="xaridor",
+        attribute="xaridor",
+        widget=CreateIfNotExistWidget(Xaridor,"ism")
+    )
+    
+    class Meta:
+        model = Xaridor
+        fields = ("id","ism","telefon","manzil")
+        export_order = ("id","ism","telefon","manzil" )
+        
+        
+from decimal import Decimal
+
+class SotuvItemResource(resources.ModelResource):
+    # Foreign key'larni ID orqali emas, aniq maydonlar orqali bog'lash uchun fields
+    sotuv = fields.Field(
+        column_name='sotuv_id',
+        attribute='sotuv',
+        widget=ForeignKeyWidget(Sotuv, 'id')
+    )
+    mahsulot = fields.Field(
+        column_name='mahsulot_nomi',
+        attribute='mahsulot',
+        widget=ForeignKeyWidget(Product, 'nomi') # Mahsulot nomi orqali qidirish
+    )
+    # Variantni tanlashda (mahsulot, rang, razmer) birikmasi muhim
+    # Lekin importda oson bo'lishi uchun variant_id ishlatish tavsiya etiladi
+    variant = fields.Field(
+        column_name='variant_id',
+        attribute='variant',
+        widget=ForeignKeyWidget(ProductVariant, 'id')
+    )
+
+    class Meta:
+        model = SotuvItem
+        fields = ('id', 'variant', 'sotuv', 'mahsulot','variant__rang', 'miqdor', 'narx', 'izoh')
+        export_order = fields
+        # Import qilinganda modeldagi save() metodini ishlatishga majburlash
+        force_init_instance = True 
+
+    def before_import_row(self, row, **kwargs):
+        """
+        Importdan oldin ma'lumotlarni tekshirish yoki o'zgartirish
+        """
+        # Masalan, narx decimal bo'lishini ta'minlash
+        if 'narx' in row and row['narx']:
+            row['narx'] = Decimal(str(row['narx']))
+        
+    def save_instance(self, instance, is_create, row, **kwargs):
+        """
+        Modelning save() metodini chaqirish orqali stock va summalarni 
+        avtomatik yangilanishini ta'minlaydi.
+        """
+        # Modelda yozilgan ValidationError yoki ValueError'larni tutib qolish
+        try:
+            super().save_instance(instance, is_create, row, **kwargs)
+        except ValueError as e:
+            # Xatolik bo'lsa import jarayonini to'xtatadi va xabarni ko'rsatadi
+            raise Exception(f"Qatorda xatolik: {str(e)}")

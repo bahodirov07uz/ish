@@ -1,262 +1,1112 @@
+<!-- sotuv html -->
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/sotuv_list.css'%}">
 
-    <div class="main-content">
-        <header class="header">
-            <div class="header-title">Sotuvlar</div>
-        </header>
+<style>
 
-        <main class="content">
-            <div class="page">
-                <div class="breadcrumb">
-                    <a href="/">Bosh sahifa</a>
-                    <span>/</span>
-                    <span>Sotuvlar</span>
+
+    .container-fluid {
+        max-width: 100%;
+        padding: 1rem 2rem;
+        background: var(--bg-primary);
+        min-height: 100vh;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    /* Form Section */
+    .form-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control,
+    .form-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        outline: none;
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    }
+
+    /* Tabs */
+    .tabs-container {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-weight: 500;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+        position: relative;
+        top: 2px;
+    }
+
+    .tab-btn.active {
+        color: var(--text-primary);
+        border-bottom-color: #4a9eff;
+    }
+
+    /* Products Table */
+    .products-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+    }
+
+    .search-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.5rem 0.75rem;
+        min-width: 300px;
+    }
+
+    .search-box input {
+        border: none;
+        background: none;
+        color: var(--text-primary);
+        outline: none;
+        width: 100%;
+        font-size: 0.875rem;
+    }
+
+    .search-box svg {
+        color: var(--text-secondary);
+    }
+
+    .btn-add {
+        background: #4a9eff;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .btn-add:hover {
+        background: #3a8eef;
+    }
+
+    .products-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .products-table thead {
+        background: var(--bg-tertiary);
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .products-table th {
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .products-table th:first-child {
+        width: 50px;
+        text-align: center;
+    }
+
+    .products-table tbody tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.15s;
+    }
+
+    .products-table tbody tr:hover {
+        background: var(--hover-bg);
+    }
+
+    .products-table tbody tr:nth-child(odd) {
+        background: var(--accent-yellow);
+    }
+
+    .products-table tbody tr:nth-child(even) {
+        background: var(--bg-primary);
+    }
+
+
+    .products-table td {
+        padding: 0.75rem;
+        color: var(--text-primary);
+    }
+
+    .product-number {
+        text-align: center;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    /* Searchable Select */
+    .custom-select-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .searchable-select {
+        position: relative;
+        width: 100%;
+    }
+
+    .select-trigger {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 38px;
+    }
+
+    .select-trigger:hover {
+        border-color: #4a9eff;
+    }
+
+    .select-trigger.active {
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    }
+
+    .select-value {
+        color: var(--text-primary);
+        font-size: 0.8125rem;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .select-value.placeholder {
+        color: var(--text-secondary);
+    }
+
+    .select-trigger svg {
+        color: var(--text-secondary);
+        flex-shrink: 0;
+        transition: transform 0.2s;
+    }
+
+    .select-trigger.active svg {
+        transform: rotate(180deg);
+    }
+
+    .select-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        max-height: 320px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .select-search {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+    }
+
+    .select-search svg {
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+
+    .select-search-input {
+        flex: 1;
+        border: none;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        outline: none;
+        font-size: 0.8125rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    .select-options {
+        overflow-y: auto;
+        max-height: 250px;
+    }
+
+    .select-options::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .select-options::-webkit-scrollbar-track {
+        background: var(--bg-secondary);
+    }
+
+    .select-options::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 4px;
+    }
+
+    .select-options::-webkit-scrollbar-thumb:hover {
+        background: #4a9eff;
+    }
+
+    .select-option {
+        padding: 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        font-size: 0.8125rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .select-option:last-child {
+        border-bottom: none;
+    }
+
+    .select-option:hover {
+        background: var(--hover-bg);
+    }
+
+    .select-option.selected {
+        background: #4a9eff;
+        color: white;
+    }
+
+    .select-option.no-results {
+        color: var(--text-secondary);
+        cursor: default;
+        text-align: center;
+    }
+
+    .select-option.no-results:hover {
+        background: transparent;
+    }
+
+    .product-select-hidden {
+        display: none !important;
+    }
+
+    .inline-input {
+        width: 80px;
+        padding: 0.4rem 0.6rem;
+        text-align: right;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.8125rem;
+        font-weight: 500;
+    }
+
+    .inline-input:focus {
+        outline: none;
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+    }
+
+    .remove-btn {
+        background: none;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        padding: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .products-table tbody tr:hover .remove-btn {
+        opacity: 1;
+    }
+
+    .remove-btn:hover {
+        color: #dc2626;
+    }
+
+    /* Summary */
+    .summary-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2rem;
+    }
+
+    .summary-box {
+        min-width: 300px;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+    }
+
+    .summary-label {
+        color: var(--text-secondary);
+        font-size: 0.9375rem;
+    }
+
+    .summary-value {
+        font-weight: 600;
+        font-size: 1.125rem;
+        color: var(--text-primary);
+    }
+
+    .summary-total {
+        border-top: 2px solid var(--border-color);
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+    }
+
+    .summary-total .summary-value {
+        font-size: 1.5rem;
+        color: #10b981;
+    }
+
+    /* Actions */
+    .actions-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .btn-submit {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+        background: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-cancel {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-cancel:hover {
+        background: var(--hover-bg);
+    }
+
+    /* Dropdown positioning fix */
+    .product-cell-wrapper {
+        position: relative;
+    }
+
+    .stock-info {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-left: 0.5rem;
+    }
+
+    .stock-warning {
+        color: #ef4444;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="breadcrumb">
+            <a href="/">Bosh sahifa</a>
+            <span>/</span>
+            <span>Sotuvlar</span>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}" style="margin: 1rem 0; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Bugungi sotuv</div>
+                <div class="stat-value">{{ bugungi_sotuv|intcomma }} so'm</div>
+                <small style="color: var(--text-secondary)">{{ bugungi_soni }} ta sotuv</small>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Bu oylik sotuv</div>
+                <div class="stat-value">{{ oylik_sotuv|floatformat:0|intcomma }} so'm</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">Jami sotuv</div>
+                <div class="stat-value">{{ jami_sotuv|floatformat:0|intcomma }} so'm</div>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'main:sotuv_qoshish' %}" id="sotuvForm">
+            {% csrf_token %}
+
+            <div class="form-section">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Xaridor turi</label>
+                        <select name="xaridor_turi" id="xaridorTuri" class="form-select" required>
+                            <option value="mavjud">Mavjud xaridor</option>
+                            <option value="yangi">Yangi xaridor</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="mavjudXaridor">
+                        <label class="form-label">Xaridor</label>
+                        <select name="xaridor" class="form-select" required>
+                            <option value="">Tanlang...</option>
+                            {% for xaridor in xaridorlar %}
+                                <option value="{{ xaridor.id }}">
+                                    {{ xaridor.ism }}{% if xaridor.telefon %} - {{ xaridor.telefon }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
 
-                <div class="page-header">
-                    <h2>Mahsulot sotish</h2>
-                    <p>Xaridorlarga mahsulot sotish va kirimlarni boshqarish</p>
-                </div>
-
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                {% if message.tags == 'success' %}
-                                    <path d="M7 10l3 3 6-6"/><circle cx="10" cy="10" r="8"/>
-                                {% else %}
-                                    <path d="M10 6v4m0 4h.01"/><circle cx="10" cy="10" r="8"/>
-                                {% endif %}
-                            </svg>
-                            {{ message }}
+                <div id="yangiXaridor" style="display: none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Ism</label>
+                            <input type="text" name="xaridor_ism" class="form-control" placeholder="Ism">
                         </div>
-                    {% endfor %}
-                {% endif %}
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <span>Bugungi sotuv</span>
-                            <div class="stat-icon stat-icon-success">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2v6m0 0v6m0-6h6m-6 0H6"/>
-                                </svg>
-                            </div>
+                        <div class="form-group">
+                            <label class="form-label">Telefon</label>
+                            <input type="tel" name="xaridor_telefon" class="form-control" placeholder="+998">
                         </div>
-                        <div class="stat-value">{{ bugungi_sotuv|intcomma }} so'm</div>
-                        <small style="color: var(--text-secondary)">{{ bugungi_soni }} ta sotuv</small>
                     </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <span>Bu oylik sotuv</span>
-                            <div class="stat-icon stat-icon-success">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="4" width="14" height="13" rx="2"/>
-                                    <path d="M3 8h14M7 4v3M13 4v3"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="stat-value">{{ oylik_sotuv|intcomma }} so'm</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <span>Jami sotuv</span>
-                            <div class="stat-icon stat-icon-success">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 3v14a2 2 0 0 0 2 2h14"/>
-                                    <path d="M7 13V8M12 13V6M17 13v-3"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="stat-value">{{ jami_sotuv|intcomma }} so'm</div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="form-card">
-                        <h3>Yangi sotuv</h3>
-                        <form method="post" action="{% url 'main:sotuv_qoshish' %}">
-                            {% csrf_token %}
-                            
-                            <div class="form-group">
-                                <label class="form-label required">Mahsulot</label>
-                                <select name="mahsulot" id="mahsulotSelect" class="form-select" required>
-                                    <option value="">Tanlang...</option>
-                                    {% for mahsulot in mahsulotlar %}
-                                        <option value="{{ mahsulot.id }}" 
-                                                data-narx="{{ mahsulot.narxi }}"
-                                                data-soni="{{ mahsulot.stock }}">
-                                            {{ mahsulot.product.nomi }} {{  mahsulot.rang}} - {{ mahsulot.price|intcomma }} so'm ({{ mahsulot.stock }} ta)
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label required">Miqdor</label>
-                                <input type="number" name="miqdor" id="miqdorInput" class="form-input" min="1" required>
-                                <small id="mavjudSoni" style="color: var(--text-secondary); font-size: 0.75rem;"></small>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label required">Xaridor</label>
-                                <select name="xaridor_turi" id="xaridorTuri" class="form-select" required>
-                                    <option value="mavjud">Mavjud xaridor</option>
-                                    <option value="yangi">Yangi xaridor</option>
-                                </select>
-                            </div>
-
-                            <div id="mavjudXaridor" class="form-group">
-                                <select name="xaridor" class="form-select">
-                                    <option value="">Tanlang...</option>
-                                    {% for xaridor in xaridorlar %}
-                                        <option value="{{ xaridor.id }}">
-                                            {{ xaridor.ism }}{% if xaridor.telefon %} - {{ xaridor.telefon }}{% endif %}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <div id="yangiXaridor" style="display: none;">
-                                <div class="form-group">
-                                    <input type="text" name="xaridor_ism" class="form-input" placeholder="Ism">
-                                </div>
-                                <div class="form-group">
-                                    <input type="tel" name="xaridor_telefon" class="form-input" placeholder="Telefon">
-                                </div>
-                                <div class="form-group">
-                                    <input type="text" name="xaridor_manzil" class="form-input" placeholder="Manzil">
-                                </div>
-                            </div>
-
-                            <div id="umumiySumma" style="padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius); margin-bottom: 1.25rem; display: none;">
-                                <small style="color: var(--text-secondary)">Umumiy summa:</small>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-success);" id="summaText">0 so'm</div>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M8 3v10M3 8h10"/>
-                                </svg>
-                                Sotish
-                            </button>
-                        </form>
-                    </div>
-
-                    <div class="list-card">
-                        <div class="card-header">
-                            <h3>So'nggi sotuvlar</h3>
-                        </div>
-                        
-                        <div class="filters">
-                            <a href="?date=bugun" class="filter-btn {% if request.GET.date == 'bugun' %}active{% endif %}">Bugun</a>
-                            <a href="?date=hafta" class="filter-btn {% if request.GET.date == 'hafta' %}active{% endif %}">Hafta</a>
-                            <a href="?date=oy" class="filter-btn {% if request.GET.date == 'oy' %}active{% endif %}">Oy</a>
-                            <a href="{% url 'main:sotuvlar' %}" class="filter-btn {% if not request.GET.date %}active{% endif %}">Barchasi</a>
-                        </div>
-
-                        {% if sotuvlar %}
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Xaridor</th>
-                                        <th>Mahsulot</th>
-                                        <th>Miqdor</th>
-                                        <th>Summa</th>
-                                        <th>Sana</th>
-                                        <th>Amal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for sotuv in sotuvlar %}
-                                    <tr>
-                                        <td>
-                                            <a href="{% url 'main:xaridor_detail' sotuv.xaridor.id %}" style="color: var(--color-primary);">
-                                                {{ sotuv.xaridor.ism }}
-                                            </a>
-                                        </td>
-                                        <td>{{ sotuv.mahsulot.nomi }}</td>
-                                        <td>{{ sotuv.miqdor }} ta</td>
-                                        <td><strong>{{ sotuv.umumiy_summa|intcomma }} so'm</strong></td>
-                                        <td>{{ sotuv.sana|date:"d.m.Y H:i" }}</td>
-                                        <td>
-                                            <form method="post" action="{% url 'main:sotuv_ochirish' sotuv.id %}" style="display: inline;">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-danger" onclick="return confirm('O\'chirmoqchimisiz?')">
-                                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
-                                                    </svg>
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali sotuvlar yo'q</p>
-                        {% endif %}
+                    <div class="form-group">
+                        <label class="form-label">Manzil</label>
+                        <input type="text" name="xaridor_manzil" class="form-control" placeholder="Manzil">
                     </div>
                 </div>
             </div>
-        </main>
+
+            <div class="tabs-container">
+                <button type="button" class="tab-btn active">Mahsulotlar</button>
+                <button type="button" class="tab-btn">Qo'shimcha</button>
+            </div>
+
+            <div class="products-section">
+                <div class="table-toolbar">
+                    <div class="search-box" id="globalSearchBox">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="7" cy="7" r="5"/>
+                            <path d="M11 11l3 3"/>
+                        </svg>
+                        <input type="text" id="globalSearchInput" placeholder="Mahsulot qidirish...">
+                    </div>
+                    <button type="button" class="btn-add" id="addProductBtn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M8 3v10M3 8h10"/>
+                        </svg>
+                        Qo'shish
+                    </button>
+                </div>
+
+                <table class="products-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Mahsulot</th>
+                            <th>Miqdor</th>
+                            <th>Birlik narxi</th>
+                            <th>Jami</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <tr class="product-row" data-index="0">
+                            <td class="product-number">1</td>
+                            <td>
+                                <div class="custom-select-wrapper">
+                                    <select name="mahsulot_0" class="form-select product-select-hidden" data-index="0" required style="display: none;">
+                                        <option value="">Tanlang...</option>
+                                        {% for mahsulot in mahsulotlar %}
+                                            <option value="{{ mahsulot.id }}" 
+                                                    data-narx="{{ mahsulot.price }}"
+                                                    data-soni="{{ mahsulot.stock }}"
+                                                    data-nomi="{{ mahsulot.product.nomi|lower }} {{ mahsulot.rang|lower }}"
+                                                    data-sku="{{ mahsulot.product.sku|default:''|lower }}">
+                                                {{ mahsulot.product.nomi }} {{ mahsulot.rang }} - {{ mahsulot.price|intcomma }} so'm ({{ mahsulot.stock }} ta)
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="searchable-select" data-index="0">
+                                        <div class="select-trigger" data-index="0">
+                                            <span class="select-value">Mahsulot tanlang...</span>
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M4 6l4 4 4-4"/>
+                                            </svg>
+                                        </div>
+                                        <div class="select-dropdown" data-index="0" style="display: none;">
+                                            <div class="select-search">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="7" cy="7" r="5"/>
+                                                    <path d="M11 11l3 3"/>
+                                                </svg>
+                                                <input type="text" class="select-search-input" data-index="0" placeholder="Qidirish..." autocomplete="off">
+                                            </div>
+                                            <div class="select-options" data-index="0"></div>
+                                        </div>
+                                    </div>
+                                    <div class="stock-warning" data-index="0"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="number" 
+                                       name="miqdor_0" 
+                                       class="inline-input miqdor-input" 
+                                       data-index="0" 
+                                       min="1" 
+                                       placeholder="0">
+                                <span class="stock-info" data-index="0"></span>
+                            </td>
+                            <td>
+                                <input type="number" 
+                                       name="narx_0" 
+                                       class="inline-input narx-input" 
+                                       data-index="0" 
+                                       step="0.01" 
+                                       min="0" 
+                                       placeholder="0.00">
+                            </td>
+                            <td class="item-total" data-index="0">0 so'm</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="summary-section" id="summarySection" style="display: none;">
+                <div class="summary-grid">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">Izoh</label>
+                            <textarea name="izoh" class="form-control" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">To'lov holati</label>
+                            <select name="tolov_holati" class="form-select">
+                                <option value="tolandi">To'landi</option>
+                                <option value="qisman">Qisman to'landi</option>
+                                <option value="tolanmadi">To'lanmadi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-row">
+                            <span class="summary-label">Jami summa:</span>
+                            <span class="summary-value" id="jamiSumma">0 so'm</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Chegirma:</span>
+                            <input type="number" name="chegirma" id="chegirmaInput" class="inline-input" min="0" step="0.01" value="0" style="width: 120px;">
+                        </div>
+                        <div class="summary-row summary-total">
+                            <span class="summary-label">Jami:</span>
+                            <span class="summary-value" id="yakuniySumma">0 so'm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-bar">
+                <button type="button" class="btn-cancel" onclick="window.location.href='{% url 'main:sotuvlar' %}'">Bekor qilish</button>
+                <button type="submit" class="btn-submit">Sotuvni saqlash</button>
+            </div>
+
+            <input type="hidden" name="items" id="itemsData">
+        </form>
     </div>
+</div>
 
-    <script>
-        const xaridorTuri = document.getElementById('xaridorTuri');
-        const mavjudXaridor = document.getElementById('mavjudXaridor');
-        const yangiXaridor = document.getElementById('yangiXaridor');
-        const mahsulotSelect = document.getElementById('mahsulotSelect');
-        const miqdorInput = document.getElementById('miqdorInput');
-        const mavjudSoni = document.getElementById('mavjudSoni');
-        const umumiySumma = document.getElementById('umumiySumma');
-        const summaText = document.getElementById('summaText');
-
-        xaridorTuri.addEventListener('change', function() {
-            if (this.value === 'yangi') {
-                mavjudXaridor.style.display = 'none';
-                yangiXaridor.style.display = 'block';
-                mavjudXaridor.querySelector('select').removeAttribute('required');
-                yangiXaridor.querySelector('input[name="xaridor_ism"]').setAttribute('required', 'required');
-            } else {
-                mavjudXaridor.style.display = 'block';
-                yangiXaridor.style.display = 'none';
-                mavjudXaridor.querySelector('select').setAttribute('required', 'required');
-                yangiXaridor.querySelector('input[name="xaridor_ism"]').removeAttribute('required');
+<script>
+    let productIndex = 1;
+    
+    // Get all products from select options
+    function getProductsFromSelect(selectElement) {
+        const products = [];
+        const options = selectElement.querySelectorAll('option');
+        
+        options.forEach(option => {
+            if (option.value) {
+                products.push({
+                    id: option.value,
+                    name: option.textContent.trim(),
+                    searchName: option.dataset.nomi || '',
+                    sku: option.dataset.sku || '',
+                    price: parseFloat(option.dataset.narx) || 0,
+                    stock: parseInt(option.dataset.soni) || 0
+                });
             }
         });
+        
+        return products;
+    }
 
-        function calculateSumma() {
-            const selectedOption = mahsulotSelect.options[mahsulotSelect.selectedIndex];
-            const narx = parseFloat(selectedOption.getAttribute('data-narx'));
-            const soni = parseInt(selectedOption.getAttribute('data-soni'));
-            const miqdor = parseInt(miqdorInput.value);
+    // Xaridor turi
+    document.getElementById('xaridorTuri').addEventListener('change', function() {
+        const mavjud = document.getElementById('mavjudXaridor');
+        const yangi = document.getElementById('yangiXaridor');
+        
+        if (this.value === 'yangi') {
+            mavjud.style.display = 'none';
+            yangi.style.display = 'block';
+            mavjud.querySelector('select').removeAttribute('required');
+            yangi.querySelector('input[name="xaridor_ism"]').setAttribute('required', 'required');
+        } else {
+            mavjud.style.display = 'block';
+            yangi.style.display = 'none';
+            mavjud.querySelector('select').setAttribute('required', 'required');
+            yangi.querySelector('input[name="xaridor_ism"]').removeAttribute('required');
+        }
+    });
 
-            if (soni) {
-                mavjudSoni.textContent = `Mavjud: ${soni} ta`;
-                if (miqdor > soni) {
-                    mavjudSoni.style.color = 'var(--color-danger)';
-                } else {
-                    mavjudSoni.style.color = 'var(--text-secondary)';
-                }
+    // Setup searchable select
+    function setupSearchableSelect(wrapper, index) {
+        const hiddenSelect = wrapper.querySelector('.product-select-hidden');
+        const trigger = wrapper.querySelector('.select-trigger');
+        const dropdown = wrapper.querySelector('.select-dropdown');
+        const searchInput = wrapper.querySelector('.select-search-input');
+        const optionsContainer = wrapper.querySelector('.select-options');
+        const valueSpan = trigger.querySelector('.select-value');
+        
+        const products = getProductsFromSelect(hiddenSelect);
+        
+        // Toggle dropdown
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isActive = trigger.classList.contains('active');
+            
+            // Close all other dropdowns
+            document.querySelectorAll('.select-trigger.active').forEach(t => {
+                t.classList.remove('active');
+                t.parentElement.querySelector('.select-dropdown').style.display = 'none';
+            });
+            
+            if (!isActive) {
+                trigger.classList.add('active');
+                dropdown.style.display = 'block';
+                searchInput.value = '';
+                searchInput.focus();
+                renderOptions(products, optionsContainer, hiddenSelect, trigger, dropdown, index);
             }
+        });
+        
+        // Search functionality
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                renderOptions(products, optionsContainer, hiddenSelect, trigger, dropdown, index);
+                return;
+            }
+            
+            const filtered = products.filter(p => {
+                const matchName = p.searchName.includes(searchTerm);
+                const matchSku = p.sku.includes(searchTerm);
+                const matchDisplay = p.name.toLowerCase().includes(searchTerm);
+                return matchName || matchSku || matchDisplay;
+            });
+            
+            renderOptions(filtered, optionsContainer, hiddenSelect, trigger, dropdown, index);
+        });
+        
+        // Close on outside click
+        document.addEventListener('click', function(e) {
+            if (!wrapper.contains(e.target)) {
+                trigger.classList.remove('active');
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+    
+    function renderOptions(products, container, selectElement, trigger, dropdown, index) {
+        if (products.length === 0) {
+            container.innerHTML = '<div class="select-option no-results">Mahsulot topilmadi</div>';
+            return;
+        }
+        
+        container.innerHTML = products.map(product => `
+            <div class="select-option" 
+                 data-value="${product.id}"
+                 data-name="${product.name}"
+                 data-price="${product.price}"
+                 data-stock="${product.stock}">
+                ${product.name}
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        container.querySelectorAll('.select-option').forEach(option => {
+            option.addEventListener('click', function() {
+                if (this.classList.contains('no-results')) return;
+                
+                const value = this.dataset.value;
+                const name = this.dataset.name;
+                const price = this.dataset.price;
+                const stock = this.dataset.stock;
+                
+                // Update hidden select
+                selectElement.value = value;
+                
+                // Update trigger display
+                const valueSpan = trigger.querySelector('.select-value');
+                valueSpan.textContent = name;
+                valueSpan.classList.remove('placeholder');
+                
+                // Close dropdown
+                trigger.classList.remove('active');
+                dropdown.style.display = 'none';
+                
+                // Update price
+                const narxInput = document.querySelector(`input[name="narx_${index}"]`);
+                if (narxInput) {
+                    narxInput.value = price;
+                }
+                
+                // Show stock
+                const stockInfo = document.querySelector(`.stock-warning[data-index="${index}"]`);
+                if (stockInfo) {
+                    stockInfo.textContent = `Mavjud: ${stock} ta`;
+                    stockInfo.style.color = 'var(--text-secondary)';
+                    stockInfo.style.fontSize = '0.75rem';
+                    stockInfo.style.marginTop = '0.25rem';
+                }
+                
+                // Focus on quantity
+                const miqdorInput = document.querySelector(`input[name="miqdor_${index}"]`);
+                if (miqdorInput) {
+                    miqdorInput.focus();
+                }
+                
+                calculateItemTotal(index);
+            });
+        });
+    }
 
-            if (narx && miqdor && miqdor > 0) {
-                const jami = narx * miqdor;
-                summaText.textContent = jami.toLocaleString() + ' so\'m';
-                umumiySumma.style.display = 'block';
-            } else {
-                umumiySumma.style.display = 'none';
+    // Mahsulot qo'shish
+    document.getElementById('addProductBtn').addEventListener('click', function() {
+        const tbody = document.getElementById('productsTableBody');
+        const firstRow = tbody.querySelector('.product-row');
+        const newRow = firstRow.cloneNode(true);
+        
+        newRow.setAttribute('data-index', productIndex);
+        newRow.querySelector('.product-number').textContent = productIndex + 1;
+        
+        // Update all data-index attributes
+        newRow.querySelectorAll('[data-index]').forEach(el => {
+            el.dataset.index = productIndex;
+        });
+        
+        // Update input names
+        newRow.querySelectorAll('[name]').forEach(input => {
+            const name = input.getAttribute('name');
+            if (name) {
+                input.setAttribute('name', name.replace(/_\d+$/, `_${productIndex}`));
+            }
+        });
+        
+        // Clear values
+        newRow.querySelectorAll('input').forEach(input => {
+            if (input.type !== 'hidden') {
+                input.value = '';
+            }
+        });
+        
+        // Reset select
+        const select = newRow.querySelector('.product-select-hidden');
+        if (select) {
+            select.selectedIndex = 0;
+        }
+        
+        // Reset trigger
+        const valueSpan = newRow.querySelector('.select-value');
+        valueSpan.textContent = 'Mahsulot tanlang...';
+        valueSpan.classList.add('placeholder');
+        
+        // Reset displays
+        newRow.querySelector('.item-total').textContent = '0 so\'m';
+        const stockWarning = newRow.querySelector('.stock-warning');
+        if (stockWarning) {
+            stockWarning.textContent = '';
+        }
+        
+        // Add remove button
+        const lastTd = newRow.querySelector('td:last-child');
+        lastTd.innerHTML = `
+            <button type="button" class="remove-btn" onclick="this.closest('tr').remove(); updateRowNumbers(); calculateTotal();">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                </svg>
+            </button>
+        `;
+        
+        tbody.appendChild(newRow);
+        
+        // Setup new row
+        const wrapper = newRow.querySelector('.custom-select-wrapper');
+        setupSearchableSelect(wrapper, productIndex);
+        setupRowEvents(newRow, productIndex);
+        
+        productIndex++;
+        updateRowNumbers();
+    });
+
+    function setupRowEvents(row, index) {
+        row.querySelector('.miqdor-input').addEventListener('input', function() {
+            calculateItemTotal(index);
+        });
+        
+        row.querySelector('.narx-input').addEventListener('input', function() {
+            calculateItemTotal(index);
+        });
+    }
+
+    function calculateItemTotal(index) {
+        const row = document.querySelector(`.product-row[data-index="${index}"]`);
+        if (!row) return;
+        
+        const miqdor = parseFloat(row.querySelector('.miqdor-input').value) || 0;
+        const narx = parseFloat(row.querySelector('.narx-input').value) || 0;
+        const total = miqdor * narx;
+        
+        row.querySelector('.item-total').textContent = total > 0 ? total.toLocaleString() + ' so\'m' : '0 so\'m';
+        
+        // Stock check
+        const select = row.querySelector('.product-select-hidden');
+        const stockWarning = row.querySelector('.stock-warning');
+        
+        if (select && select.value) {
+            const selectedOption = select.options[select.selectedIndex];
+            const stock = parseInt(selectedOption.dataset.soni) || 0;
+            
+            if (miqdor > stock) {
+                stockWarning.textContent = `⚠️ Omborda faqat ${stock} ta mavjud!`;
+                stockWarning.style.color = '#ef4444';
+            } else if (miqdor > 0) {
+                stockWarning.textContent = `Mavjud: ${stock} ta`;
+                stockWarning.style.color = 'var(--text-secondary)';
             }
         }
+        
+        calculateTotal();
+    }
 
-        mahsulotSelect.addEventListener('change', calculateSumma);
-        miqdorInput.addEventListener('input', calculateSumma);
-    </script>
+    function calculateTotal() {
+        let total = 0;
+        
+        document.querySelectorAll('.product-row').forEach(row => {
+            const miqdor = parseFloat(row.querySelector('.miqdor-input').value) || 0;
+            const narx = parseFloat(row.querySelector('.narx-input').value) || 0;
+            total += miqdor * narx;
+        });
+        
+        const summarySection = document.getElementById('summarySection');
+        
+        if (total > 0) {
+            summarySection.style.display = 'block';
+            document.getElementById('jamiSumma').textContent = total.toLocaleString() + ' so\'m';
+            
+            const chegirma = parseFloat(document.getElementById('chegirmaInput').value) || 0;
+            const yakuniy = Math.max(0, total - chegirma);
+            
+            document.getElementById('yakuniySumma').textContent = yakuniy.toLocaleString() + ' so\'m';
+        } else {
+            summarySection.style.display = 'none';
+        }
+    }
+
+    function updateRowNumbers() {
+        document.querySelectorAll('.product-row').forEach((row, index) => {
+            row.querySelector('.product-number').textContent = index + 1;
+        });
+    }
+
+    // Chegirma
+    document.getElementById('chegirmaInput').addEventListener('input', calculateTotal);
+
+    // Form submit
+    document.getElementById('sotuvForm').addEventListener('submit', function(e) {
+        const items = [];
+        
+        document.querySelectorAll('.product-row').forEach(row => {
+            const select = row.querySelector('.product-select-hidden');
+            const miqdor = row.querySelector('.miqdor-input').value;
+            const narx = row.querySelector('.narx-input').value;
+            
+            if (select && select.value && miqdor && narx) {
+                items.push({
+                    variant_id: select.value,
+                    miqdor: parseInt(miqdor),
+                    narx: parseFloat(narx)
+                });
+            }
+        });
+        
+        if (items.length === 0) {
+            e.preventDefault();
+            alert('Iltimos, kamida bitta mahsulot qo\'shing!');
+            return;
+        }
+        
+        document.getElementById('itemsData').value = JSON.stringify(items);
+    });
+
+    // Initialize first row
+    const firstWrapper = document.querySelector('.custom-select-wrapper');
+    if (firstWrapper) {
+        setupSearchableSelect(firstWrapper, 0);
+        setupRowEvents(document.querySelector('.product-row'), 0);
+    }
+</script>
 {% endblock content %}

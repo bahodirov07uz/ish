@@ -120,29 +120,34 @@
                             </div>
                             
                             {% if sotuvlar %}
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Mahsulot</th>
-                                            <th>Miqdor</th>
-                                            <th>Summa</th>
-                                            <th>Sana</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for sotuv in sotuvlar %}
-                                        <tr>
-                                            <td>{{ sotuv.mahsulot.nomi }}</td>
-                                            <td>{{ sotuv.miqdor }} ta</td>
-                                            <td><strong>{{ sotuv.umumiy_summa|intcomma }} so'm</strong></td>
-                                            <td>{{ sotuv.sana|date:"d.m.Y H:i" }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                            {% for sotuv in sotuvlar %}
+                                <div class="sotuv-box">
+                                    <h4>Sotuv #{{ sotuv.id }} - {{ sotuv.sana|date:"d.m.Y" }}</h4>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Mahsulot</th>
+                                                <th>Miqdor</th>
+                                                <th>Narx</th>
+                                                <th>Jami</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in sotuv.items.all %}
+                                            <tr>
+                                                <td>{{ item.mahsulot.nomi }} ({{ item.variant }})</td>
+                                                <td>{{ item.miqdor }}</td>
+                                                <td>{{ item.narx }}</td>
+                                                <td>{{ item.jami }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endfor %}
                             {% else %}
                                 <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali xaridlar yo'q</p>
-                            {% endif %}
+                            {% endif%}
                         </div>
                     </div>
                 </div>

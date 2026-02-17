@@ -21,11 +21,17 @@ urlpatterns = [
     
     path('ish-qoshish/', views.IshQoshishView.as_view(), name='ish_qoshish'),
     
-    #sotuvlar
+    # sotuvlar
     path('sotuvlar/', views.SotuvListView.as_view(), name='sotuvlar'),
-    path('sotuvlar/qoshish/', views.sotuv_qoshish, name='sotuv_qoshish'),
-    path('sotuvlar/<int:pk>/ochirish/', views.sotuv_ochirish, name='sotuv_ochirish'),
-    
+    path('sotuv/qoshish/', views.sotuv_qoshish, name='sotuv_qoshish'),
+    path('sotuv/<int:sotuv_id>/ochirish/', views.sotuv_ochirish, name='sotuv_ochirish'),
+    path('sotuv/detail/<int:pk>/',views.SotuvDetailView.as_view(),name="sotuv_detail"),
+    # Sotuv itemlari
+    path('sotuv/<int:sotuv_id>/item/qoshish/', views.sotuv_item_qoshish, name='sotuv_item_qoshish'),
+    path('sotuv/item/<int:item_id>/tahrirlash/', views.sotuv_item_tahrirlash, name='sotuv_item_tahrirlash'),
+    path('sotuv/item/<int:item_id>/ochirish/', views.sotuv_item_ochirish, name='sotuv_item_ochirish'),
+    path('api/variant/<int:variant_id>/', views.get_variant_info, name='get_variant_info'),
+
     # Kirimlar
     path('kirimlar/', views.KirimListView.as_view(), name='kirimlar'),
 

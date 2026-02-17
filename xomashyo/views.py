@@ -8,163 +8,276 @@ import decimal
 from decimal import Decimal
 from django.db import transaction
 from django.contrib.auth.decorators import login_required,user_passes_test
+from django.core.serializers.json import DjangoJSONEncoder
 
 from django.utils.decorators import method_decorator
 
 from django.db.models.functions import Coalesce
-from crm.models import Chiqim, ChiqimTuri,Ishchi
+from crm.models import Chiqim, ChiqimTuri,Ishchi,ChiqimItem
 from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,Taminlash,TaminlashItem,XomashyoVariant
 from crm.views import AdminRequiredMixin,is_admin
+import json
 
-class ChiqimListView(AdminRequiredMixin,ListView):
+def _parse_sana(sana_str):
+    """
+    'YYYY-MM-DD' formatidan date obyekti qaytaradi.
+    Bo'sh yoki noto'g'ri bo'lsa bugungi sana.
+    """
+    if sana_str:
+        try:
+            return datetime.strptime(sana_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    return date.today()
+
+
+def _xomashyo_to_dict(x):
+    """Xomashyo → JSON-safe dict (JS uchun)."""
+    narx = float(x.narxi) if x.narxi else 0
+    cat  = x.category.name if x.category_id else ''
+    label = x.nomi + (f' ({cat})' if cat else '') + f" — {narx:,.0f} so'm/{x.get_olchov_birligi_display()}"
+    return {
+        'id':     str(x.id),
+        'label':  label,
+        'search': x.nomi.lower(),
+        'narx':   narx,
+        'olchov': x.get_olchov_birligi_display(),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────
+# LIST VIEW
+# ─────────────────────────────────────────────────────────────────
+
+class ChiqimListView(AdminRequiredMixin, ListView):
     model = Chiqim
     template_name = 'chiqim.html'
     context_object_name = 'chiqimlar'
     ordering = ['-created']
     paginate_by = 50
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = date.today()
-        
+
         context['bugungi_chiqim'] = Chiqim.objects.filter(
             created=today
         ).aggregate(Sum('price'))['price__sum'] or 0
-        
+
         context['oylik_chiqim'] = Chiqim.objects.filter(
             created__year=today.year,
-            created__month=today.month
+            created__month=today.month,
         ).aggregate(Sum('price'))['price__sum'] or 0
-        
+
         context['jami_chiqim'] = Chiqim.objects.aggregate(
             Sum('price')
         )['price__sum'] or 0
-        
-        context['xomashyolar'] = Xomashyo.objects.filter(
+
+        # today_str → HTML date input uchun default qiymat
+        context['today_str'] = today.strftime('%Y-%m-%d')
+
+        xomashyolar    = Xomashyo.objects.filter(
             holati='active'
-        ).order_by('nomi')
-        
-        context['chiqim_turlari'] = ChiqimTuri.objects.all()
+        ).select_related('category').order_by('nomi')
+        chiqim_turlari = ChiqimTuri.objects.all()
+
+        context['xomashyolar']         = xomashyolar
+        context['chiqim_turlari']       = chiqim_turlari
         context['yetkazib_beruvchilar'] = YetkazibBeruvchi.objects.all()
-        
+
+        # json_script filter o'zi serialize qiladi — json.dumps ishlatmang
+        context['xomashyo_json'] = [_xomashyo_to_dict(x) for x in xomashyolar]
+        context['cats_json']     = [{'id': str(t.id), 'name': t.name} for t in chiqim_turlari]
         return context
 
-@login_required(login_url="login")
-@user_passes_test(is_admin,login_url="login")
-def chiqim_qoshish(request):
-    if request.method == 'POST':
-        chiqim_turi = request.POST.get('chiqim_turi')
-        
-        try:
-            if chiqim_turi == 'xomashyo':
-                xomashyo_id = request.POST.get('xomashyo')
-                miqdor = request.POST.get('miqdor')
-                narx = request.POST.get('xomashyo_narx')
-                yetkazib_beruvchi_id = request.POST.get('yetkazib_beruvchi')
-                izoh = request.POST.get('izoh', '')
-                print(f"DEBUG {narx} {miqdor}")
-                if not xomashyo_id:
-                    messages.error(request, 'Xomashyoni tanlang!')
-                    return redirect('crm:chiqimlar')
-                
-                if not miqdor or Decimal(miqdor) <= 0:
-                    messages.error(request, 'Miqdorni to\'g\'ri kiriting!')
-                    return redirect('crm:chiqimlar')
-                
-                xomashyo = get_object_or_404(Xomashyo, id=xomashyo_id)
-                miqdor_decimal = Decimal(miqdor)
-                try:
-                    
-                    if narx:
-                        narx_decimal = Decimal(narx)
-                    else:
-                        # Agar narx kiritilmagan bo'lsa, xomashyoning narxidan hisoblash
-                        narx_decimal = xomashyo.narxi * miqdor_decimal
-                except (decimal.InvalidOperation,TypeError):
-                    messages.error(request,"Narx noto‘g‘ri formatda!")
-                    return redirect("main:chiqimlar")
-                
-                # Yetkazib beruvchi
-                yetkazib_beruvchi = None
-                if yetkazib_beruvchi_id:
-                    yetkazib_beruvchi = YetkazibBeruvchi.objects.get(id=yetkazib_beruvchi_id)
-                
-                # 1. Chiqim obyektini yaratadi (save metodida)
-                XomashyoHarakat.objects.create(
-                    xomashyo=xomashyo,
-                    harakat_turi='kirim',
-                    miqdori=miqdor_decimal,
-                    narxi=narx_decimal,
-                    izoh=izoh or f"{xomashyo.nomi} sotib olindi",
-                    yetkazib_beruvchi=yetkazib_beruvchi,
-                    foydalanuvchi=request.user if request.user.is_authenticated else None
-                )
-                category_obj, created = ChiqimTuri.objects.get_or_create(name="xarajat")
-                
-                Chiqim.objects.create(
-                    name=f"Xarajat {xomashyo} {miqdor} uchun",
-                    category=category_obj,
-                    price=narx_decimal
-                )
-                messages.success(
-                    request, 
-                    f"✅ {xomashyo.nomi} ({miqdor_decimal} {xomashyo.get_olchov_birligi_display()}) "
-                    f"muvaffaqiyatli sotib olindi! Chiqim avtomatik yaratildi."
-                )
-                
-            elif chiqim_turi == 'boshqa':
-                # Oddiy chiqim
-                name = request.POST.get('name')
-                price = request.POST.get('price')
-                category_id = request.POST.get('category')
-                
-                # Validatsiya
-                if not name:
-                    messages.error(request, 'Chiqim nomini kiriting!')
-                    return redirect('crm:chiqimlar')
-                
-                if not price or int(price) <= 0:
-                    messages.error(request, 'Narxni to\'g\'ri kiriting!')
-                    return redirect('crm:chiqimlar')
-                
-                # Kategoriya
-                category = None
-                if category_id:
-                    category = ChiqimTuri.objects.get(id=category_id)
-                
-                # Chiqim yaratish
-                Chiqim.objects.create(
-                    name=name,
-                    price=int(price),
-                    category=category
-                )
-                
-                messages.success(request, f"✅ {name} chiqimi muvaffaqiyatli qo'shildi!")
-            
-            else:
-                messages.error(request, 'Chiqim turini tanlang!')
-                
-        except decimal.InvalidOperation:
-            messages.error(request, 'Son formatida xatolik!')
-        except Exception as e:
-            messages.error(request, f'❌ Xatolik: {str(e)}')
-    
-    return redirect('xomashyo:chiqimlar')
+
+# ─────────────────────────────────────────────────────────────────
+# CHIQIM QO'SHISH
+# ─────────────────────────────────────────────────────────────────
 
 @login_required(login_url="login")
-@user_passes_test(is_admin,login_url="login")
-def chiqim_ochirish(request, pk):
-    """Chiqimni o'chirish"""
-    if request.method == 'POST':
-        try:
-            chiqim = get_object_or_404(Chiqim, id=pk)
-            chiqim_nomi = chiqim.name
-            chiqim.delete()
-            messages.success(request, f"✅ {chiqim_nomi} o'chirildi!")
-        except Exception as e:
-            messages.error(request, f'❌ Xatolik: {str(e)}')
-    
+@user_passes_test(lambda u: u.is_staff, login_url="login")
+def chiqim_qoshish(request):
+    """
+    POST fields:
+      chiqim_turi       = 'xomashyo' | 'boshqa'
+      sana              = 'YYYY-MM-DD'   (ixtiyoriy, default: bugun)
+      yetkazib_beruvchi = <id>           (xomashyo uchun, ixtiyoriy)
+      izoh              = '...'          (ixtiyoriy)
+      items             = JSON string
+
+    items JSON (xomashyo):
+      [{"xomashyo_id": 1, "miqdor": 5, "birlik_narx": 12000, "narx": 60000}, ...]
+      - birlik_narx: tahrirlangan birlik narxi
+      - narx: miqdor × birlik_narx (jami)
+
+    items JSON (boshqa):
+      [{"name": "Elektr", "narx": "120000", "category_id": 2}, ...]
+    """
+    if request.method != 'POST':
+        return redirect('xomashyo:chiqimlar')
+
+    chiqim_turi = request.POST.get('chiqim_turi')
+    izoh_umumiy = request.POST.get('izoh', '').strip()
+    yb_id       = request.POST.get('yetkazib_beruvchi') or None
+    sana        = _parse_sana(request.POST.get('sana'))
+
+    try:
+        with transaction.atomic():
+            items_raw = request.POST.get('items', '[]')
+            rows = json.loads(items_raw)
+
+            if not rows:
+                messages.error(request, "Kamida bitta qator kerak!")
+                return redirect('xomashyo:chiqimlar')
+
+            yetkazib_beruvchi = None
+            if yb_id:
+                yetkazib_beruvchi = get_object_or_404(YetkazibBeruvchi, id=yb_id)
+
+            # ── XOMASHYO kirim ──────────────────────────────────
+            if chiqim_turi == 'xomashyo':
+                xomashyo_cat, _ = ChiqimTuri.objects.get_or_create(name="xomashyo xarajati")
+
+                izoh_parts   = []
+                jami_narx    = Decimal('0')
+                item_objects = []
+
+                for row in rows:
+                    xomashyo    = get_object_or_404(Xomashyo, id=row['xomashyo_id'])
+                    miqdor      = Decimal(str(row['miqdor']))
+
+                    # birlik_narx: frontdan keladi (tahrirlangan yoki default)
+                    # narx: jami (miqdor × birlik_narx), frontdan keladi
+                    birlik_narx_val = row.get('birlik_narx')
+                    narx_val        = row.get('narx')
+
+                    if birlik_narx_val:
+                        birlik_narx = Decimal(str(birlik_narx_val))
+                    else:
+                        birlik_narx = xomashyo.narxi or Decimal('0')
+
+                    if narx_val:
+                        narx = Decimal(str(narx_val))
+                    else:
+                        narx = birlik_narx * miqdor
+
+                    olchov = xomashyo.get_olchov_birligi_display()
+                    izoh_parts.append(
+                        f"{xomashyo.nomi} dan {miqdor:g} {olchov}"
+                    )
+                    jami_narx += narx
+                    item_objects.append({
+                        'xomashyo':   xomashyo,
+                        'miqdor':     miqdor,
+                        'birlik_narx': birlik_narx,
+                        'narx':       narx,
+                        'name':       f"{xomashyo.nomi} — {miqdor:g} {olchov}",
+                    })
+
+                auto_izoh = ", ".join(izoh_parts) + " sotib olindi"
+                if izoh_umumiy:
+                    auto_izoh += f"\nIzoh: {izoh_umumiy}"
+
+                chiqim = Chiqim.objects.create(
+                    name=f"Xomashyo kirim — {', '.join(izoh_parts)}",
+                    category=xomashyo_cat,
+                    price=jami_narx,
+                    izoh=auto_izoh,
+                    created_by=request.user,
+                )
+                # created auto_now_add ni override qilish uchun update ishlatamiz
+                Chiqim.objects.filter(pk=chiqim.pk).update(created=sana)
+
+                for obj in item_objects:
+                    ChiqimItem.objects.create(
+                        chiqim=chiqim,
+                        item_turi='xomashyo',
+                        name=obj['name'],
+                        price=obj['narx'],
+                        xomashyo=obj['xomashyo'],
+                        miqdor=obj['miqdor'],
+                        yetkazib_beruvchi=yetkazib_beruvchi,
+                    )
+                    # ChiqimItem.save() ichida XomashyoHarakat avtomatik yaratiladi
+                    # XomashyoHarakat sanasini ham yangilash (sana field DateTimeField bo'lsa)
+                    # Agar XomashyoHarakat da sana DateField bo'lsa:
+                    last_harakat = XomashyoHarakat.objects.filter(
+                        chiqim_item__xomashyo=obj['xomashyo']
+                    ).order_by('-sana').first()
+                    if last_harakat:
+                        XomashyoHarakat.objects.filter(pk=last_harakat.pk).update(sana=sana)
+
+                messages.success(
+                    request,
+                    f"✅ {auto_izoh} | Jami: {jami_narx:,.0f} so'm"
+                )
+
+            # ── BOSHQA chiqim ───────────────────────────────────
+            elif chiqim_turi == 'boshqa':
+                jami_narx    = Decimal('0')
+                item_objects = []
+
+                for row in rows:
+                    name   = row.get('name', '').strip()
+                    narx   = Decimal(str(row['narx']))
+                    cat_id = row.get('category_id') or None
+                    cat    = ChiqimTuri.objects.get(id=cat_id) if cat_id else None
+                    if not name or narx <= 0:
+                        continue
+                    jami_narx += narx
+                    item_objects.append({'name': name, 'narx': narx, 'category': cat})
+
+                if not item_objects:
+                    messages.error(request, "To'g'ri ma'lumot kiriting!")
+                    return redirect('xomashyo:chiqimlar')
+
+                names_str = ", ".join(o['name'] for o in item_objects)
+                chiqim = Chiqim.objects.create(
+                    name=names_str,
+                    category=item_objects[0]['category'],
+                    price=jami_narx,
+                    izoh=izoh_umumiy,
+                    created_by=request.user,
+                )
+                Chiqim.objects.filter(pk=chiqim.pk).update(created=sana)
+
+                for obj in item_objects:
+                    ChiqimItem.objects.create(
+                        chiqim=chiqim,
+                        item_turi='boshqa',
+                        name=obj['name'],
+                        price=obj['narx'],
+                    )
+
+                messages.success(request, f"✅ {names_str} — {jami_narx:,.0f} so'm | {sana}")
+
+            else:
+                messages.error(request, "Chiqim turini tanlang!")
+
+    except (decimal.InvalidOperation, TypeError):
+        messages.error(request, "Son formatida xatolik!")
+    except ValueError as e:
+        messages.error(request, str(e))
+    except Exception as e:
+        messages.error(request, f"❌ Xatolik: {e}")
+
     return redirect('xomashyo:chiqimlar')
+
+
+# ─────────────────────────────────────────────────────────────────
+# O'CHIRISH
+# ─────────────────────────────────────────────────────────────────
+
+@login_required(login_url="login")
+@user_passes_test(lambda u: u.is_staff, login_url="login")
+def chiqim_ochirish(request, chiqim_id):
+    if request.method == 'POST':
+        chiqim = get_object_or_404(Chiqim, id=chiqim_id)
+        chiqim.delete()
+        messages.success(request, "✅ Chiqim o'chirildi.")
+    return redirect('xomashyo:chiqimlar')
+
 
 class XomashyolarListView(AdminRequiredMixin,ListView):
     model = Xomashyo

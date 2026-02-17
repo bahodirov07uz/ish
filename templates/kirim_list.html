@@ -94,7 +94,6 @@
                                                 {{ kirim.xaridor.ism }}
                                             </a>
                                         </td>
-                                        <td>{{ kirim.mahsulot.nomi }}</td>
                                         <td><strong style="color: var(--color-success)">{{ kirim.summa|intcomma }} so'm</strong></td>
                                         <td>{{ kirim.sana|date:"d.m.Y H:i" }}</td>
                                     </tr>
@@ -111,19 +110,7 @@
                             <h3>Top mahsulotlar</h3>
                         </div>
                         <div class="top-products">
-                            {% if top_mahsulotlar %}
-                                {% for item in top_mahsulotlar %}
-                                    <div class="product-item">
-                                        <div class="product-info">
-                                            <div class="product-name">{{ item.mahsulot__nomi }}</div>
-                                            <div class="product-stats">{{ item.soni }} ta sotilgan</div>
-                                        </div>
-                                        <div class="product-summa">{{ item.jami|intcomma }} so'm</div>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Ma'lumot yo'q</p>
-                            {% endif %}
+
                         </div>
                     </div>
                 </div>

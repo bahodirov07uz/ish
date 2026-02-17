@@ -11,7 +11,7 @@ from decimal import Decimal,InvalidOperation
 from django.utils import timezone
 from django.db import transaction
 import traceback
-
+import json
 from crm import models as m
 from crm.models import Chiqim, ChiqimTuri,IshXomashyo
 from xomashyo.models import Xomashyo, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
@@ -52,35 +52,38 @@ class HomeView(LoginRequiredMixin, ListView):
     model = m.Ishchi
     template_name = "index.html"
     login_url = 'account_login'
-    
+
     def handle_no_permission(self):
         messages.error(self.request, '❌ Iltimos avval tizimga kiring!')
         return super().handle_no_permission()
-     
+
     def get_context_data(self, **kwargs):
-        context =  super().get_context_data(**kwargs)
-        
+        context = super().get_context_data(**kwargs)
+
         now = timezone.now()
         current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
         monthly_sales = m.Sotuv.objects.filter(sana__gte=current_month_start)
         monthly_outlays = m.Chiqim.objects.filter(created__gte=current_month_start)
-        
-        monthly_sales = monthly_sales.annotate(
-            profit=ExpressionWrapper(
-                F('mahsulot__avg_profit') * F('miqdor'),
-                output_field=DecimalField(max_digits=12, decimal_places=2)
+
+        # ✅ Profit: Sotuv -> items -> variant(avg_profit) * miqdor
+        total_profit = monthly_sales.aggregate(
+            total=Sum(
+                ExpressionWrapper(
+                    F('items__variant__product__avg_profit') * F('items__miqdor'),
+                    output_field=DecimalField(max_digits=12, decimal_places=2)
+                )
             )
-        )
-        total_profit = monthly_sales.aggregate(total=Sum('profit'))['total'] or 0
+        )['total'] or 0
+
         context['salary_sum'] = m.Ish.objects.aggregate(umumiy=Sum('narxi'))['umumiy'] or 0
         context['monthly_outlays'] = monthly_outlays.aggregate(total=Sum('price'))['total'] or 0
         context['monthly_sales'] = monthly_sales
         context['total_profit'] = total_profit
-        context['products'] = m.ProductVariant.objects.all().aggregate(total_son=Sum('stock'))['total_son']
+        context['products'] = m.ProductVariant.objects.all().aggregate(total_son=Sum('stock'))['total_son'] or 0
         context['employees'] = m.Ishchi.objects.filter(is_active=True).count()
-        
-        return context
 
+        return context
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
@@ -241,18 +244,6 @@ class ProductsView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['is_admin'] = is_admin(self.request.user)
         return context
-
-
-from django.db import connection
-
-def log_fk_check(tag=""):
-    with connection.cursor() as cursor:
-        cursor.execute("PRAGMA foreign_key_check;")
-        rows = cursor.fetchall()
-    if rows:
-        logger.error("FK CHECK %s => %s", tag, rows)
-    else:
-        logger.info("FK CHECK %s => OK", tag)
 
 
 class IshQoshishView(AdminRequiredMixin,View):
@@ -984,7 +975,7 @@ class IshQoshishView(AdminRequiredMixin,View):
 #  SOTUVLAR 
 
 class SotuvListView(AdminRequiredMixin, ListView):
-    """Sotuvlar ro'yxati - Barcha login qilgan foydalanuvchilar"""
+    """Sotuvlar ro'yxati"""
     model = m.Sotuv
     template_name = 'sotuv_list.html'
     context_object_name = 'sotuvlar'
@@ -1000,8 +991,8 @@ class SotuvListView(AdminRequiredMixin, ListView):
         if search:
             queryset = queryset.filter(
                 Q(xaridor__ism__icontains=search) |
-                Q(mahsulot__nomi__icontains=search) |
-                Q(xaridor__telefon__icontains=search)
+                Q(xaridor__telefon__icontains=search) |
+                Q(id__icontains=search)
             )
         
         # Sana filtri
@@ -1017,7 +1008,7 @@ class SotuvListView(AdminRequiredMixin, ListView):
                 sana__month=date.today().month
             )
         
-        return queryset.select_related('xaridor', 'mahsulot')
+        return queryset.select_related('xaridor').prefetch_related('items__variant__product')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1026,7 +1017,7 @@ class SotuvListView(AdminRequiredMixin, ListView):
         # Statistika
         context['bugungi_sotuv'] = m.Sotuv.objects.filter(
             sana__date=today
-        ).aggregate(Sum('umumiy_summa'))['umumiy_summa__sum'] or 0
+        ).aggregate(Sum('yakuniy_summa'))['yakuniy_summa__sum'] or 0
         
         context['bugungi_soni'] = m.Sotuv.objects.filter(
             sana__date=today
@@ -1035,121 +1026,259 @@ class SotuvListView(AdminRequiredMixin, ListView):
         context['oylik_sotuv'] = m.Sotuv.objects.filter(
             sana__year=today.year,
             sana__month=today.month
-        ).aggregate(Sum('umumiy_summa'))['umumiy_summa__sum'] or 0
+        ).aggregate(Sum('yakuniy_summa'))['yakuniy_summa__sum'] or 0
         
         context['jami_sotuv'] = m.Sotuv.objects.aggregate(
-            Sum('umumiy_summa')
-        )['umumiy_summa__sum'] or 0
+            Sum('yakuniy_summa')
+        )['yakuniy_summa__sum'] or 0
         
         # Form uchun ma'lumotlar
         context['xaridorlar'] = m.Xaridor.objects.all().order_by('-created_at')[:20]
-        context['mahsulotlar'] = m.ProductVariant.objects.filter(stock__gt=0).order_by('product__nomi')
+        context['mahsulotlar'] = m.ProductVariant.objects.filter(
+            stock__gt=0
+        ).select_related('product').order_by('product__nomi')
         context['is_admin'] = is_admin(self.request.user)
         
         return context
 
+class SotuvDetailView(AdminRequiredMixin,DetailView):
+    model = m.Sotuv
+    template_name = "sotuv/sotuv.html"
+    
 
 @login_required(login_url='login')
-@user_passes_test(is_admin,login_url="login")
+@user_passes_test(is_admin, login_url="login")
 def sotuv_qoshish(request):
+    """Yangi sotuv yaratish (bir nechta mahsulot bilan)"""
     if request.method == 'POST':
         try:
-            xaridor_turi = request.POST.get('xaridor_turi')
-            variant_id = request.POST.get('mahsulot')
+            with transaction.atomic():
+                # 1. Xaridorni aniqlash
+                xaridor_turi = request.POST.get('xaridor_turi')
+                
+                if xaridor_turi == 'yangi':
+                    xaridor_ism = request.POST.get('xaridor_ism')
+                    xaridor_telefon = request.POST.get('xaridor_telefon')
+                    xaridor_manzil = request.POST.get('xaridor_manzil')
+                    
+                    if not xaridor_ism:
+                        messages.error(request, 'Xaridor ismini kiriting!')
+                        return redirect('main:sotuvlar')
+                    
+                    xaridor = m.Xaridor.objects.create(
+                        ism=xaridor_ism,
+                        telefon=xaridor_telefon,
+                        manzil=xaridor_manzil
+                    )
+                else:
+                    xaridor_id = request.POST.get('xaridor')
+                    if not xaridor_id:
+                        messages.error(request, 'Xaridorni tanlang!')
+                        return redirect('main:sotuvlar')
+                    xaridor = get_object_or_404(m.Xaridor, id=xaridor_id)
+                
+                # 2. Asosiy sotuvni yaratish
+                chegirma = request.POST.get('chegirma', 0)
+                izoh = request.POST.get('izoh', '')
+                tolov_holati = request.POST.get('tolov_holati', 'tolandi')
+                
+                sotuv = m.Sotuv.objects.create(
+                    xaridor=xaridor,
+                    chegirma=Decimal(str(chegirma)) if chegirma else 0,
+                    izoh=izoh,
+                    tolov_holati=tolov_holati
+                )
+                
+                # 3. Mahsulotlarni qo'shish (frontenddan JSON formatda keladi)
+                items_json = request.POST.get('items')
+                if not items_json:
+                    # Eski format - bitta mahsulot
+                    variant_id = request.POST.get('mahsulot')
+                    miqdor = request.POST.get('miqdor')
+                    narx = request.POST.get('narx')
+                    
+                    if not all([variant_id, miqdor, narx]):
+                        raise ValueError('Mahsulot, miqdor va narx majburiy!')
+                    
+                    variant = get_object_or_404(m.ProductVariant, id=variant_id)
+                    
+                    m.SotuvItem.objects.create(
+                        sotuv=sotuv,
+                        mahsulot=variant.product,
+                        variant=variant,
+                        miqdor=int(miqdor),
+                        narx=Decimal(str(narx))
+                    )
+                else:
+                    # Yangi format - bir nechta mahsulot
+                    items = json.loads(items_json)
+                    
+                    for item in items:
+                        variant = get_object_or_404(m.ProductVariant, id=item['variant_id'])
+                        
+                        m.SotuvItem.objects.create(
+                            sotuv=sotuv,
+                            mahsulot=variant.product,
+                            variant=variant,
+                            miqdor=int(item['miqdor']),
+                            narx=Decimal(str(item['narx']))
+                        )
+                
+                # 4. Summani yangilash (SotuvItem.save() da avtomatik bo'ladi)
+                sotuv.refresh_from_db()
+                
+                messages.success(
+                    request,
+                    f"✅ Sotuv #{sotuv.id} muvaffaqiyatli yaratildi! "
+                    f"Summa: {sotuv.yakuniy_summa:,.0f} so'm"
+                )
+                
+                return redirect('main:sotuvlar')
+                
+        except ValueError as e:
+            messages.error(request, f'❌ Xatolik: {str(e)}')
+        except Exception as e:
+            messages.error(request, f'❌ Kutilmagan xatolik: {str(e)}')
+    
+    return redirect('main:sotuvlar')
+
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url="login")
+def sotuv_item_qoshish(request, sotuv_id):
+    """Mavjud sotuvga yangi mahsulot qo'shish"""
+    if request.method == 'POST':
+        try:
+            sotuv = get_object_or_404(m.Sotuv, id=sotuv_id)
+            
+            variant_id = request.POST.get('variant_id')
             miqdor = request.POST.get('miqdor')
+            narx = request.POST.get('narx')
             
-            if not variant_id:
-                messages.error(request, 'Mahsulot variantini tanlang!')
-                return redirect('main:sotuvlar')
-            
-            if not miqdor or int(miqdor) <= 0:
-                messages.error(request, 'Miqdorni to\'g\'ri kiriting!')
-                return redirect('main:sotuvlar')
+            if not all([variant_id, miqdor, narx]):
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Barcha maydonlarni to\'ldiring!'
+                })
             
             variant = get_object_or_404(m.ProductVariant, id=variant_id)
-            mahsulot = variant.product
-            miqdor_int = int(miqdor)
-            print(f"aaaaaaaaaaaaaaaa {variant_id}")
             
-            # mahsulot yetarlimi?
-            if variant.stock < miqdor_int:
-                messages.error(
-                    request, 
-                    f'Omborda yetarli {variant.product.nomi} yo\'q! Mavjud: {variant.stock} ta'
-                )
-                return redirect('main:sotuvlar')
-
-            # xaridor
-            if xaridor_turi == 'yangi':
-                xaridor_ism = request.POST.get('xaridor_ism')
-                xaridor_telefon = request.POST.get('xaridor_telefon')
-                xaridor_manzil = request.POST.get('xaridor_manzil')
-                
-                if not xaridor_ism:
-                    messages.error(request, 'Xaridor ismini kiriting!')
-                    return redirect('main:sotuvlar')
-                
-                xaridor = m.Xaridor.objects.create(
-                    ism=xaridor_ism,
-                    telefon=xaridor_telefon,
-                    manzil=xaridor_manzil
-                )
-            else:
-                xaridor_id = request.POST.get('xaridor')
-                if not xaridor_id:
-                    messages.error(request, 'Xaridorni tanlang!')
-                    return redirect('main:sotuvlar')
-                xaridor = get_object_or_404(m.Xaridor, id=xaridor_id)
-            
-            # Sotuv yaratish
-            sotuv = m.Sotuv.objects.create(
-                xaridor=xaridor,
-                mahsulot=mahsulot,
+            item = m.SotuvItem.objects.create(
+                sotuv=sotuv,
+                mahsulot=variant.product,
                 variant=variant,
-                miqdor=miqdor_int
+                miqdor=int(miqdor),
+                narx=Decimal(str(narx))
             )
-            with transaction.atomic():
-                variant.refresh_from_db()
-                if variant.stock < miqdor_int:
-                    raise ValueError("omborda yetarli mahsulot yo'q!")
-                
-                variant.stock = F("stock") - miqdor_int
-                variant.save()
             
-            messages.success(
-                request,
-                f"✅ {variant.product.nomi} ({miqdor_int} ta) {xaridor.ism}ga sotildi! "
-                f"Summa: {sotuv.umumiy_summa:,.0f} so'm"
-            )
+            sotuv.refresh_from_db()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Mahsulot qo\'shildi!',
+                'item_id': item.id,
+                'jami_summa': float(sotuv.jami_summa),
+                'yakuniy_summa': float(sotuv.yakuniy_summa)
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Xatolik: {str(e)}'})
+    
+    return JsonResponse({'success': False, 'error': 'Faqat POST so\'rov qabul qilinadi'})
+
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url="login")
+def sotuv_item_tahrirlash(request, item_id):
+    """Sotuv itemini tahrirlash (narx va miqdorni)"""
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(m.SotuvItem, id=item_id)
+            
+            narx = request.POST.get('narx')
+            miqdor = request.POST.get('miqdor')
+            
+            if narx:
+                item.narx = Decimal(str(narx))
+            if miqdor:
+                item.miqdor = int(miqdor)
+            
+            item.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Yangilandi!',
+                'jami': float(item.jami),
+                'sotuv_summa': float(item.sotuv.yakuniy_summa)
+            })
             
         except Exception as e:
-            messages.error(request, f'❌ Xatolik: {str(e)}')
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Faqat POST so\'rov'})
+
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url="login")
+def sotuv_item_ochirish(request, item_id):
+    """Sotuv itemini o'chirish"""
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(m.SotuvItem, id=item_id)
+            sotuv = item.sotuv
+            
+            item.delete()
+            sotuv.refresh_from_db()
+            
+            messages.success(request, 'Mahsulot o\'chirildi!')
+            return redirect('main:sotuv_detail', pk=sotuv.id)
+            
+        except Exception as e:
+            messages.error(request, f'Xatolik: {str(e)}')
     
     return redirect('main:sotuvlar')
 
 
 @login_required(login_url='login')
-@user_passes_test(is_admin, login_url='login')
-def sotuv_ochirish(request, pk):
-    """Sotuvni o'chirish - FAQAT ADMIN"""
+@user_passes_test(is_admin, login_url="login")
+def sotuv_ochirish(request, sotuv_id):
+    """Butun sotuvni o'chirish"""
     if request.method == 'POST':
         try:
-            sotuv = get_object_or_404(m.Sotuv, id=pk)
-            
-            # Mahsulot sonini qaytarish
-            mahsulot = sotuv.mahsulot
-            mahsulot.soni += sotuv.miqdor
-            mahsulot.save()
-            
-            sotuv_info = f"{sotuv.xaridor.ism} - {sotuv.mahsulot.nomi}"
-            sotuv.delete()
-            
-            messages.success(request, f"✅ Sotuv o'chirildi: {sotuv_info}")
+            with transaction.atomic():
+                sotuv = get_object_or_404(m.Sotuv, id=sotuv_id)
+                
+                # Itemlarni o'chirish (stock qaytariladi)
+                for item in sotuv.items.all():
+                    item.delete()
+                
+                # Sotuvni o'chirish
+                sotuv.delete()
+                
+                messages.success(request, 'Sotuv o\'chirildi!')
+                
         except Exception as e:
-            messages.error(request, f'❌ Xatolik: {str(e)}')
+            messages.error(request, f'Xatolik: {str(e)}')
     
     return redirect('main:sotuvlar')
 
+
+@login_required(login_url='login')
+def get_variant_info(request, variant_id):
+    """Variant ma'lumotlarini olish (AJAX uchun)"""
+    try:
+        variant = get_object_or_404(m.ProductVariant, id=variant_id)
+        
+        return JsonResponse({
+            'success': True,
+            'narx': float(variant.price),
+            'stock': variant.stock,
+            'nomi': str(variant)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 # ==================== KIRIMLAR ====================
 
@@ -1184,7 +1313,7 @@ class KirimListView(LoginRequiredMixin, ListView):
                 sana__month=date.today().month
             )
         
-        return queryset.select_related('xaridor', 'mahsulot', 'sotuv')
+        return queryset.select_related('xaridor',  'sotuv')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1203,12 +1332,6 @@ class KirimListView(LoginRequiredMixin, ListView):
             Sum('summa')
         )['summa__sum'] or 0
         
-        context['top_mahsulotlar'] = m.Kirim.objects.values(
-            'mahsulot__nomi'
-        ).annotate(
-            jami=Sum('summa'),
-            soni=Count('id')
-        ).order_by('-jami')[:5]
         
         return context
 
@@ -1240,10 +1363,10 @@ class XaridorListView(LoginRequiredMixin, ListView):
         
         xaridorlar = context['xaridorlar']
         for xaridor in xaridorlar:
-            xaridor.jami_xarid = xaridor.sales.aggregate(
-                Sum('umumiy_summa')
-            )['umumiy_summa__sum'] or 0
-            xaridor.xaridlar_soni = xaridor.sales.count()
+            xaridor.jami_xarid = xaridor.sotuvlar.aggregate(
+                Sum('jami_summa')
+            )['jami_summa__sum'] or 0
+            xaridor.xaridlar_soni = xaridor.sotuvlar.count()
         
         context['jami_xaridorlar'] = m.Xaridor.objects.count()
         context['is_admin'] = is_admin(self.request.user)
@@ -1262,22 +1385,18 @@ class XaridorDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         xaridor = self.object
         
-        context['sotuvlar'] = xaridor.sales.select_related(
-            'mahsulot'
+        context['sotuvlar'] = xaridor.sotuvlar.prefetch_related(
+            'items__mahsulot', 
+            'items__variant'
         ).order_by('-sana')
         
-        context['jami_xarid'] = xaridor.sales.aggregate(
-            Sum('umumiy_summa')
-        )['umumiy_summa__sum'] or 0
+        context['jami_xarid'] = xaridor.sotuvlar.aggregate(
+            Sum('jami_summa')
+        )['jami_summa__sum'] or 0
         
-        context['xaridlar_soni'] = xaridor.sales.count()
+        context['xaridlar_soni'] = xaridor.sotuvlar.count()
         
-        context['top_mahsulotlar'] = xaridor.sales.values(
-            'mahsulot__nomi'
-        ).annotate(
-            jami_miqdor=Sum('miqdor'),
-            jami_summa=Sum('umumiy_summa')
-        ).order_by('-jami_summa')[:5]
+
         
         return context
 

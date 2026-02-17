@@ -2,509 +2,602 @@
 {% load static %}
 {% load humanize %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/chiqim.css' %}">
-    <div class="app">
-        <div class="main-content">
-            <header class="header">
-                <div class="header-title">Chiqimlar</div>
-            </header>
+<link rel="stylesheet" href="{% static 'css/sotuv_list.css' %}">
 
-            <main class="content">
-                <div class="page">
-                    <div class="page-header">
-                        <div class="breadcrumb">
-                            <a href="/">Bosh sahifa</a>
-                            <span>/</span>
-                            <span>Chiqimlar</span>
-                        </div>
-                        <h2>Chiqimlarni boshqarish</h2>
-                        <p>Xomashyo va boshqa chiqimlarni ro'yxatga olish</p>
-                    </div>
+<style>
+    .container-fluid { max-width:100%; padding:1rem 2rem; background:var(--bg-primary); min-height:100vh; }
 
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }}">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                    {% if message.tags == 'success' %}
-                                        <path d="M7 10l3 3 6-6"/>
-                                        <circle cx="10" cy="10" r="8"/>
-                                    {% else %}
-                                        <path d="M10 6v4m0 4h.01"/>
-                                        <circle cx="10" cy="10" r="8"/>
-                                    {% endif %}
-                                </svg>
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .stat-card  { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:1.25rem; }
+    .stat-label { font-size:.875rem; color:var(--text-secondary); margin-bottom:.4rem; }
+    .stat-value { font-size:1.6rem; font-weight:700; color:var(--text-primary); }
 
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-header">
-                                <span>Bugungi chiqimlar</span>
-                                <div class="stat-icon stat-icon-danger">
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M10 14v-4m0-4h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="stat-value">{{ bugungi_chiqim|intcomma }} so'm</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-header">
-                                <span>Bu oylik chiqimlar</span>
-                                <div class="stat-icon stat-icon-warning">
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="3" y="4" width="14" height="13" rx="2"/>
-                                        <path d="M3 8h14M7 4v3M13 4v3"/>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="stat-value">{{ oylik_chiqim|intcomma }} so'm</div>
-                        </div>
+    .form-section  { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:1.5rem; margin-bottom:1.5rem; }
+    .section-title { font-size:1rem; font-weight:600; color:var(--text-primary); margin-bottom:1rem; }
+    .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    .form-grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; }
+    .form-group { margin-bottom:1rem; }
+    .form-label { display:block; font-size:.875rem; font-weight:500; color:var(--text-primary); margin-bottom:.4rem; }
+    .form-control,.form-select { width:100%; padding:.5rem .75rem; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:.875rem; transition:all .2s; }
+    .form-control:focus,.form-select:focus { outline:none; border-color:#4a9eff; box-shadow:0 0 0 3px rgba(74,158,255,.1); }
+    textarea.form-control { resize:vertical; min-height:68px; }
 
-                        <div class="stat-card">
-                            <div class="stat-header">
-                                <span>Jami chiqimlar</span>
-                                <div class="stat-icon stat-icon-danger">
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M3 3v14a2 2 0 0 0 2 2h14"/>
-                                        <path d="M7 13v-3M12 13V8M17 13V6"/>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="stat-value">{{ jami_chiqim|intcomma }} so'm</div>
-                        </div>
-                    </div>
+    .tabs-container { display:flex; gap:.5rem; border-bottom:2px solid var(--border-color); margin-bottom:1.5rem; }
+    .tab-btn { padding:.75rem 1.5rem; background:none; border:none; color:var(--text-secondary); font-weight:500; cursor:pointer; border-bottom:3px solid transparent; transition:all .2s; position:relative; top:2px; }
+    .tab-btn.active { color:var(--text-primary); border-bottom-color:#ef4444; }
 
-                    <div class="content-grid">
-                        <div class="form-card">
-                            <h3>Yangi chiqim qo'shish</h3>
-                            <form method="post" action="{% url 'xomashyo:chiqim_qoshish' %}">
-                                {% csrf_token %}
-                                
-                                <div class="form-group">
-                                    <label class="form-label required">Chiqim turi</label>
-                                    <select name="chiqim_turi" id="chiqimTuri" class="form-select" required>
-                                        <option value="">Tanlang...</option>
-                                        <option value="xomashyo">Xomashyo</option>
-                                        <option value="boshqa">Boshqa chiqim</option>
-                                    </select>
-                                </div>
+    .products-section { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; margin-bottom:1.5rem; overflow:visible; }
+    .table-toolbar { display:flex; justify-content:space-between; align-items:center; padding:1rem; border-bottom:1px solid var(--border-color); background:var(--bg-tertiary); }
+    .toolbar-title { font-weight:600; color:var(--text-primary); font-size:.9375rem; }
+    .btn-add { background:#ef4444; color:white; border:none; padding:.5rem 1rem; border-radius:4px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:.5rem; transition:all .2s; }
+    .btn-add:hover { background:#dc2626; }
 
-                                <div id="xomashyoFields" style="display: none;">
-                                    <div class="form-group">
-                                        <label class="form-label required">Xomashyo</label>
-                                        <div class="custom-select-wrapper">
-                                            <select name="xomashyo" id="xomashyoSelect" class="form-select">
-                                                <option value="">Tanlang...</option>
-                                                {% for xomashyo in xomashyolar %}
-                                                    <option value="{{ xomashyo.id }}" 
-                                                            data-narx="{{ xomashyo.narxi }}"
-                                                            data-olchov="{{ xomashyo.get_olchov_birligi_display }}"
-                                                            data-nomi="{{ xomashyo.nomi|lower }}"
-                                                            data-kategoriya="{% if xomashyo.kategoriya %}{{ xomashyo.kategoriya.nomi|lower }}{% endif %}">
-                                                        {{ xomashyo.nomi }} {% if xomashyo.kategoriya %}({{ xomashyo.kategoriya.nomi }}){% endif %} - {{ xomashyo.narxi|intcomma }} so'm / {{ xomashyo.get_olchov_birligi_display }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                            <div class="dropdown-search" id="dropdownSearch" style="display: none;">
-                                                <input type="text" id="xomashyoSearchInput" placeholder="Qidirish..." autocomplete="off">
-                                                <div class="dropdown-options" id="dropdownOptions"></div>
-                                            </div>
-                                        </div>
-                                    </div>
+    .products-table { width:100%; border-collapse:collapse; font-size:.875rem; }
+    .products-table thead { background:var(--bg-tertiary); border-bottom:2px solid var(--border-color); }
+    .products-table th { padding:.75rem; text-align:left; font-weight:600; color:var(--text-secondary); font-size:.8125rem; text-transform:uppercase; letter-spacing:.5px; }
+    .products-table th:first-child { width:42px; text-align:center; }
+    .products-table tbody tr { border-bottom:1px solid var(--border-color); transition:background .15s; }
+    .products-table tbody tr:nth-child(odd)  { background:var(--bg-secondary); }
+    .products-table tbody tr:nth-child(even) { background:var(--bg-primary); }
+    .products-table tbody tr:hover { background:var(--hover-bg); }
+    .products-table td { padding:.6rem .75rem; color:var(--text-primary); vertical-align:middle; }
+    .row-num { text-align:center; font-weight:600; color:var(--text-secondary); }
 
-                                    <div class="form-group">
-                                        <label class="form-label required">Miqdori</label>
-                                        <input type="number" name="miqdor" id="miqdorInput" class="form-input" step="0.01" min="0.01">
-                                        <span class="form-help" id="olchovBirligi">Xomashyo miqdorini kiriting</span>
-                                    </div>
+    /* Searchable select */
+    .sel-wrap    { position:relative; width:100%; min-width:180px; }
+    .sel-trigger { display:flex; justify-content:space-between; align-items:center; padding:.5rem .75rem; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer; min-height:36px; transition:all .2s; user-select:none; }
+    .sel-trigger:hover { border-color:#4a9eff; }
+    .sel-trigger.open  { border-color:#4a9eff; box-shadow:0 0 0 3px rgba(74,158,255,.1); }
+    .sel-val { font-size:.8125rem; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-primary); }
+    .sel-val.ph { color:var(--text-secondary); }
+    .sel-trigger svg { color:var(--text-secondary); flex-shrink:0; transition:transform .2s; pointer-events:none; }
+    .sel-trigger.open svg { transform:rotate(180deg); }
+    .sel-drop { position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; z-index:9999; box-shadow:0 4px 16px rgba(0,0,0,.35); display:flex; flex-direction:column; }
+    .sel-search { display:flex; align-items:center; gap:.5rem; padding:.6rem .75rem; border-bottom:1px solid var(--border-color); background:var(--bg-secondary); }
+    .sel-search svg { color:var(--text-secondary); flex-shrink:0; }
+    .sel-inp { flex:1; border:none; background:var(--bg-primary); color:var(--text-primary); outline:none; font-size:.8125rem; padding:.3rem .5rem; border-radius:4px; }
+    .sel-opts { overflow-y:auto; max-height:220px; }
+    .sel-opts::-webkit-scrollbar { width:6px; }
+    .sel-opts::-webkit-scrollbar-thumb { background:var(--border-color); border-radius:3px; }
+    .sel-opt { padding:.6rem .75rem; cursor:pointer; font-size:.8125rem; color:var(--text-primary); border-bottom:1px solid var(--border-color); transition:background .1s; }
+    .sel-opt:last-child { border-bottom:none; }
+    .sel-opt:hover { background:var(--hover-bg); }
+    .sel-opt.empty { color:var(--text-secondary); cursor:default; text-align:center; }
+    .sel-opt.empty:hover { background:transparent; }
 
-                                    <div class="form-group">
-                                        <label class="form-label">Yetkazib beruvchi</label>
-                                        <select name="yetkazib_beruvchi" class="form-select">
-                                            <option value="">Tanlang...</option>
-                                            {% for yb in yetkazib_beruvchilar %}
-                                                <option value="{{ yb.id }}">{{ yb.nomi }} - {{ yb.telefon }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
+    /* Inline inputs */
+    .ii { padding:.4rem .6rem; text-align:right; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:.8125rem; font-weight:500; width:90px; }
+    .ii:focus { outline:none; border-color:#4a9eff; }
+    .ii.wide  { width:120px; }
+    .unit { font-size:.72rem; color:var(--text-secondary); margin-left:3px; }
+    .hint { font-size:.71rem; color:#10b981; display:block; margin-top:2px; }
+    .jami-td { font-weight:600; font-size:.875rem; color:var(--text-primary); white-space:nowrap; }
 
-                                    <div class="form-group">
-                                        <label class="form-label">Jami narxi (so'm)</label>
-                                        <input type="number" name="xomashyo_jami_narx" id="narxInput" class="form-input" min="0" step="0.01">
-                                        <span class="form-help" id="narxHisob">Bo'sh qoldirilsa avtomatik hisoblanadi</span>
-                                    </div>
-                                </div>
+    .rm-btn { background:none; border:none; color:#ef4444; cursor:pointer; padding:.25rem; opacity:0; transition:opacity .2s; }
+    .products-table tbody tr:hover .rm-btn { opacity:1; }
 
-                                <div id="boshqaFields" style="display: none;">
-                                    <div class="form-group">
-                                        <label class="form-label required">Chiqim nomi</label>
-                                        <input type="text" name="name" class="form-input" placeholder="Masalan: Elektr to'lovi">
-                                    </div>
+    .summary-section { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; display:none; }
+    .sum-row { display:flex; justify-content:flex-end; align-items:center; gap:1.5rem; }
+    .sum-lbl { color:var(--text-secondary); font-size:.9375rem; }
+    .sum-val { font-size:1.5rem; font-weight:700; color:#ef4444; }
 
-                                    <div class="form-group">
-                                        <label class="form-label">Kategoriya</label>
-                                        <select name="category" class="form-select">
-                                            <option value="">Kategoriyasiz</option>
-                                            {% for tur in chiqim_turlari %}
-                                                <option value="{{ tur.id }}">{{ tur.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
+    .actions-bar { display:flex; justify-content:flex-end; gap:1rem; margin-bottom:2.5rem; }
+    .btn-submit { background:#ef4444; color:white; border:none; padding:.75rem 2rem; border-radius:6px; font-weight:600; font-size:.9375rem; cursor:pointer; transition:all .2s; }
+    .btn-submit:hover { background:#dc2626; transform:translateY(-1px); box-shadow:0 4px 12px rgba(239,68,68,.3); }
+    .btn-cancel { background:var(--bg-tertiary); color:var(--text-primary); border:1px solid var(--border-color); padding:.75rem 2rem; border-radius:6px; font-weight:600; font-size:.9375rem; cursor:pointer; }
+    .btn-cancel:hover { background:var(--hover-bg); }
 
-                                    <div class="form-group">
-                                        <label class="form-label required">Narxi (so'm)</label>
-                                        <input type="number" name="price" class="form-input" min="0" step="0.01">
-                                    </div>
-                                </div>
+    .list-section { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; overflow:hidden; }
+    .list-header  { display:flex; justify-content:space-between; align-items:center; padding:1rem; border-bottom:1px solid var(--border-color); background:var(--bg-tertiary); }
+    .list-header h3 { margin:0; font-size:1rem; font-weight:600; color:var(--text-primary); }
+    .badge { padding:.25rem .75rem; border-radius:999px; font-size:.75rem; font-weight:600; }
+    .badge-danger { background:rgba(239,68,68,.15); color:#ef4444; }
+    .hist-table { width:100%; border-collapse:collapse; font-size:.875rem; }
+    .hist-table thead { background:var(--bg-tertiary); border-bottom:2px solid var(--border-color); }
+    .hist-table th { padding:.75rem; text-align:left; font-weight:600; color:var(--text-secondary); font-size:.8125rem; text-transform:uppercase; letter-spacing:.5px; }
+    .hist-table tbody tr { border-bottom:1px solid var(--border-color); transition:background .15s; }
+    .hist-table tbody tr:hover { background:var(--hover-bg); }
+    .hist-table td { padding:.75rem; color:var(--text-primary); }
+    .izoh-cell { font-size:.8125rem; color:var(--text-secondary); white-space:pre-line; max-width:280px; }
+    .chip { display:inline-block; padding:.2rem .6rem; border-radius:4px; font-size:.75rem; font-weight:500; margin:.1rem; }
+    .chip-x { background:rgba(74,158,255,.15); color:#4a9eff; }
+    .chip-b { background:rgba(107,114,128,.15); color:var(--text-secondary); }
+    .alert { padding:.9rem 1rem; border-radius:6px; margin-bottom:1rem; font-size:.875rem; }
+    .alert-success { background:rgba(16,185,129,.1); border-left:4px solid #10b981; color:#10b981; }
+    .alert-error   { background:rgba(239,68,68,.1);  border-left:4px solid #ef4444; color:#ef4444; }
 
-                                <div class="form-group">
-                                    <label class="form-label">Izoh</label>
-                                    <textarea name="izoh" class="form-textarea" placeholder="Qo'shimcha ma'lumot..."></textarea>
-                                </div>
+    @media(max-width:1024px){ .form-grid,.form-grid-3{grid-template-columns:1fr;} }
+</style>
 
-                                <button type="submit" class="btn btn-primary">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M8 3v10M3 8h10"/>
-                                    </svg>
-                                    Chiqim qo'shish
-                                </button>
-                            </form>
-                        </div>
+<div class="main-content">
+<div class="container-fluid">
 
-                        <div class="list-card">
-                            <div class="card-header">
-                                <h3>So'nggi chiqimlar</h3>
-                                <span class="badge badge-danger">{{ chiqimlar.count }} ta</span>
-                            </div>
-                            
-                            {% if chiqimlar %}
-                                <div class="table-container">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Nomi</th>
-                                                <th>Kategoriya</th>
-                                                <th>Narxi</th>
-                                                <th>Sana</th>
-                                                <th>Amal</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for chiqim in chiqimlar %}
-                                            <tr>
-                                                <td>{{ chiqim.name }}</td>
-                                                <td>
-                                                    {% if chiqim.category %}
-                                                        {{ chiqim.category.name }}
-                                                    {% else %}
-                                                        <span style="color: var(--text-tertiary);">—</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td><strong>{{ chiqim.price|intcomma }} so'm</strong></td>
-                                                <td>{{ chiqim.created|date:"d.m.Y" }}</td>
-                                                <td>
-                                                    <form method="post" action="{% url 'xomashyo:chiqim_ochirish' chiqim.id %}" style="display: inline;">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-danger" onclick="return confirm('Rostdan ham o\'chirmoqchimisiz?')">
-                                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                                                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5M4 4h8v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z"/>
-                                                            </svg>
-                                                        </button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <div class="empty-state">
-                                    <div class="empty-icon">
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M12 8v8m-4-4h8"/>
-                                            <circle cx="12" cy="12" r="10"/>
-                                        </svg>
-                                    </div>
-                                    <h4 class="empty-title">Chiqimlar yo'q</h4>
-                                    <p class="empty-description">Hozircha hech qanday chiqim ro'yxatga olinmagan</p>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+    <div class="breadcrumb">
+        <a href="/">Bosh sahifa</a> <span>/</span> <span>Chiqimlar</span>
     </div>
 
-    <style>
-        .custom-select-wrapper {
-            position: relative;
-        }
-        
-        .dropdown-search {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: var(--bg-primary, white);
-            border: 1px solid var(--border-color, #e5e7eb);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            z-index: 1000;
-            margin-top: 4px;
-        }
-        
-        .dropdown-search input {
-            width: 100%;
-            padding: 10px 12px;
-            border: none;
-            border-bottom: 1px solid var(--border-color, #e5e7eb);
-            font-size: 14px;
-            outline: none;
-            background: var(--bg-primary, white);
-            color: var(--text-primary, #111827);
-        }
-        
-        .dropdown-search input::placeholder {
-            color: var(--text-tertiary, #9ca3af);
-        }
-        
-        .dropdown-options {
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        
-        .dropdown-options::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .dropdown-options::-webkit-scrollbar-track {
-            background: var(--bg-secondary, #f3f4f6);
-        }
-        
-        .dropdown-options::-webkit-scrollbar-thumb {
-            background: var(--border-color, #d1d5db);
-            border-radius: 4px;
-        }
-        
-        .dropdown-options::-webkit-scrollbar-thumb:hover {
-            background: var(--text-tertiary, #9ca3af);
-        }
-        
-        .dropdown-option {
-            padding: 10px 12px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-            color: var(--text-primary, #111827);
-        }
-        
-        .dropdown-option:hover {
-            background: var(--bg-secondary, #f3f4f6);
-        }
-        
-        .dropdown-option.selected {
-            background: var(--color-primary-light, #dbeafe);
-        }
-        
-        .dropdown-option .option-name {
-            font-weight: 500;
-            color: var(--text-primary, #111827);
-        }
-        
-        .dropdown-option .option-details {
-            font-size: 12px;
-            color: var(--text-secondary, #6b7280);
-            margin-top: 2px;
-        }
-        
-        .no-results {
-            padding: 20px;
-            text-align: center;
-            color: var(--text-secondary, #6b7280);
-            font-size: 14px;
-        }
-        
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            .dropdown-search {
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-            }
-        }
-    </style>
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
 
-    <script>
-        const chiqimTuri = document.getElementById('chiqimTuri');
-        const xomashyoFields = document.getElementById('xomashyoFields');
-        const boshqaFields = document.getElementById('boshqaFields');
-        const xomashyoSelect = document.getElementById('xomashyoSelect');
-        const miqdorInput = document.getElementById('miqdorInput');
-        const narxInput = document.getElementById('narxInput');
-        const olchovBirligi = document.getElementById('olchovBirligi');
-        const narxHisob = document.getElementById('narxHisob');
-        const dropdownSearch = document.getElementById('dropdownSearch');
-        const searchInput = document.getElementById('xomashyoSearchInput');
-        const dropdownOptions = document.getElementById('dropdownOptions');
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Bugungi chiqimlar</div><div class="stat-value">{{ bugungi_chiqim|intcomma }} so'm</div></div>
+        <div class="stat-card"><div class="stat-label">Bu oylik chiqimlar</div><div class="stat-value">{{ oylik_chiqim|intcomma }} so'm</div></div>
+        <div class="stat-card"><div class="stat-label">Jami chiqimlar</div><div class="stat-value">{{ jami_chiqim|intcomma }} so'm</div></div>
+    </div>
 
-        // Xomashyolar ro'yxati
-        let allXomashyolar = [];
-        if (xomashyoSelect) {
-            allXomashyolar = Array.from(xomashyoSelect.options).slice(1).map(opt => ({
-                id: opt.value,
-                nomi: opt.getAttribute('data-nomi'),
-                kategoriya: opt.getAttribute('data-kategoriya'),
-                narx: opt.getAttribute('data-narx'),
-                olchov: opt.getAttribute('data-olchov'),
-                text: opt.textContent
-            }));
-        }
+    <div class="tabs-container">
+        <button class="tab-btn active" data-tab="xomashyo">Xomashyo kirim</button>
+        <button class="tab-btn"        data-tab="boshqa">Boshqa chiqim</button>
+    </div>
 
-        // Select bosilganda dropdown ochish
-        if (xomashyoSelect) {
-            xomashyoSelect.addEventListener('click', function(e) {
-                e.preventDefault();
-                dropdownSearch.style.display = 'block';
-                searchInput.value = '';
-                renderOptions(allXomashyolar);
-                searchInput.focus();
-            });
-        }
+    <!-- ══════ TAB: XOMASHYO ══════ -->
+    <div id="tabXomashyo">
+    <form method="post" action="{% url 'xomashyo:chiqim_qoshish' %}" id="kirimForm">
+        {% csrf_token %}
+        <input type="hidden" name="chiqim_turi" value="xomashyo">
+        <input type="hidden" name="items" id="kirimItems">
 
-        // Qidirish
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const term = this.value.toLowerCase().trim();
-                
-                if (term === '') {
-                    renderOptions(allXomashyolar);
-                    return;
-                }
-                
-                const filtered = allXomashyolar.filter(x => 
-                    x.nomi.includes(term) || (x.kategoriya && x.kategoriya.includes(term))
-                );
-                
-                renderOptions(filtered);
-            });
-        }
-
-        // Optionlarni render qilish
-        function renderOptions(options) {
-            if (options.length === 0) {
-                dropdownOptions.innerHTML = '<div class="no-results">Hech narsa topilmadi</div>';
-                return;
-            }
-            
-            dropdownOptions.innerHTML = options.map(opt => `
-                <div class="dropdown-option" data-id="${opt.id}" data-narx="${opt.narx}" data-olchov="${opt.olchov}">
-                    <div class="option-name">${opt.text}</div>
+        <div class="form-section">
+            <div class="section-title">Umumiy ma'lumot</div>
+            <div class="form-grid-3">
+                <div class="form-group">
+                    <label class="form-label">Sana</label>
+                    <input type="date" name="sana" class="form-control" id="xSana" value="{{ today_str }}">
                 </div>
-            `).join('');
-            
-            // Option bosilganda
-            dropdownOptions.querySelectorAll('.dropdown-option').forEach(option => {
-                option.addEventListener('click', function() {
-                    const id = this.getAttribute('data-id');
-                    const narx = this.getAttribute('data-narx');
-                    const olchov = this.getAttribute('data-olchov');
-                    
-                    xomashyoSelect.value = id;
-                    dropdownSearch.style.display = 'none';
-                    
-                    if (olchov) {
-                        olchovBirligi.textContent = `Miqdorni ${olchov} da kiriting`;
-                    }
-                    
-                    calculatePrice();
-                });
-            });
-        }
+                <div class="form-group">
+                    <label class="form-label">Yetkazib beruvchi</label>
+                    <select name="yetkazib_beruvchi" class="form-select">
+                        <option value="">Tanlang…</option>
+                        {% for yb in yetkazib_beruvchilar %}
+                            <option value="{{ yb.id }}">{{ yb.nomi }} — {{ yb.telefon }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Izoh</label>
+                    <textarea name="izoh" class="form-control" rows="1" placeholder="Qo'shimcha ma'lumot…"></textarea>
+                </div>
+            </div>
+        </div>
 
-        // Tashqari joyga bosilganda yopish
-        document.addEventListener('click', function(e) {
-            if (!dropdownSearch.contains(e.target) && e.target !== xomashyoSelect) {
-                dropdownSearch.style.display = 'none';
-            }
+        <div class="products-section">
+            <div class="table-toolbar">
+                <span class="toolbar-title">Xomashyo qatorlari</span>
+                <button type="button" class="btn-add" id="addXRow">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3v10M3 8h10"/></svg>
+                    Qo'shish
+                </button>
+            </div>
+            <table class="products-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Xomashyo</th>
+                        <th>Miqdor</th>
+                        <th>Birlik narxi</th>
+                        <th>Jami</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="xBody"></tbody>
+            </table>
+        </div>
+
+        <div class="summary-section" id="xSummary">
+            <div class="sum-row">
+                <span class="sum-lbl">Umumiy jami:</span>
+                <span class="sum-val" id="xTotal">0 so'm</span>
+            </div>
+        </div>
+
+        <div class="actions-bar">
+            <button type="button" class="btn-cancel" onclick="resetX()">Tozalash</button>
+            <button type="submit" class="btn-submit">Kirimni saqlash</button>
+        </div>
+    </form>
+    </div>
+
+    <!-- ══════ TAB: BOSHQA ══════ -->
+    <div id="tabBoshqa" style="display:none;">
+    <form method="post" action="{% url 'xomashyo:chiqim_qoshish' %}" id="boshqaForm">
+        {% csrf_token %}
+        <input type="hidden" name="chiqim_turi" value="boshqa">
+        <input type="hidden" name="items" id="boshqaItems">
+
+        <div class="form-section">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Sana</label>
+                    <input type="date" name="sana" class="form-control" id="bSana" value="{{ today_str }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Umumiy izoh</label>
+                    <textarea name="izoh" class="form-control" rows="1" placeholder="Qo'shimcha ma'lumot…"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="products-section">
+            <div class="table-toolbar">
+                <span class="toolbar-title">Chiqim qatorlari</span>
+                <button type="button" class="btn-add" id="addBRow">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3v10M3 8h10"/></svg>
+                    Qo'shish
+                </button>
+            </div>
+            <table class="products-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nomi</th>
+                        <th>Kategoriya</th>
+                        <th>Narxi (so'm)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="bBody"></tbody>
+            </table>
+        </div>
+
+        <div class="summary-section" id="bSummary">
+            <div class="sum-row">
+                <span class="sum-lbl">Umumiy jami:</span>
+                <span class="sum-val" id="bTotal">0 so'm</span>
+            </div>
+        </div>
+
+        <div class="actions-bar">
+            <button type="button" class="btn-cancel" onclick="resetB()">Tozalash</button>
+            <button type="submit" class="btn-submit">Chiqimni saqlash</button>
+        </div>
+    </form>
+    </div>
+
+    <!-- ══════ HISTORY ══════ -->
+    <div class="list-section">
+        <div class="list-header">
+            <h3>So'nggi chiqimlar</h3>
+            <span class="badge badge-danger">{{ chiqimlar.count }} ta</span>
+        </div>
+        {% if chiqimlar %}
+        <table class="hist-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Nomi / Qatorlar</th>
+                    <th>Izoh</th>
+                    <th>Jami</th>
+                    <th>Sana</th>
+                    <th>Amal</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in chiqimlar %}
+            <tr>
+                <td>{{ c.pk }}</td>
+                <td>
+                    <div style="font-weight:500;margin-bottom:.3rem;">{{ c.name|truncatechars:55 }}</div>
+                    {% for item in c.itemlar.all %}
+                        <span class="chip {% if item.item_turi == 'xomashyo' %}chip-x{% else %}chip-b{% endif %}">{{ item.name }}</span>
+                    {% endfor %}
+                </td>
+                <td><span class="izoh-cell">{{ c.izoh|default:"—" }}</span></td>
+                <td><strong>{{ c.price|intcomma }} so'm</strong></td>
+                <td>{{ c.created|date:"d.m.Y" }}</td>
+                <td>
+                    <form method="post" action="{% url 'xomashyo:chiqim_ochirish' c.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-add" style="padding:.4rem .6rem;"
+                                onclick="return confirm('O\'chirishni tasdiqlaysizmi?')">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                            </svg>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding:3rem;text-align:center;color:var(--text-secondary);">
+            <p>Hozircha hech qanday chiqim yo'q</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+</div>
+
+{{ xomashyo_json|json_script:"xomashyo-data" }}
+{{ cats_json|json_script:"cats-data" }}
+
+<script>
+// ── Tab switch ──────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('tabXomashyo').style.display = this.dataset.tab === 'xomashyo' ? 'block' : 'none';
+        document.getElementById('tabBoshqa').style.display   = this.dataset.tab === 'boshqa'   ? 'block' : 'none';
+    });
+});
+
+// ── Data ────────────────────────────────────────────────────────
+const XOM  = JSON.parse(document.getElementById('xomashyo-data').textContent);
+const CATS = JSON.parse(document.getElementById('cats-data').textContent);
+
+// ── Dropdown state ──────────────────────────────────────────────
+let activeDropWrap = null;
+
+function closeAllDrops() {
+    if (activeDropWrap) {
+        activeDropWrap.querySelector('.sel-trigger').classList.remove('open');
+        activeDropWrap.querySelector('.sel-drop').style.display = 'none';
+        activeDropWrap = null;
+    }
+}
+document.addEventListener('click', function (e) {
+    if (activeDropWrap && !activeDropWrap.contains(e.target)) closeAllDrops();
+});
+
+// ── Searchable select factory ───────────────────────────────────
+function makeSelect(wrapper, items, placeholder, onSelect) {
+    wrapper.innerHTML = `
+        <div class="sel-trigger">
+            <span class="sel-val ph">${placeholder}</span>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+        </div>
+        <div class="sel-drop" style="display:none;">
+            <div class="sel-search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                <input class="sel-inp" placeholder="Qidirish…" autocomplete="off">
+            </div>
+            <div class="sel-opts"></div>
+        </div>`;
+
+    const trigger = wrapper.querySelector('.sel-trigger');
+    const drop    = wrapper.querySelector('.sel-drop');
+    const inp     = wrapper.querySelector('.sel-inp');
+    const opts    = wrapper.querySelector('.sel-opts');
+    const val     = trigger.querySelector('.sel-val');
+
+    function render(list) {
+        opts.innerHTML = list.length
+            ? list.map(i => `<div class="sel-opt" data-id="${i.id}">${i.label || i.name}</div>`).join('')
+            : '<div class="sel-opt empty">Topilmadi</div>';
+        opts.querySelectorAll('.sel-opt:not(.empty)').forEach(o => {
+            o.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                const item = items.find(i => String(i.id) === String(o.dataset.id));
+                val.textContent = o.textContent.trim();
+                val.classList.remove('ph');
+                closeAllDrops();
+                if (item) onSelect(item);
+            });
         });
+    }
 
-        // Chiqim turi o'zgarganda
-        chiqimTuri.addEventListener('change', function() {
-            const value = this.value;
-            
-            xomashyoFields.style.display = 'none';
-            boshqaFields.style.display = 'none';
-            
-            // Reset required attributes
-            xomashyoFields.querySelectorAll('select, input').forEach(el => {
-                el.removeAttribute('required');
-            });
-            boshqaFields.querySelectorAll('select, input').forEach(el => {
-                el.removeAttribute('required');
-            });
-            
-            if (value === 'xomashyo') {
-                xomashyoFields.style.display = 'block';
-                xomashyoSelect.setAttribute('required', 'required');
-                miqdorInput.setAttribute('required', 'required');
-            } else if (value === 'boshqa') {
-                boshqaFields.style.display = 'block';
-                boshqaFields.querySelector('input[name="name"]').setAttribute('required', 'required');
-                boshqaFields.querySelector('input[name="price"]').setAttribute('required', 'required');
-            }
+    trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const isOpen = activeDropWrap === wrapper;
+        closeAllDrops();
+        if (!isOpen) {
+            activeDropWrap = wrapper;
+            trigger.classList.add('open');
+            drop.style.display = 'block';
+            inp.value = '';
+            render(items);
+            setTimeout(() => inp.focus(), 0);
+        }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+    inp.addEventListener('input', function () {
+        const t = this.value.toLowerCase();
+        render(t ? items.filter(i => (i.label || i.name).toLowerCase().includes(t)) : items);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// XOMASHYO ROWS
+// ══════════════════════════════════════════════════════════════
+let xIdx = 0;
+
+function addXRow() {
+    const idx = xIdx++;
+    const rowCount = document.querySelectorAll('.xrow').length + 1;
+    const tr = document.createElement('tr');
+    tr.className   = 'xrow';
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+        <td class="row-num">${rowCount}</td>
+        <td style="min-width:190px;"><div class="sel-wrap" data-idx="${idx}"></div></td>
+        <td style="white-space:nowrap;">
+            <input type="number" class="ii x-miqdor" data-idx="${idx}" step="0.01" min="0.01" placeholder="0.00">
+            <span class="unit x-olchov" data-idx="${idx}"></span>
+        </td>
+        <td style="white-space:nowrap;">
+            <input type="number" class="ii wide x-birlik" data-idx="${idx}" step="0.01" min="0" placeholder="0.00">
+            <span class="unit">so'm</span>
+        </td>
+        <td class="jami-td x-jami" data-idx="${idx}">—</td>
+        <td>
+            <button type="button" class="rm-btn" onclick="removeRow(this,'xrow');calcX();">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                </svg>
+            </button>
+        </td>`;
+    document.getElementById('xBody').appendChild(tr);
+
+    // Hidden xomashyo id
+    const hiddenId = document.createElement('input');
+    hiddenId.type      = 'hidden';
+    hiddenId.className = 'x-xom-id';
+    hiddenId.dataset.idx = idx;
+    tr.appendChild(hiddenId);
+
+    // Searchable select
+    makeSelect(tr.querySelector('.sel-wrap'), XOM, 'Xomashyo tanlang…', (item) => {
+        hiddenId.value = String(item.id);
+        tr.querySelector('.x-olchov').textContent = item.olchov;
+
+        // Birlik narxini default qiymatiga o'rnat (faqat bo'sh bo'lsa)
+        const birlikInp = tr.querySelector('.x-birlik');
+        if (!birlikInp.value) {
+            birlikInp.value = item.narx > 0 ? item.narx : '';
+        }
+        calcXRow(idx);
+        calcX();
+    });
+
+    // Miqdor o'zgarganda
+    tr.querySelector('.x-miqdor').addEventListener('input', () => { calcXRow(idx); calcX(); });
+
+    // Birlik narxi o'zgarganda
+    tr.querySelector('.x-birlik').addEventListener('input', () => { calcXRow(idx); calcX(); });
+
+    renumber('xrow');
+}
+
+function calcXRow(idx) {
+    const miqdor = parseFloat(document.querySelector(`.x-miqdor[data-idx="${idx}"]`)?.value) || 0;
+    const birlik = parseFloat(document.querySelector(`.x-birlik[data-idx="${idx}"]`)?.value) || 0;
+    const jamiEl = document.querySelector(`.x-jami[data-idx="${idx}"]`);
+    if (jamiEl) {
+        const jami = miqdor * birlik;
+        jamiEl.textContent = jami > 0 ? jami.toLocaleString() + ' so\'m' : '—';
+    }
+}
+
+function calcX() {
+    let total = 0;
+    document.querySelectorAll('.xrow').forEach(tr => {
+        const miqdor = parseFloat(tr.querySelector('.x-miqdor')?.value) || 0;
+        const birlik = parseFloat(tr.querySelector('.x-birlik')?.value) || 0;
+        const xomId  = tr.querySelector('.x-xom-id')?.value;
+        if (!xomId || !miqdor) return;
+        // birlik narxi kiritilmagan bo'lsa xomashyo narxini olamiz
+        const narx = birlik || (XOM.find(x => String(x.id) === xomId)?.narx || 0);
+        total += miqdor * narx;
+    });
+    document.getElementById('xSummary').style.display = total > 0 ? 'block' : 'none';
+    document.getElementById('xTotal').textContent = total.toLocaleString() + ' so\'m';
+}
+
+function resetX() {
+    document.getElementById('xBody').innerHTML = '';
+    xIdx = 0;
+    addXRow();
+    calcX();
+}
+
+document.getElementById('addXRow').addEventListener('click', addXRow);
+
+document.getElementById('kirimForm').addEventListener('submit', function (e) {
+    const items = [];
+    document.querySelectorAll('.xrow').forEach(tr => {
+        const xomId  = tr.querySelector('.x-xom-id')?.value;
+        const miqdor = parseFloat(tr.querySelector('.x-miqdor')?.value) || 0;
+        const birlik = parseFloat(tr.querySelector('.x-birlik')?.value) || 0;
+        if (!xomId || !miqdor) return;
+        const narx = birlik || (XOM.find(x => String(x.id) === xomId)?.narx || 0);
+        items.push({
+            xomashyo_id: xomId,
+            miqdor:      miqdor,
+            birlik_narx: narx,                    // birlik narxi (alohida)
+            narx:        (miqdor * narx).toFixed(2) // jami narx
         });
+    });
+    if (!items.length) { e.preventDefault(); alert("Kamida bitta xomashyo qatori to'ldiring!"); return; }
+    document.getElementById('kirimItems').value = JSON.stringify(items);
+});
 
-        // Xomashyo tanlanganda o'lchov birligini ko'rsatish
-        if (xomashyoSelect) {
-            xomashyoSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const olchov = selectedOption.getAttribute('data-olchov');
-                
-                if (olchov) {
-                    olchovBirligi.textContent = `Miqdorni ${olchov} da kiriting`;
-                }
-                
-                // Narxni hisoblash
-                calculatePrice();
-            });
-        }
+// ══════════════════════════════════════════════════════════════
+// BOSHQA CHIQIM ROWS
+// ══════════════════════════════════════════════════════════════
+let bIdx = 0;
 
-        // Miqdor o'zgarganda narxni hisoblash
-        if (miqdorInput) {
-            miqdorInput.addEventListener('input', calculatePrice);
-        }
-        
-        // Narx inputga qo'lda kiritilganda
-        if (narxInput) {
-            narxInput.addEventListener('input', function() {
-                if (this.value) {
-                    narxHisob.textContent = 'Qo\'lda kiritilgan narx ishlatiladi';
-                    narxHisob.style.color = 'var(--color-primary)';
-                } else {
-                    calculatePrice();
-                }
-            });
-        }
+function addBRow() {
+    const idx = bIdx++;
+    const rowCount = document.querySelectorAll('.brow').length + 1;
+    const tr = document.createElement('tr');
+    tr.className   = 'brow';
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+        <td class="row-num">${rowCount}</td>
+        <td><input type="text" class="form-control b-name" data-idx="${idx}" placeholder="Chiqim nomi…" style="min-width:150px;"></td>
+        <td style="min-width:140px;"><div class="sel-wrap" data-idx="${idx}"></div></td>
+        <td><input type="number" class="ii wide b-narx" data-idx="${idx}" step="0.01" min="0" placeholder="0.00"></td>
+        <td>
+            <button type="button" class="rm-btn" onclick="removeRow(this,'brow');calcB();">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                </svg>
+            </button>
+        </td>`;
+    document.getElementById('bBody').appendChild(tr);
 
-        // Narx avtomatik hisoblash funksiyasi
-        function calculatePrice() {
-            if (!xomashyoSelect || !miqdorInput) return;
-            
-            const selectedOption = xomashyoSelect.options[xomashyoSelect.selectedIndex];
-            const narx = parseFloat(selectedOption.getAttribute('data-narx'));
-            const miqdor = parseFloat(miqdorInput.value);
-            
-            if (narx && miqdor && miqdor > 0) {
-                const jamiNarx = (narx * miqdor).toFixed(2);
-                narxHisob.textContent = `Avtomatik hisoblangan: ${parseInt(jamiNarx).toLocaleString()} so'm`;
-                narxHisob.style.color = 'var(--color-success)';
-            } else {
-                narxHisob.textContent = 'Bo\'sh qoldirilsa avtomatik hisoblanadi';
-                narxHisob.style.color = 'var(--text-secondary)';
-            }
-        }
-    </script>
+    const catIdInput = document.createElement('input');
+    catIdInput.type      = 'hidden';
+    catIdInput.className = 'b-cat-id';
+    catIdInput.dataset.idx = idx;
+    tr.appendChild(catIdInput);
+
+    makeSelect(tr.querySelector('.sel-wrap'), CATS, 'Kategoriya…', (item) => {
+        catIdInput.value = String(item.id);
+    });
+    tr.querySelector('.b-narx').addEventListener('input', calcB);
+    renumber('brow');
+}
+
+function calcB() {
+    let total = 0;
+    document.querySelectorAll('.brow').forEach(tr => {
+        total += parseFloat(tr.querySelector('.b-narx')?.value) || 0;
+    });
+    document.getElementById('bSummary').style.display = total > 0 ? 'block' : 'none';
+    document.getElementById('bTotal').textContent = total.toLocaleString() + ' so\'m';
+}
+
+function resetB() {
+    document.getElementById('bBody').innerHTML = '';
+    bIdx = 0;
+    addBRow();
+    calcB();
+}
+
+document.getElementById('addBRow').addEventListener('click', addBRow);
+
+document.getElementById('boshqaForm').addEventListener('submit', function (e) {
+    const items = [];
+    document.querySelectorAll('.brow').forEach(tr => {
+        const name  = tr.querySelector('.b-name')?.value.trim();
+        const narx  = tr.querySelector('.b-narx')?.value;
+        const catId = tr.querySelector('.b-cat-id')?.value || null;
+        if (!name || !narx || parseFloat(narx) <= 0) return;
+        items.push({ name, narx, category_id: catId });
+    });
+    if (!items.length) { e.preventDefault(); alert("Kamida bitta qator to'ldiring!"); return; }
+    document.getElementById('boshqaItems').value = JSON.stringify(items);
+});
+
+// ── Helpers ────────────────────────────────────────────────────
+function removeRow(btn, cls) {
+    btn.closest('tr').remove();
+    renumber(cls);
+}
+function renumber(cls) {
+    document.querySelectorAll(`.${cls}`).forEach((r, i) => {
+        r.querySelector('.row-num').textContent = i + 1;
+    });
+}
+
+// ── Init ───────────────────────────────────────────────────────
+addXRow();
+addBRow();
+</script>
 {% endblock content %}

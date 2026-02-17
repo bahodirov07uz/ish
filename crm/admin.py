@@ -5,10 +5,10 @@ from import_export.admin import ImportExportModelAdmin
 from import_export.admin import ExportMixin
 from .models import (
     Category, Product, ProductVariant, IshchiCategory, Ishchi,
-    Oyliklar, EskiIsh, Ish, ChiqimTuri, Chiqim, Xaridor, Sotuv, Kirim,IshXomashyo,Feature,Avans,TeriSarfi
+    Oyliklar, EskiIsh, Ish, ChiqimTuri, Chiqim, Xaridor, Sotuv, Kirim,IshXomashyo,Feature,Avans,TeriSarfi,SotuvItem,ChiqimItem
 )
 
-from resources import IshchiResource,ProductResource,ProductVariantResource,IshResource,ChiqimResource
+from resources import IshchiResource,ProductResource,ProductVariantResource,IshResource,ChiqimResource,SotuvResource,SotuvItemResource
 from crm.periodfilter import Last15DaysFilter
 
 class ProductVariantInline(admin.TabularInline):
@@ -50,11 +50,11 @@ class ProductAdmin(ImportExportModelAdmin):
          
 @admin.register(ProductVariant)
 class ProductVariantAdmin(ImportExportModelAdmin):
-    
     resource_class = ProductVariantResource
-    list_display = ('product', 'stock', 'price','rang')
-    list_filter = ('product',)
+    list_display = ('product', 'stock', 'price','type','rang',"sku")
+    list_filter = ('product','type')
     search_fields = ('product__nomi',)
+    autocomplete_fields = ["product"]
     list_per_page = 20
 
 @admin.register(IshchiCategory)
@@ -149,19 +149,80 @@ class XaridorAdmin(admin.ModelAdmin):
     search_fields = ('ism', 'telefon')
     list_per_page = 20
 
-@admin.register(Sotuv)
-class SotuvAdmin(admin.ModelAdmin):
-    list_display = ('xaridor', 'mahsulot', 'miqdor', 'umumiy_summa', 'sana')
-    list_filter = ('sana',)
-    search_fields = ('xaridor__ism', 'mahsulot__nomi')
-    readonly_fields = ('umumiy_summa',)
-    list_per_page = 20
+class SotuvItemInline(admin.TabularInline):
+    """Sotuv ichida itemlarni ko'rsatish"""
+    model = SotuvItem
+    extra = 1
+    fields = ('mahsulot', 'variant', 'miqdor', 'narx', 'jami')
+    readonly_fields = ('jami',)
+    autocomplete_fields = ['variant', 'mahsulot']
 
+
+@admin.register(Sotuv)
+class SotuvAdmin(ImportExportModelAdmin):
+    """Sotuv admin paneli"""
+    resource_class = SotuvResource
+    list_display = ('id', 'xaridor', 'jami_summa', 'chegirma', 'yakuniy_summa', 'tolov_holati', 'sana')
+    list_filter = ('tolov_holati', 'sana')
+    search_fields = ('xaridor__ism', 'xaridor__telefon', 'id')
+    readonly_fields = ('jami_summa', 'yakuniy_summa', 'created_at', 'updated_at')
+    date_hierarchy = 'sana'
+    inlines = [SotuvItemInline]
+    
+    fieldsets = (
+        ('Asosiy ma\'lumotlar', {
+            'fields': ('xaridor', 'tolov_holati', 'sana')
+        }),
+        ('Summa', {
+            'fields': ('jami_summa', 'chegirma', 'yakuniy_summa')
+        }),
+        ('Qo\'shimcha', {
+            'fields': ('izoh', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('xaridor').prefetch_related('items')
+
+
+@admin.register(SotuvItem)
+class SotuvItemAdmin(ImportExportModelAdmin):
+    """Sotuv item admin paneli"""
+    resource_class = SotuvItemResource
+    list_display = ('id', 'sotuv', 'variant', 'miqdor', 'narx', 'jami')
+    list_filter = ('sotuv__sana',)
+    search_fields = ('sotuv__id', 'mahsulot__nomi', 'variant__rang')
+    readonly_fields = ('jami',)
+    autocomplete_fields = ['sotuv', 'variant', 'mahsulot']
+    date_hierarchy = 'sotuv__sana'
+
+    fieldsets = (
+        ('Sotuv', {
+            'fields': ('sotuv',)
+        }),
+        ('Mahsulot', {
+            'fields': ('mahsulot', 'variant')
+        }),
+        ('Narx va miqdor', {
+            'fields': ('miqdor', 'narx', 'jami')
+        }),
+        ('Qo\'shimcha', {
+            'fields': ('izoh',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'sotuv', 'mahsulot', 'variant'
+        )
+    
 @admin.register(Kirim)
 class KirimAdmin(admin.ModelAdmin):
-    list_display = ('mahsulot', 'xaridor', 'summa', 'sana')
+    list_display = ( 'xaridor', 'summa', 'sana')
     list_filter = ('sana',)
-    search_fields = ('mahsulot__nomi', 'xaridor__ism')
+    search_fields = ('xaridor__ism',)
     readonly_fields = ('summa', 'sana')
     list_per_page = 20
 
