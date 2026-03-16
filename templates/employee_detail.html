@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{% static 'css/employee_detail.css' %}">
 <div class="app">
     <div class="main-content">
-       
+
         <main class="content">
             <div class="page">
                 <div class="page-header">
@@ -113,7 +113,9 @@
                             <h3>Bu oydagi ishlar</h3>
                             <span class="badge">{{ object.ishlar.count }} ta ish obyekti topildi</span>
                         </div>
-
+       <a href="{% url 'main:ishchi_chek' ishchi.id %}" class="btn btn-primary">
+    PDF Chek
+</a>
                         {% if ishlar %}
                         <div class="table-container">
                             <table>

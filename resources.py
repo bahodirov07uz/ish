@@ -132,7 +132,7 @@ class IshResource(resources.ModelResource):
     class Meta:
         model = Ish
         fields = (
-            "id","mahsulot","ishchi","soni","sana","narxi","status"
+            "id","product","ishchi","soni","sana","narxi","status"
         )
 
 class XomashyoHarakatResource(resources.ModelResource):
@@ -173,12 +173,7 @@ class ChiqimResource(resources.ModelResource):
         export_order = ("id", "created", "name", "category_name", "price")
 
 class SotuvResource(resources.ModelResource):
-    xaridor_ism = fields.Field(
-        column_name="xaridor",
-        attribute="xaridor",
-        widget=CreateIfNotExistWidget(Xaridor,"ism")
-    )
-    
+
     class Meta:
         model = Xaridor
         fields = ("id","ism","telefon","manzil")

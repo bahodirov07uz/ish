@@ -1,0 +1,679 @@
+
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/sotuv/sotuv_list.css'%}">
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="16" rx="2"/>
+                <path d="M3 8h18M8 4v4M16 4v4"/>
+            </svg>
+            Sotuvlar
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'main:sotuvlar' %}" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3v10M3 8h10"/>
+                </svg>
+                Yangi sotuv
+            </a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb">
+                <a href="/">Bosh sahifa</a>
+                <span>/</span>
+                <span>Sotuvlar</span>
+            </div>
+
+            <!-- Filters and Search -->
+            <div class="filters-section">
+                <div class="filters-header">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h14M3 10h14M3 14h8"/>
+                        </svg>
+                        Filterlar va qidiruv
+                    </h3>
+                    {% if request.GET %}
+                    <a href="{% url 'main:sotuvlar' %}" class="btn btn-sm btn-secondary">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 3L3 11M3 3l8 8"/>
+                        </svg>
+                        Filterlarni tozalash
+                    </a>
+                    {% endif %}
+                </div>
+
+                <form method="get" class="filters-form" id="filtersForm">
+                    <div class="filters-grid">
+                        <!-- Qidiruv -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="7" cy="7" r="5"/>
+                                    <path d="M14 14l-3-3"/>
+                                </svg>
+                                Qidiruv
+                            </label>
+                            <input 
+                                type="text" 
+                                name="search" 
+                                class="filter-input" 
+                                placeholder="Xaridor, telefon, sotuv #..." 
+                                value="{{ request.GET.search }}"
+                            >
+                        </div>
+
+                        <!-- Sana oralig'i -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="12" height="11" rx="2"/>
+                                    <path d="M2 6h12M5 3v2M11 3v2"/>
+                                </svg>
+                                Boshlanish sanasi
+                            </label>
+                            <input 
+                                type="date" 
+                                name="date_from" 
+                                class="filter-input" 
+                                value="{{ request.GET.date_from }}"
+                            >
+                        </div>
+
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="12" height="11" rx="2"/>
+                                    <path d="M2 6h12M5 3v2M11 3v2"/>
+                                </svg>
+                                Tugash sanasi
+                            </label>
+                            <input 
+                                type="date" 
+                                name="date_to" 
+                                class="filter-input" 
+                                value="{{ request.GET.date_to }}"
+                            >
+                        </div>
+
+                        <!-- To'lov holati -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="8" cy="8" r="6"/>
+                                    <path d="M8 5v3l2 2"/>
+                                </svg>
+                                To'lov holati
+                            </label>
+                            <select name="tolov_holati" class="filter-select">
+                                <option value="">Hammasi</option>
+                                <option value="tolandi" {% if request.GET.tolov_holati == 'tolandi' %}selected{% endif %}>To'landi</option>
+                                <option value="qisman" {% if request.GET.tolov_holati == 'qisman' %}selected{% endif %}>Qisman</option>
+                                <option value="tolanmadi" {% if request.GET.tolov_holati == 'tolanmadi' %}selected{% endif %}>To'lanmadi</option>
+                            </select>
+                        </div>
+
+                        <!-- Xaridor -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 14a6 6 0 0 1 12 0"/>
+                                </svg>
+                                Xaridor
+                            </label>
+                            <select name="xaridor" class="filter-select">
+                                <option value="">Hammasi</option>
+                                {% for xaridor in xaridorlar %}
+                                <option value="{{ xaridor.id }}" {% if request.GET.xaridor == xaridor.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ xaridor.ism }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Minimum summa -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 2v12M5 7h6"/>
+                                </svg>
+                                Min summa (so'm)
+                            </label>
+                            <input 
+                                type="number" 
+                                name="min_summa" 
+                                class="filter-input" 
+                                placeholder="0" 
+                                value="{{ request.GET.min_summa }}"
+                            >
+                        </div>
+
+                        <!-- Maximum summa -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 2v12M5 7h6"/>
+                                </svg>
+                                Max summa (so'm)
+                            </label>
+                            <input 
+                                type="number" 
+                                name="max_summa" 
+                                class="filter-input" 
+                                placeholder="999999999" 
+                                value="{{ request.GET.max_summa }}"
+                            >
+                        </div>
+
+                        <!-- Saralash -->
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 6l4 4 4-4"/>
+                                </svg>
+                                Saralash
+                            </label>
+                            <select name="ordering" class="filter-select">
+                                <option value="-sana" {% if request.GET.ordering == '-sana' or not request.GET.ordering %}selected{% endif %}>Yangi → Eski</option>
+                                <option value="sana" {% if request.GET.ordering == 'sana' %}selected{% endif %}>Eski → Yangi</option>
+                                <option value="-yakuniy_summa" {% if request.GET.ordering == '-yakuniy_summa' %}selected{% endif %}>Katta summa → Kichik</option>
+                                <option value="yakuniy_summa" {% if request.GET.ordering == 'yakuniy_summa' %}selected{% endif %}>Kichik summa → Katta</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="filters-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h10M3 10h10"/>
+                            </svg>
+                            Qo'llash
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Quick Filters -->
+                <div class="quick-filters">
+                    <a href="?date=bugun" class="quick-filter {% if request.GET.date == 'bugun' %}active{% endif %}">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="8" cy="8" r="6"/>
+                        </svg>
+                        Bugun
+                    </a>
+                    <a href="?date=hafta" class="quick-filter {% if request.GET.date == 'hafta' %}active{% endif %}">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="12" height="11" rx="2"/>
+                        </svg>
+                        Hafta
+                    </a>
+                    <a href="?date=oy" class="quick-filter {% if request.GET.date == 'oy' %}active{% endif %}">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="12" height="11" rx="2"/>
+                            <path d="M2 6h12"/>
+                        </svg>
+                        Oy
+                    </a>
+                    <a href="?tolov_holati=tolanmadi" class="quick-filter {% if request.GET.tolov_holati == 'tolanmadi' %}active{% endif %}">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="8" cy="8" r="6"/>
+                            <path d="M5 8h6"/>
+                        </svg>
+                        To'lanmagan
+                    </a>
+                </div>
+            </div>
+
+            <!-- Results Info -->
+            <div class="results-info">
+                <p>
+                    <strong>{{ page_obj.paginator.count }}</strong> ta sotuv topildi
+                    {% if request.GET.search %}
+                        <span class="filter-tag">
+                            Qidiruv: "{{ request.GET.search }}"
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'search' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">×</a>
+                        </span>
+                    {% endif %}
+                    {% if request.GET.tolov_holati %}
+                        <span class="filter-tag">
+                            To'lov: {{ request.GET.tolov_holati }}
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'tolov_holati' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">×</a>
+                        </span>
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- Sotuvlar jadvali -->
+            <div class="table-card">
+                <div class="table-container">
+                    {% if sotuvlar %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Xaridor</th>
+                                <th>Mahsulotlar</th>
+                                <th>Summa</th>
+                                <th>Chegirma</th>
+                                <th>Yakuniy</th>
+                                <th>Holat</th>
+                                <th>Sana</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sotuv in sotuvlar %}
+                            <tr class="table-row">
+                                <td>
+                                    <a href="{% url 'main:sotuv_detail' sotuv.id %}" class="sotuv-id">
+                                        #{{ sotuv.id }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="customer-cell">
+                                        <div class="customer-avatar">
+                                            {{ sotuv.xaridor.ism|slice:":1"|upper }}
+                                        </div>
+                                        <div class="customer-info">
+                                            <a href="{% url 'main:xaridor_detail' sotuv.xaridor.id %}" class="customer-name">
+                                                {{ sotuv.xaridor.ism }}
+                                            </a>
+                                            {% if sotuv.xaridor.telefon %}
+                                            <small>{{ sotuv.xaridor.telefon }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="products-cell">
+                                        {% for item in sotuv.items.all|slice:":3" %}
+                                        <span class="product-badge" title="{{ item.variant }}">
+                                            {{ item.variant.product.nomi|truncatechars:15 }} ({{ item.miqdor }})
+                                        </span>
+                                        {% endfor %}
+                                        {% if sotuv.items.count > 3 %}
+                                        <span class="product-badge more">+{{ sotuv.items.count|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="amount">{{ sotuv.jami_summa|intcomma }}</span>
+                                </td>
+                                <td>
+                                    {% if sotuv.chegirma > 0 %}
+                                    <span class="discount">-{{ sotuv.chegirma|intcomma }}</span>
+                                    {% else %}
+                                    <span class="no-discount">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="total-amount">{{ sotuv.yakuniy_summa|intcomma }} so'm</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ sotuv.tolov_holati }}">
+                                        {% if sotuv.tolov_holati == 'tolandi' %}
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M10 3L4.5 8.5L2 6"/>
+                                            </svg>
+                                            To'landi
+                                        {% elif sotuv.tolov_holati == 'qisman' %}
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="6" cy="6" r="5"/>
+                                            </svg>
+                                            Qisman
+                                        {% else %}
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 3l6 6M9 3l-6 6"/>
+                                            </svg>
+                                            To'lanmadi
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="date-cell">
+                                        <span class="date">{{ sotuv.sana|date:"d.m.Y" }}</span>
+                                        <small>{{ sotuv.sana|date:"H:i" }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="{% url 'main:sotuv_detail' sotuv.id %}" class="btn-icon btn-view" title="Ko'rish">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 8s2-5 7-5 7 5 7 5-2 5-7 5-7-5-7-5z"/>
+                                                <circle cx="8" cy="8" r="2"/>
+                                            </svg>
+                                        </a>
+                                        <a href="{% url 'main:sotuv_pdf' sotuv.id %}" class="btn-icon btn-pdf" title="PDF" target="_blank">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                                            </svg>
+                                        </a>
+                                        <button onclick="deleteSotuv({{ sotuv.id }})" class="btn-icon btn-delete" title="O'chirish">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="8" y="12" width="48" height="40" rx="4"/>
+                            <path d="M8 20h48M20 12v8M44 12v8"/>
+                            <path d="M24 32h16M24 40h10"/>
+                        </svg>
+                        <h3>Sotuvlar topilmadi</h3>
+                        <p>Hozircha bu filterga mos sotuv yo'q</p>
+                        <a href="{% url 'main:sotuvlar' %}" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 3v10M3 8h10"/>
+                            </svg>
+                            Birinchi sotuvni yaratish
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4L7 8l4 4"/>
+                    </svg>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4L7 8l4 4"/>
+                    </svg>
+                </a>
+                <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4L7 8l4 4"/>
+                    </svg>
+                </a>
+                {% endif %}
+
+                <span class="page-info">
+                    Sahifa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 4l4 4-4 4"/>
+                    </svg>
+                </a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="page-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 4l4 4-4 4"/>
+                    </svg>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 4l4 4-4 4"/>
+                    </svg>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<!-- Delete confirmation form (hidden) -->
+<form id="deleteForm" method="post" style="display: none;">
+    {% csrf_token %}
+</form>
+
+<script>
+    // Auto-submit form on filter change
+    const filterSelects = document.querySelectorAll('.filter-select');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            document.getElementById('filtersForm').submit();
+        });
+    });
+
+    // Delete sotuv
+    function deleteSotuv(sotuvId) {
+        if (confirm('Rostdan ham bu sotuvni o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi!')) {
+            const form = document.getElementById('deleteForm');
+            form.action = `/sotuv/${sotuvId}/ochirish/`;
+            form.submit();
+        }
+    }
+
+    // Clear single filter tag
+    document.querySelectorAll('.filter-tag a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = this.href;
+        });
+    });
+</script>
+<script>
+    let USD_KURS = 0;
+
+/**
+ * CBU dan USD kursini olish
+ */
+async function fetchUsdKurs() {
+    try {
+        const response = await fetch('/api/usd-kurs/');
+        const data = await response.json();
+        USD_KURS = parseFloat(data.rate);
+        
+        // Formadagi hidden input va ko'rsatish elementini yangilash
+        const kursInput = document.getElementById('usd_kurs');
+        const kursDisplay = document.getElementById('usd_kurs_display');
+        
+        if (kursInput) kursInput.value = USD_KURS;
+        if (kursDisplay) kursDisplay.textContent = `1 USD = ${USD_KURS.toLocaleString('uz-UZ', {minimumFractionDigits: 2})} so'm`;
+        
+        return USD_KURS;
+    } catch (error) {
+        console.error('USD kurs olishda xatolik:', error);
+        return 0;
+    }
+}
+
+/**
+ * Narxni USD dan so'mga yoki aksincha aylantirish
+ */
+function convertNarx(value, fromCurrency) {
+    if (!USD_KURS || USD_KURS === 0) return 0;
+    
+    const amount = parseFloat(value) || 0;
+    if (fromCurrency === 'usd') {
+        return Math.round(amount * USD_KURS);
+    } else {
+        return (amount / USD_KURS).toFixed(4);
+    }
+}
+
+/**
+ * Mahsulot qator narxini real-time yangilash
+ * narxInput - narx kiritish input
+ * narxTuriSelect - 'uzs' yoki 'usd' select
+ * somDisplay - so'mdagi narx ko'rsatish span
+ * usdDisplay - USD dagi narx ko'rsatish span
+ */
+function setupNarxConverter(narxInput, narxTuriSelect, somDisplay, usdDisplay) {
+    function updateConversion() {
+        const narx = parseFloat(narxInput.value) || 0;
+        const tur = narxTuriSelect.value;
+        
+        if (tur === 'usd') {
+            const somNarx = convertNarx(narx, 'usd');
+            if (somDisplay) somDisplay.textContent = `= ${parseInt(somNarx).toLocaleString('uz-UZ')} so'm`;
+            if (usdDisplay) usdDisplay.textContent = `${narx.toFixed(4)} USD`;
+        } else {
+            const usdNarx = convertNarx(narx, 'uzs');
+            if (usdDisplay) usdDisplay.textContent = `≈ $${parseFloat(usdNarx).toFixed(4)}`;
+            if (somDisplay) somDisplay.textContent = `${parseInt(narx).toLocaleString('uz-UZ')} so'm`;
+        }
+    }
+    
+    narxInput.addEventListener('input', updateConversion);
+    narxTuriSelect.addEventListener('change', updateConversion);
+}
+
+// ============================================================
+// Qarz to'lash modali / formasini boshqarish
+// ============================================================
+
+/**
+ * Qarz to'lash
+ * @param {number} sotuvId - Sotuv ID
+ * @param {number} qarzSumma - Qolgan qarz miqdori (so'mda)
+ */
+async function qarzTolash(sotuvId, qarzSumma) {
+    const modalHtml = `
+    <div id="qarzModal" class="modal-overlay" style="
+        position:fixed; inset:0; background:rgba(0,0,0,0.5); 
+        display:flex; align-items:center; justify-content:center; z-index:9999;
+    ">
+        <div style="background:white; border-radius:12px; padding:24px; width:400px; max-width:90vw;">
+            <h3 style="margin:0 0 16px; font-size:18px; color:#1e40af;">
+                💳 Qarz to'lash
+            </h3>
+            
+            <div style="background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:12px; margin-bottom:16px;">
+                <p style="margin:0; font-size:14px; color:#92400e;">
+                    Qolgan qarz: <strong>${parseInt(qarzSumma).toLocaleString('uz-UZ')} so'm</strong>
+                    ${USD_KURS > 0 ? `(≈ $${(qarzSumma / USD_KURS).toFixed(2)})` : ''}
+                </p>
+            </div>
+            
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">
+                    Valyuta
+                </label>
+                <select id="tolashValyuta" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:8px;" 
+                        onchange="updateTolashConverter(${qarzSumma})">
+                    <option value="uzs">So'm (UZS)</option>
+                    ${USD_KURS > 0 ? '<option value="usd">USD</option>' : ''}
+                </select>
+            </div>
+            
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">
+                    Summa
+                </label>
+                <input type="number" id="tolashSumma" 
+                       placeholder="Summani kiriting"
+                       style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:8px; box-sizing:border-box;"
+                       oninput="updateTolashConverter(${qarzSumma})"
+                />
+                <p id="tolashConvert" style="font-size:12px; color:#6b7280; margin:4px 0 0;"></p>
+            </div>
+            
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">
+                    Izoh (ixtiyoriy)
+                </label>
+                <input type="text" id="tolashIzoh" 
+                       placeholder="Izoh..."
+                       style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:8px; box-sizing:border-box;"
+                />
+            </div>
+            
+            <div style="display:flex; gap:8px;">
+                <button onclick="submitQarzTolash(${sotuvId})" style="
+                    flex:1; padding:10px; background:#059669; color:white;
+                    border:none; border-radius:8px; cursor:pointer; font-weight:600;
+                ">✅ To'lash</button>
+                <button onclick="document.getElementById('qarzModal').remove()" style="
+                    flex:1; padding:10px; background:#f3f4f6; color:#374151;
+                    border:none; border-radius:8px; cursor:pointer;
+                ">Bekor qilish</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function updateTolashConverter(qarzSumma) {
+    const summa = parseFloat(document.getElementById('tolashSumma').value) || 0;
+    const valyuta = document.getElementById('tolashValyuta').value;
+    const convertEl = document.getElementById('tolashConvert');
+    
+    if (!convertEl) return;
+    
+    if (valyuta === 'usd' && USD_KURS > 0) {
+        const somNarx = Math.round(summa * USD_KURS);
+        const qarzUsd = qarzSumma / USD_KURS;
+        convertEl.textContent = `= ${somNarx.toLocaleString('uz-UZ')} so'm | Qarz: $${qarzUsd.toFixed(2)}`;
+        convertEl.style.color = somNarx > qarzSumma ? '#dc2626' : '#059669';
+    } else {
+        convertEl.textContent = USD_KURS > 0 ? `≈ $${(summa / USD_KURS).toFixed(2)}` : '';
+        convertEl.style.color = summa > qarzSumma ? '#dc2626' : '#059669';
+    }
+}
+
+async function submitQarzTolash(sotuvId) {
+    const summa = document.getElementById('tolashSumma').value;
+    const valyuta = document.getElementById('tolashValyuta').value;
+    const izoh = document.getElementById('tolashIzoh').value;
+    
+    if (!summa || parseFloat(summa) <= 0) {
+        alert('Summani kiriting!');
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('summa', summa);
+        formData.append('valyuta', valyuta);
+        formData.append('izoh', izoh);
+        formData.append('csrfmiddlewaretoken', getCsrf());
+        
+        const response = await fetch(`/sotuv/${sotuvId}/qarz-tolash/`, {
+            method: 'POST',
+            body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            document.getElementById('qarzModal').remove();
+            window.location.reload(); // Sahifani yangilash
+        } else {
+            alert('Xatolik: ' + data.error);
+        }
+    } catch (error) {
+        alert('Tarmoq xatoligi: ' + error.message);
+    }
+}
+
+function getCsrf() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+
+// ============================================================
+// Sahifa yuklanganda USD kursini olish
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    fetchUsdKurs();
+    
+    // Har 10 daqiqada kursni yangilash
+    setInterval(fetchUsdKurs, 10 * 60 * 1000);
+});
+
+</script>
+
+{% endblock content %}

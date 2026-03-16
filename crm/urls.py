@@ -4,6 +4,7 @@ from . import views
 from django.conf import settings
 from django.conf.urls.static import static
 from . import checker
+import chek
 app_name = "main"
 
 urlpatterns = [
@@ -22,10 +23,14 @@ urlpatterns = [
     path('ish-qoshish/', views.IshQoshishView.as_view(), name='ish_qoshish'),
     
     # sotuvlar
-    path('sotuvlar/', views.SotuvListView.as_view(), name='sotuvlar'),
+    path('sotuvlar/', views.SotuvQoshish.as_view(), name='sotuvlar'),
+    path('sotuv/list/',views.SotuvListView.as_view(),name="sotuv_list"),
     path('sotuv/qoshish/', views.sotuv_qoshish, name='sotuv_qoshish'),
     path('sotuv/<int:sotuv_id>/ochirish/', views.sotuv_ochirish, name='sotuv_ochirish'),
     path('sotuv/detail/<int:pk>/',views.SotuvDetailView.as_view(),name="sotuv_detail"),
+    path('sotuv/<int:sotuv_id>/pdf/', views.sotuv_pdf, name='sotuv_pdf'),
+
+
     # Sotuv itemlari
     path('sotuv/<int:sotuv_id>/item/qoshish/', views.sotuv_item_qoshish, name='sotuv_item_qoshish'),
     path('sotuv/item/<int:item_id>/tahrirlash/', views.sotuv_item_tahrirlash, name='sotuv_item_tahrirlash'),
@@ -34,6 +39,7 @@ urlpatterns = [
 
     # Kirimlar
     path('kirimlar/', views.KirimListView.as_view(), name='kirimlar'),
+    path('kirim/qoshish/', views.kirim_qoshish, name='kirim_qoshish'),
 
     # Xaridorlar
     path('xaridorlar/', views.XaridorListView.as_view(), name='xaridorlar'),
@@ -41,6 +47,12 @@ urlpatterns = [
     path('xaridorlar/qoshish/', views.xaridor_qoshish, name='xaridor_qoshish'),
     path('xaridorlar/<int:pk>/tahrirlash/', views.xaridor_tahrirlash, name='xaridor_tahrirlash'),
     
+    
+    path('xaridorlar/<int:pk>/umumiy-chek/',
+    chek.XaridorUmumiyChekView.as_view(),
+    name='xaridor_umumiy_chek'),
+    path('ishchilar/<int:pk>/chek/', chek.IshchiChekView.as_view(), name='ishchi_chek'),
+
     # Checking
     
     path(
@@ -59,5 +71,6 @@ urlpatterns = [
     path('api/mahsulot/<int:mahsulot_id>/kroy-xomashyolar/', 
         checker.get_kroy_xomashyolar_api, 
         name='get_kroy_xomashyolar'),
+    path('api/usd-kurs/',views.get_usd_kurs,name="usd_kurs")
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

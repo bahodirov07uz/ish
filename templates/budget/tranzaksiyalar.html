@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<style>
+.filter-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:.85rem 1.1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fi{padding:5px 9px;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:12px;font-family:inherit;outline:none}
+.fi:focus{border-color:#7c3aed}
+.btn-filter{background:#7c3aed;color:white;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.summary-strip{display:flex;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.sum-box{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:.85rem 1.25rem;flex:1;min-width:150px}
+.sum-label{font-size:11px;text-transform:uppercase;font-weight:700;color:var(--text-secondary)}
+.sum-value{font-size:1.15rem;font-weight:800;margin-top:3px}
+.bd-table{width:100%;border-collapse:collapse;font-size:12px}
+.bd-table th{padding:.55rem .85rem;background:var(--bg-secondary);font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-secondary);font-weight:700;text-align:left}
+.bd-table td{padding:.65rem .85rem;border-top:1px solid var(--border-color)}
+.bd-table tbody tr:hover{background:var(--bg-hover)}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+.tag-c{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.tag-x{background:#fef3c7;color:#b45309;border:1px solid #fcd34d}
+.pagination{display:flex;gap:6px;justify-content:center;margin-top:1.25rem}
+.pag-btn{padding:5px 12px;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:12px;font-weight:600;text-decoration:none}
+.pag-btn.active{background:#7c3aed;color:white;border-color:#7c3aed}
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Tranzaksiyalar</div>
+        <a href="{% url 'budget:list' %}" style="font-size:13px;color:var(--text-secondary);text-decoration:none;display:flex;align-items:center;gap:5px;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5"/></svg>Byudjetlar
+        </a>
+    </header>
+    <main class="content"><div class="page">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;">
+            <h2 style="font-size:1.15rem;font-weight:800;margin:0;">Barcha tranzaksiyalar (log)</h2>
+            <span style="font-size:12px;color:var(--text-secondary);">Avtomatik — Chiqim va Xomashyo dan</span>
+        </div>
+
+        <!-- Filter -->
+        <form method="GET">
+            <div class="filter-panel">
+                <select name="manba" class="fi">
+                    <option value="">Barcha manba</option>
+                    <option value="chiqim" {% if manba_filter == 'chiqim' %}selected{% endif %}>Chiqim</option>
+                    <option value="xomashyo" {% if manba_filter == 'xomashyo' %}selected{% endif %}>Xomashyo</option>
+                </select>
+                <input type="date" name="date_from" class="fi" value="{{ date_from }}" placeholder="Boshlanish">
+                <span style="font-size:12px;color:var(--text-secondary);">—</span>
+                <input type="date" name="date_to" class="fi" value="{{ date_to }}" placeholder="Tugash">
+                <select name="ishchi" class="fi">
+                    <option value="">Barcha ishchilar</option>
+                    {% for i in ishchilar %}
+                    <option value="{{ i.pk }}" {% if request.GET.ishchi == i.pk|stringformat:'s' %}selected{% endif %}>{{ i.ism }} {{ i.familiya }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-filter">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 11 11" style="vertical-align:middle;margin-right:3px;"><circle cx="5" cy="5" r="4"/><path d="M9 9l1.5 1.5"/></svg>
+                    Filter
+                </button>
+                {% if manba_filter or date_from or date_to or request.GET.ishchi %}
+                <a href="{% url 'budget:tranzaksiyalar' %}" style="font-size:12px;color:#dc2626;font-weight:600;text-decoration:none;">✕ Tozalash</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- Summary -->
+        <div class="summary-strip">
+            <div class="sum-box">
+                <div class="sum-label">Jami sarfi (UZS)</div>
+                <div class="sum-value" style="color:#dc2626;">{{ jami_uzs|floatformat:0|intcomma }} so'm</div>
+            </div>
+            <div class="sum-box">
+                <div class="sum-label">Jami sarfi (USD)</div>
+                <div class="sum-value" style="color:#1d4ed8;">${{ jami_usd|floatformat:2 }}</div>
+            </div>
+            <div class="sum-box">
+                <div class="sum-label">Yozuvlar soni</div>
+                <div class="sum-value" style="color:#7c3aed;">{{ paginator.count }}</div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden;">
+            <div style="overflow-x:auto;">
+                <table class="bd-table">
+                    <thead><tr>
+                        <th>Sana</th>
+                        <th>Tur</th>
+                        <th>Nomi</th>
+                        <th>Kategoriya</th>
+                        <th>Ishchi / Foydalanuvchi</th>
+                        <th>Summa (UZS)</th>
+                        <th>Summa (USD)</th>
+                        <th>Manba</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for t in tranzaksiyalar %}
+                    <tr>
+                        <td style="color:var(--text-secondary);white-space:nowrap;">{{ t.sana|date:"d.m.Y" }}</td>
+                        <td>
+                            {% if t.manba == 'chiqim' %}<span class="tag tag-c">Chiqim</span>
+                            {% else %}<span class="tag tag-x">Xomashyo</span>{% endif %}
+                        </td>
+                        <td style="font-weight:600;max-width:220px;">{{ t.nomi|truncatechars:40 }}</td>
+                        <td style="color:var(--text-secondary);">{{ t.kategoriya|default:"—" }}</td>
+                        <td style="color:var(--text-secondary);">
+                            {% if t.ishchi %}
+                                <span style="font-weight:600;color:var(--text-primary);">{{ t.ishchi.ism }} {{ t.ishchi.familiya }}</span>
+                            {% elif t.foydalanuvchi %}
+                                {{ t.foydalanuvchi.get_full_name|default:t.foydalanuvchi.username }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td style="font-weight:800;color:#dc2626;white-space:nowrap;">{{ t.summa_uzs|floatformat:0|intcomma }}</td>
+                        <td style="color:#6b7280;">
+                            {% if t.summa_usd %}${{ t.summa_usd|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if t.chiqim %}
+                                <a href="#" style="font-size:11px;color:var(--color-primary);text-decoration:none;">Chiqim #{{ t.chiqim_id }}</a>
+                            {% elif t.xomashyo_harakat %}
+                                <a href="#" style="font-size:11px;color:#b45309;text-decoration:none;">Xomashyo #{{ t.xomashyo_harakat_id }}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary);">Tranzaksiyalar yo'q</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&manba={{ manba_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="pag-btn">← Oldingi</a>
+            {% endif %}
+            <span class="pag-btn active">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&manba={{ manba_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="pag-btn">Keyingi →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div></main>
+</div>
+{% endblock %}

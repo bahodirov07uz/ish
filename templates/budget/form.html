@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+.bf-wrap{max-width:520px;margin:0 auto}
+.bf-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden}
+.bf-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border-color)}
+.bf-head h3{font-size:1rem;font-weight:800;margin:0}
+.bf-body{padding:1.5rem}
+.fg{margin-bottom:1rem}
+.fl{display:block;font-size:.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:.4rem}
+.fi{width:100%;padding:.6rem .9rem;border:1.5px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:.875rem;outline:none;font-family:inherit;box-sizing:border-box;transition:border-color .15s}
+.fi:focus{border-color:#7c3aed;background:var(--bg-card)}
+.fi-ta{resize:vertical;min-height:70px}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.qb{background:var(--bg-secondary);border:1.5px solid var(--border-color);border-radius:6px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary);font-family:inherit;transition:all .12s}
+.qb:hover{border-color:#7c3aed;color:#7c3aed}
+.bf-actions{display:flex;gap:8px;padding-top:1rem;border-top:1px solid var(--border-color);margin-top:.75rem}
+.btn-sub{flex:1;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-can{background:var(--bg-secondary);color:var(--text-primary);border:1.5px solid var(--border-color);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center}
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">{% if object %}Byudjet tahrirlash{% else %}Yangi byudjet{% endif %}</div>
+    </header>
+    <main class="content"><div class="page">
+        <div class="bf-wrap">
+            <div class="bf-card">
+                <div class="bf-head">
+                    <h3>{% if object %}{{ object.nomi }}{% else %}Yangi byudjet yaratish{% endif %}</h3>
+                </div>
+                <div class="bf-body">
+                    {% if not object %}
+                    <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">Tezkor tanlov</div>
+                    <div class="quick-btns">
+                        <button type="button" class="qb" onclick="setMonth(0)">Bu oy</button>
+                        <button type="button" class="qb" onclick="setMonth(-1)">O'tgan oy</button>
+                        <button type="button" class="qb" onclick="setQuarter()">Bu chorak</button>
+                        <button type="button" class="qb" onclick="setYear()">Bu yil</button>
+                    </div>
+                    {% endif %}
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="fg">
+                            <label class="fl">Byudjet nomi <span style="color:#ef4444;">*</span></label>
+                            <input type="text" name="nomi" class="fi" value="{{ form.nomi.value|default:'' }}" placeholder="Masalan: Mart 2025 byudjeti" required id="nomiInput">
+                        </div>
+                        <div class="fg-row">
+                            <div class="fg">
+                                <label class="fl">Davr boshi <span style="color:#ef4444;">*</span></label>
+                                <input type="date" name="davr_boshi" class="fi" value="{{ form.davr_boshi.value|default:'' }}" required id="davrBoshi">
+                            </div>
+                            <div class="fg">
+                                <label class="fl">Davr oxiri <span style="color:#ef4444;">*</span></label>
+                                <input type="date" name="davr_oxiri" class="fi" value="{{ form.davr_oxiri.value|default:'' }}" required id="davrOxiri">
+                            </div>
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Umumiy byudjet (so'm) <span style="color:#ef4444;">*</span></label>
+                            <input type="number" name="umumiy_summa" class="fi" value="{{ form.umumiy_summa.value|default:'' }}" placeholder="50000000" min="1" required>
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Izoh</label>
+                            <textarea name="izoh" class="fi fi-ta" placeholder="Qo'shimcha ma'lumot...">{{ form.izoh.value|default:'' }}</textarea>
+                        </div>
+                        {% if form.errors %}
+                        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#dc2626;">
+                            {% for f,errs in form.errors.items %}{% for e in errs %}<div>⚠ {{ e }}</div>{% endfor %}{% endfor %}
+                        </div>
+                        {% endif %}
+                        <div class="bf-actions">
+                            <a href="{% url 'budget:list' %}" class="btn-can">Bekor</a>
+                            <button type="submit" class="btn-sub">{% if object %}✅ Saqlash{% else %}🚀 Yaratish{% endif %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div></main>
+</div>
+<script>
+function fmt(d){return d.toISOString().split('T')[0]}
+const OY=['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
+function setMonth(offset){
+    const now=new Date(),y=now.getFullYear(),m=now.getMonth()+offset;
+    const first=new Date(y,m,1),last=new Date(y,m+1,0);
+    document.getElementById('davrBoshi').value=fmt(first);
+    document.getElementById('davrOxiri').value=fmt(last);
+    document.getElementById('nomiInput').value=`${OY[first.getMonth()]} ${first.getFullYear()} byudjeti`;
+}
+function setQuarter(){
+    const now=new Date(),q=Math.floor(now.getMonth()/3);
+    const first=new Date(now.getFullYear(),q*3,1),last=new Date(now.getFullYear(),q*3+3,0);
+    document.getElementById('davrBoshi').value=fmt(first);
+    document.getElementById('davrOxiri').value=fmt(last);
+    document.getElementById('nomiInput').value=`${now.getFullYear()} Q${q+1} byudjeti`;
+}
+function setYear(){
+    const y=new Date().getFullYear();
+    document.getElementById('davrBoshi').value=`${y}-01-01`;
+    document.getElementById('davrOxiri').value=`${y}-12-31`;
+    document.getElementById('nomiInput').value=`${y} yillik byudjet`;
+}
+</script>
+{% endblock %}

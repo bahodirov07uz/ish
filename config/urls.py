@@ -8,6 +8,9 @@ urlpatterns = [
     path("",include("shop.urls")),
     path('uy', include('crm.urls')),
     path('xomashyo/', include('xomashyo.urls')),
+    path('analytics/', include('analytics.urls', namespace='analytics')),
+    path('budget/', include('budget.urls')),
     path('accounts/', include('allauth.urls')),
+    
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

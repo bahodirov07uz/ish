@@ -1,0 +1,1045 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<style>
+/* ─── kirim_qoshish sahifasiga xos stillar ─── */
+.kq-wrapper {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.kq-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.kq-page-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.kq-page-header h2 span.icon-bg {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, #059669, #047857);
+    border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; flex-shrink: 0;
+}
+.kq-page-header p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.kq-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.kq-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.kq-card-header {
+    padding: 1.1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; gap: 10px;
+}
+.kq-card-header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+}
+.kq-card-body { padding: 1.5rem; }
+
+.section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    margin-top: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.section-label:first-child { margin-top: 0; }
+.section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.form-group { margin-bottom: 1.1rem; }
+.form-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.45rem;
+}
+.form-label .required {
+    color: #ef4444;
+    margin-left: 2px;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+    outline: none;
+    font-family: inherit;
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    background: var(--bg-card);
+}
+.form-textarea { resize: vertical; min-height: 80px; }
+
+.summa-group {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+.summa-group .form-group { flex: 1; margin-bottom: 0; }
+.valyuta-toggle {
+    display: flex;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    height: 40px;
+}
+.valyuta-toggle input[type="radio"] { display: none; }
+.valyuta-toggle label {
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    transition: all .15s;
+    border-right: 1px solid var(--border-color);
+    user-select: none;
+    gap: 5px;
+}
+.valyuta-toggle label:last-of-type { border-right: none; }
+.valyuta-toggle input[type="radio"]:checked + label {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.usd-kurs-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    margin-top: 0.75rem;
+    font-size: 12px;
+    color: #1e40af;
+    font-weight: 600;
+}
+.usd-kurs-row input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    color: #1e40af;
+    font-weight: 700;
+    outline: none;
+    font-family: inherit;
+}
+.usd-preview {
+    font-size: 12px;
+    color: #059669;
+    font-weight: 600;
+    margin-top: 4px;
+    min-height: 18px;
+    transition: opacity .2s;
+}
+
+.xaridor-search-wrap { position: relative; }
+.xaridor-search-wrap input { padding-left: 2.2rem; }
+.xaridor-search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+.xaridor-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--bg-card);
+    border: 1.5px solid var(--color-primary);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 999;
+    display: none;
+}
+.xaridor-dropdown.open { display: block; }
+.xaridor-item {
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background .1s;
+}
+.xaridor-item:last-child { border-bottom: none; }
+.xaridor-item:hover { background: var(--bg-hover); }
+.xaridor-item .avatar-sm {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white; font-weight: 700; font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.xaridor-item .xaridor-info { flex: 1; }
+.xaridor-item .xaridor-tel { font-size: 11px; color: var(--text-secondary); }
+.xaridor-selected-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: #166534;
+    font-weight: 600;
+}
+.xaridor-selected-badge.show { display: flex; }
+.xaridor-selected-badge button {
+    background: none; border: none; cursor: pointer;
+    color: #dc2626; padding: 0; margin-left: auto;
+    display: flex; align-items: center;
+}
+
+.qarz-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #845fb1; border: 1px solid #fcd34d;
+    color: #92400e; border-radius: 6px; padding: 3px 8px;
+    font-size: 11px; font-weight: 700;
+}
+
+.kq-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 1.25rem;
+}
+.btn-submit {
+    flex: 1;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all .15s;
+    font-family: inherit;
+}
+.btn-submit:hover { background: linear-gradient(135deg, #047857, #065f46); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(5,150,105,.3); }
+.btn-submit:active { transform: translateY(0); }
+.btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex; align-items: center; gap: 6px;
+    transition: all .15s;
+    font-family: inherit;
+}
+.btn-cancel:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.info-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.info-card-header {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-secondary);
+    display: flex; align-items: center; gap: 6px;
+}
+.info-card-body { padding: 1rem; }
+
+.sidebar-qarz-item {
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background .1s;
+    border-radius: 4px;
+    padding-left: 4px;
+}
+.sidebar-qarz-item:last-child { border-bottom: none; }
+.sidebar-qarz-item:hover { background: var(--bg-hover); }
+.sidebar-qarz-item .qarz-sotuv { color: var(--text-secondary); font-size: 11px; }
+.sidebar-qarz-summa { font-weight: 700; color: #dc2626; white-space: nowrap; }
+
+.tip-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; color: var(--text-secondary);
+    margin-bottom: 0.6rem;
+    line-height: 1.5;
+}
+.tip-item:last-child { margin-bottom: 0; }
+.tip-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--color-primary);
+    flex-shrink: 0; margin-top: 5px;
+}
+
+.messages-wrap { margin-bottom: 1rem; }
+.alert {
+    padding: 0.75rem 1rem; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 0.5rem;
+}
+.alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+.alert-success { background: #f0fdf4; border: 1px solid #86efac; color: #16a34a; }
+
+/* ── YANGI: Avtomatik taqsimlash checkbox va preview ── */
+.avto-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    transition: border-color .15s;
+    user-select: none;
+}
+.avto-toggle:hover { border-color: var(--color-primary); }
+.avto-toggle.active {
+    border-color: #059669;
+    background: #f0fdf4;
+}
+.avto-toggle input[type="checkbox"] { display: none; }
+.avto-toggle-icon {
+    width: 20px; height: 20px; border-radius: 5px;
+    border: 2px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all .15s;
+    background: var(--bg-card);
+}
+.avto-toggle.active .avto-toggle-icon {
+    background: #059669;
+    border-color: #059669;
+    color: white;
+}
+.avto-toggle-text { flex: 1; }
+.avto-toggle-text strong { font-size: 13px; color: var(--text-primary); }
+.avto-toggle-text small  { display: block; font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+
+.avto-preview {
+    display: none;
+    border: 1.5px solid #fcd34d;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.avto-preview.show { display: block; }
+.avto-preview-header {
+    padding: 8px 12px;
+    background: #0abc2b;
+    border-bottom: 1px solid #fcd34d;
+    font-size: 11px; font-weight: 700; color: #92400e;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.avto-preview-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid #fde68a;
+}
+.avto-preview-item:last-child { border-bottom: none; }
+.avto-preview-item.full    { background: #f0fdf4; }
+.avto-preview-item.partial { background: #fffbeb; }
+.avto-preview-item.nopay  { opacity: 0.45; background: var(--bg-secondary); }
+.api-id   { font-weight: 700; color: var(--color-primary); width: 52px; flex-shrink: 0; }
+.api-sana { color: var(--text-secondary); flex: 1; }
+.api-qarz { font-weight: 700; color: #dc2626; white-space: nowrap; }
+.api-sep  { color: var(--text-secondary); }
+.api-res  { font-weight: 800; color: #059669; white-space: nowrap; }
+.api-res.red { color: #9ca3af; font-weight: 400; }
+.avto-preview-footer {
+    padding: 7px 12px;
+    background: #fef3c7;
+    border-top: 1px solid #fcd34d;
+    font-size: 11px; font-weight: 600; color: #92400e;
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+@media (max-width: 900px) { .kq-layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+    .main-content { margin-left: 0; }
+    .content { padding: 1rem; }
+    .kq-card-body { padding: 1rem; }
+    .summa-group { flex-direction: column; }
+    .valyuta-toggle { width: 100%; }
+}
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Kirim qo'shish</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <a href="{% url 'main:kirimlar' %}" style="display:flex; align-items:center; gap:6px; color:var(--text-secondary); text-decoration:none; font-size:13px;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5"/></svg>
+                Kirimlar
+            </a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <div class="breadcrumb">
+                <a href="/">Bosh sahifa</a>
+                <span>/</span>
+                <a href="{% url 'main:kirimlar' %}">Kirimlar</a>
+                <span>/</span>
+                <span>Qo'shish</span>
+            </div>
+
+            <div class="kq-page-header">
+                <div>
+                    <h2>
+                        <span class="icon-bg">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 18 18">
+                                <path d="M9 3v12M3 9h12"/>
+                            </svg>
+                        </span>
+                        Yangi kirim qo'shish
+                    </h2>
+                    <p style="margin-top:4px;">Xaridordan to'lov yoki kirim ro'yxatga olish</p>
+                </div>
+            </div>
+
+            {% if messages %}
+            <div class="messages-wrap">
+                {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+                    {% if message.tags == 'error' %}
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M7 4v4M7 10h.01"/></svg>
+                    {% else %}
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M2 7l4 4 6-6"/></svg>
+                    {% endif %}
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="kq-layout">
+                <!-- MAIN FORM -->
+                <div>
+                    <form method="POST" id="kirimForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="xaridor_id" id="selectedXaridorId">
+                        <input type="hidden" name="usd_kurs" id="hiddenUsdKurs" value="0">
+                        <!-- YANGI: avtomatik taqsimlash flag -->
+                        <input type="hidden" name="taqsimlash_rejimi" id="taqsimlashRejimi" value="0">
+
+                        <div class="kq-card">
+                            <div class="kq-card-header">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 16 16"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+                                <h3>Xaridor va sotuv</h3>
+                            </div>
+                            <div class="kq-card-body">
+
+                                <div class="section-label">Xaridor tanlash</div>
+
+                                <!-- Xaridor search -->
+                                <div class="form-group">
+                                    <label class="form-label">Xaridor <span class="required">*</span></label>
+                                    <div class="xaridor-search-wrap" id="xaridorSearchWrap">
+                                        <svg class="xaridor-search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 15 15">
+                                            <circle cx="6.5" cy="6.5" r="4.5"/><path d="M11 11l2.5 2.5"/>
+                                        </svg>
+                                        <input
+                                            type="text"
+                                            id="xaridorSearch"
+                                            class="form-input"
+                                            placeholder="Xaridor ismi yoki telefon raqami..."
+                                            autocomplete="off"
+                                        >
+                                        <div class="xaridor-dropdown" id="xaridorDropdown">
+                                            {% for xaridor in xaridorlar %}
+                                            <div class="xaridor-item"
+                                                 data-id="{{ xaridor.id }}"
+                                                 data-ism="{{ xaridor.ism }}"
+                                                 data-tel="{{ xaridor.telefon|default:'' }}"
+                                                 onclick="selectXaridor(this)">
+                                                <div class="avatar-sm">{{ xaridor.ism|slice:":1"|upper }}</div>
+                                                <div class="xaridor-info">
+                                                    <div>{{ xaridor.ism }}</div>
+                                                    {% if xaridor.telefon %}
+                                                    <div class="xaridor-tel">{{ xaridor.telefon }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="xaridor-selected-badge" id="xaridorBadge">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7l4 4 6-6"/></svg>
+                                        <span id="xaridorBadgeText"></span>
+                                        <button type="button" onclick="clearXaridor()" title="O'chirish">
+                                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- YANGI: Avtomatik taqsimlash toggle -->
+                                <div class="avto-toggle" id="avtoToggleLabel" onclick="toggleAvto()">
+                                    <div class="avto-toggle-icon" id="avtoIcon">
+                                        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 11 11" style="display:none;" id="avtoCheck"><path d="M1.5 5.5l3 3 5-5"/></svg>
+                                    </div>
+                                    <div class="avto-toggle-text">
+                                        <strong>⚡ Avtomatik taqsimlash</strong>
+                                        <small>Pul eski qarzlardan boshlab ketma-ket yopiladi (sotuv tanlamasa ham)</small>
+                                    </div>
+                                </div>
+
+                                <!-- Avto preview -->
+                                <div class="avto-preview" id="avtoPreview">
+                                    <div class="avto-preview-header">
+                                        <span>⚡ Taqsimlash tartibi (eski → yangi)</span>
+                                        <span id="avtoTotalQarz"></span>
+                                    </div>
+                                    <div id="avtoPreviewBody">
+                                        <div style="padding:10px 12px; color:var(--text-secondary); font-size:12px; text-align:center;">
+                                            Xaridor va summani kiriting
+                                        </div>
+                                    </div>
+                                    <div class="avto-preview-footer" id="avtoPreviewFooter" style="display:none;">
+                                        <span id="avtoFooterText"></span>
+                                        <span id="avtoFooterVal" style="color:#059669; font-weight:800;"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Sotuv (optional) — avto rejimda yashiriladi -->
+                                <div id="sotuvBlock">
+                                    <div class="form-group">
+                                        <label class="form-label">Bog'liq sotuv <small style="color:var(--text-secondary); font-weight:400;">(ixtiyoriy)</small></label>
+                                        <select name="sotuv_id" id="sotuvSelect" class="form-select">
+                                            <option value="">— Sotuvsiz kirim (umumiy) —</option>
+                                            {% for sotuv in barcha_sotuvlar %}
+                                            <option value="{{ sotuv.id }}"
+                                                    data-xaridor="{{ sotuv.xaridor.id }}"
+                                                    data-qarz="{{ sotuv.qarz_summa }}"
+                                                    data-xaridor-ism="{{ sotuv.xaridor.ism }}">
+                                                #{{ sotuv.id }} — {{ sotuv.xaridor.ism }} — Qarz: {{ sotuv.qarz_summa|floatformat:0 }} so'm ({{ sotuv.sana|date:"d.m.Y" }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div id="sotuvQarzBadge" style="display:none; margin-top:8px;">
+                                            <span class="qarz-badge">
+                                                ⚠ Qolgan qarz: <strong id="sotuvQarzVal"></strong>
+                                            </span>
+                                            <small style="color:var(--text-secondary); font-size:11px; margin-left:8px;">Summani qarzdan oshirmaslik kerak</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="section-label">To'lov ma'lumotlari</div>
+
+                                <!-- Summa + Valyuta -->
+                                <div class="form-group">
+                                    <label class="form-label">Summa <span class="required">*</span></label>
+                                    <div class="summa-group">
+                                        <div class="form-group">
+                                            <input
+                                                type="number"
+                                                name="summa"
+                                                id="summaInput"
+                                                class="form-input"
+                                                placeholder="0"
+                                                min="1"
+                                                step="any"
+                                                required
+                                                oninput="updateUsdPreview()"
+                                            >
+                                        </div>
+                                        <div class="valyuta-toggle">
+                                            <input type="radio" name="valyuta" id="vUzs" value="uzs" checked onchange="onValyutaChange()">
+                                            <label for="vUzs">🇺🇿 So'm</label>
+                                            <input type="radio" name="valyuta" id="vUsd" value="usd" onchange="onValyutaChange()">
+                                            <label for="vUsd">🇺🇸 USD</label>
+                                        </div>
+                                    </div>
+                                    <div class="usd-kurs-row" id="usdKursRow">
+                                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 3.5v3l1.5 1.5"/></svg>
+                                        1 USD =
+                                        <input type="text" id="usdKursInput" value="Yuklanmoqda..." oninput="updateUsdPreview()">
+                                        so'm
+                                        <button type="button" onclick="fetchUsdKurs()" style="background:none;border:none;cursor:pointer;color:#3b82f6;display:flex;align-items:center;padding:0;">
+                                            <svg id="kursRefIcon" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><path d="M10 2A5 5 0 1 0 11 6M11 2v3H8"/></svg>
+                                        </button>
+                                    </div>
+                                    <div class="usd-preview" id="usdPreview"></div>
+                                </div>
+
+                                <div class="section-label">Qo'shimcha</div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Izoh</label>
+                                    <textarea name="izoh" class="form-textarea" placeholder="Masalan: Naqd to'lov, karta orqali, qarz uzdi..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Sana va vaqt</label>
+                                    <input type="datetime-local" name="sana" class="form-input" value="{{ now_iso }}">
+                                </div>
+
+                                <div class="kq-actions">
+                                    <a href="{% url 'main:kirimlar' %}" class="btn-cancel">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5"/></svg>
+                                        Bekor
+                                    </a>
+                                    <button type="submit" class="btn-submit" id="submitBtn">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 16 16"><path d="M8 2v12M2 8h12"/></svg>
+                                        <span id="submitBtnText">Kirimni saqlash</span>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SIDEBAR -->
+                <div>
+                    <!-- USD Kurs -->
+                    <div class="info-card">
+                        <div class="info-card-header">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 4v3l1.5 1"/></svg>
+                            Valyuta kursi
+                        </div>
+                        <div class="info-card-body">
+                            <div style="font-size:22px; font-weight:800; color:var(--color-primary);" id="sidebarKurs">—</div>
+                            <div style="font-size:12px; color:var(--text-secondary); margin-top:3px;">1 USD = ? so'm (CBU)</div>
+                            <button onclick="fetchUsdKurs()" style="margin-top:10px; width:100%; background:var(--bg-secondary); border:1.5px solid var(--border-color); border-radius:7px; padding:7px; font-size:12px; font-weight:600; cursor:pointer; color:var(--text-primary); font-family:inherit; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><path d="M10 2A5 5 0 1 0 11 6M11 2v3H8"/></svg>
+                                Kursni yangilash
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Qarzli sotuvlar -->
+                    {% if barcha_sotuvlar %}
+                    <div class="info-card">
+                        <div class="info-card-header" style="color:#d97706;">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 4v4M6.5 10h.01"/></svg>
+                            Qarzli sotuvlar
+                        </div>
+                        <div class="info-card-body" style="padding: 0.5rem 0.75rem;">
+                            {% for sotuv in barcha_sotuvlar|slice:":8" %}
+                            <div class="sidebar-qarz-item" onclick="fillFromSotuv('{{ sotuv.id }}', '{{ sotuv.xaridor.id }}', '{{ sotuv.xaridor.ism|escapejs }}', '{{ sotuv.xaridor.telefon|default:""|escapejs }}', '{{ sotuv.qarz_summa|floatformat:0 }}')">
+                                <div>
+                                    <div style="font-weight:600; color:var(--text-primary);">{{ sotuv.xaridor.ism }}</div>
+                                    <div class="qarz-sotuv">Sotuv #{{ sotuv.id }} · {{ sotuv.sana|date:"d.m.Y" }}</div>
+                                </div>
+                                <div class="sidebar-qarz-summa">{{ sotuv.qarz_summa|floatformat:0 }} so'm</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Tips -->
+                    <div class="info-card">
+                        <div class="info-card-header">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 4v4M6.5 9h.01"/></svg>
+                            Eslatmalar
+                        </div>
+                        <div class="info-card-body">
+                            <div class="tip-item">
+                                <div class="tip-dot"></div>
+                                <span>Sotuv tanlanmasa — kirim umumiy hisob sifatida qo'shiladi</span>
+                            </div>
+                            <div class="tip-item">
+                                <div class="tip-dot"></div>
+                                <span>USD da kiritilsa, avtomatik so'mga aylantiriladi</span>
+                            </div>
+                            <div class="tip-item">
+                                <div class="tip-dot"></div>
+                                <span>Sotuv qarzidan ortiq summa kiritish mumkin emas</span>
+                            </div>
+                            <div class="tip-item">
+                                <div class="tip-dot"></div>
+                                <span><b>Avto taqsimlash</b>: eski qarzdan yangi qarzga ketma-ket yopadi</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+/* ── Sotuvlar data (avto preview uchun) ── */
+const SOTUVLAR_BY_XARIDOR = {};
+{% for sotuv in barcha_sotuvlar %}
+{% if sotuv.qarz_summa > 0 %}
+(SOTUVLAR_BY_XARIDOR["{{ sotuv.xaridor.id }}"] = SOTUVLAR_BY_XARIDOR["{{ sotuv.xaridor.id }}"] || []).push({
+    id: {{ sotuv.id }},
+    sana: "{{ sotuv.sana|date:'d.m.Y' }}",
+    qarz: parseFloat("{{ sotuv.qarz_summa|floatformat:2 }}".replace(',', '.')),
+});
+{% endif %}
+{% endfor %}
+
+/* ── Eski o'zgaruvchilar ── */
+let USD_KURS = 0;
+let selectedXaridorId = null;
+let avtoEnabled = false;
+let searchInput, dropdown;
+
+/* ── USD kurs — ASLIY logika ── */
+async function fetchUsdKurs() {
+    const icon = document.getElementById('kursRefIcon');
+    if (icon) icon.style.animation = 'spin 1s linear infinite';
+    try {
+        const resp = await fetch('/uyapi/usd-kurs/');
+        const data = await resp.json();
+        USD_KURS = parseFloat(data.rate) || 0;
+        if (USD_KURS > 0) {
+            document.getElementById('usdKursInput').value = USD_KURS.toFixed(2);
+            document.getElementById('hiddenUsdKurs').value = USD_KURS;
+            document.getElementById('sidebarKurs').textContent =
+                USD_KURS.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + " so'm";
+            updateUsdPreview();
+        }
+    } catch(e) {
+        const el = document.getElementById('usdKursInput');
+        if (el) el.value = 'Xatolik';
+    }
+    if (icon) icon.style.animation = '';
+}
+
+function getKursFromInput() {
+    let raw = document.getElementById('usdKursInput').value;
+    raw = raw.replace(/\s/g, '');
+    const commaCount = (raw.match(/,/g) || []).length;
+    if (commaCount === 1) {
+        raw = raw.replace(',', '.');
+    } else {
+        raw = raw.replace(/,/g, '');
+    }
+    raw = raw.replace(/[^\d.]/g, '');
+    const val = parseFloat(raw);
+    if (val > 0) {
+        USD_KURS = val;
+        document.getElementById('hiddenUsdKurs').value = val;
+        return val;
+    }
+    return USD_KURS;
+}
+
+function updateUsdPreview() {
+    const summa = parseFloat(document.getElementById('summaInput').value) || 0;
+    const kurs = getKursFromInput();
+    const el = document.getElementById('usdPreview');
+    if (!el) return;
+    if (summa <= 0 || kurs <= 0) { el.textContent = ''; }
+    else {
+        const isUsd = document.querySelector('input[name="valyuta"]:checked')?.value === 'usd';
+        if (isUsd) {
+            el.textContent = `≈ ${(summa * kurs).toLocaleString('ru-RU', {maximumFractionDigits:0})} so'm`;
+        } else {
+            el.textContent = `≈ $${(summa / kurs).toFixed(2)}`;
+        }
+    }
+    if (avtoEnabled) refreshAvtoPreview();
+}
+
+function onValyutaChange() {
+    updateUsdPreview();
+}
+
+/* ── Xaridor search ── */
+function selectXaridor(el) {
+    selectedXaridorId = el.dataset.id;
+    document.getElementById('selectedXaridorId').value = selectedXaridorId;
+    document.getElementById('xaridorBadge').classList.add('show');
+    document.getElementById('xaridorBadgeText').textContent =
+        el.dataset.ism + (el.dataset.tel ? ' · ' + el.dataset.tel : '');
+    searchInput.value = '';
+    dropdown.classList.remove('open');
+    filterSotuvByXaridor(selectedXaridorId);
+    if (avtoEnabled) refreshAvtoPreview();
+}
+
+function clearXaridor() {
+    selectedXaridorId = null;
+    document.getElementById('selectedXaridorId').value = '';
+    document.getElementById('xaridorBadge').classList.remove('show');
+    filterSotuvByXaridor(null);
+    if (avtoEnabled) refreshAvtoPreview();
+}
+
+function filterSotuvByXaridor(xaridorId) {
+    const sel = document.getElementById('sotuvSelect');
+    const opts = sel.querySelectorAll('option[data-xaridor]');
+    opts.forEach(opt => {
+        opt.style.display = (!xaridorId || opt.dataset.xaridor === xaridorId) ? '' : 'none';
+    });
+    if (sel.value && sel.options[sel.selectedIndex]?.dataset.xaridor !== xaridorId) {
+        sel.value = '';
+        onSotuvChange();
+    }
+}
+
+function onSotuvChange() {
+    const sel = document.getElementById('sotuvSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const badge = document.getElementById('sotuvQarzBadge');
+    if (opt && opt.dataset.qarz) {
+        const qarz = parseFloat(opt.dataset.qarz);
+        if (qarz > 0) {
+            badge.style.display = 'block';
+            document.getElementById('sotuvQarzVal').textContent =
+                qarz.toLocaleString('uz-UZ', { maximumFractionDigits: 0 }) + " so'm";
+            if (!selectedXaridorId && opt.dataset.xaridor) {
+                const xIsmEl = document.querySelector(`.xaridor-item[data-id="${opt.dataset.xaridor}"]`);
+                if (xIsmEl) selectXaridor(xIsmEl);
+            }
+        } else {
+            badge.style.display = 'none';
+        }
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function fillFromSotuv(sotuvId, xaridorId, xaridorIsm, xaridorTel, qarz) {
+    const xEl = document.querySelector(`.xaridor-item[data-id="${xaridorId}"]`);
+    if (xEl) selectXaridor(xEl);
+    else {
+        selectedXaridorId = xaridorId;
+        document.getElementById('selectedXaridorId').value = xaridorId;
+        document.getElementById('xaridorBadge').classList.add('show');
+        document.getElementById('xaridorBadgeText').textContent = xaridorIsm + (xaridorTel ? ' · ' + xaridorTel : '');
+    }
+    const sel = document.getElementById('sotuvSelect');
+    sel.value = sotuvId;
+    onSotuvChange();
+    if (qarz && parseFloat(qarz) > 0) {
+        document.getElementById('summaInput').value = parseFloat(qarz);
+        updateUsdPreview();
+    }
+    document.getElementById('kirimForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Avtomatik taqsimlash ── */
+function toggleAvto() {
+    avtoEnabled = !avtoEnabled;
+    document.getElementById('taqsimlashRejimi').value = avtoEnabled ? '1' : '0';
+    document.getElementById('avtoToggleLabel').classList.toggle('active', avtoEnabled);
+    document.getElementById('avtoCheck').style.display = avtoEnabled ? 'block' : 'none';
+    document.getElementById('avtoPreview').classList.toggle('show', avtoEnabled);
+    document.getElementById('sotuvBlock').style.display = avtoEnabled ? 'none' : 'block';
+    document.getElementById('submitBtnText').textContent = avtoEnabled ? '⚡ Avtomatik taqsimlash' : 'Kirimni saqlash';
+    if (avtoEnabled) refreshAvtoPreview();
+}
+
+function getUzsSumma() {
+    const summa = parseFloat(document.getElementById('summaInput').value) || 0;
+    const kurs  = getKursFromInput();
+    const isUsd = document.querySelector('input[name="valyuta"]:checked')?.value === 'usd';
+    return isUsd ? summa * kurs : summa;
+}
+
+function refreshAvtoPreview() {
+    if (!avtoEnabled) return;
+    const uzsSumma = getUzsSumma();
+    const sotuvlar = (SOTUVLAR_BY_XARIDOR[selectedXaridorId] || []).slice().sort((a, b) => a.id - b.id);
+    const bodyEl   = document.getElementById('avtoPreviewBody');
+    const footerEl = document.getElementById('avtoPreviewFooter');
+
+    const totalQarz = sotuvlar.reduce((s, x) => s + x.qarz, 0);
+    document.getElementById('avtoTotalQarz').textContent =
+        totalQarz > 0 ? 'Jami: ' + totalQarz.toLocaleString('ru-RU') + ' so\'m' : '';
+
+    if (!selectedXaridorId) {
+        bodyEl.innerHTML = '<div style="padding:10px 12px;color:var(--text-secondary);font-size:12px;text-align:center;">Xaridor tanlanmagan</div>';
+        footerEl.style.display = 'none';
+        return;
+    }
+    if (sotuvlar.length === 0) {
+        bodyEl.innerHTML = '<div style="padding:10px 12px;color:#059669;font-size:12px;text-align:center;">✅ Bu xaridorda qarzli sotuvlar yo\'q</div>';
+        footerEl.style.display = 'none';
+        return;
+    }
+
+    let qolgan = uzsSumma;
+    let html = '';
+    for (const s of sotuvlar) {
+        const tolov    = Math.min(Math.max(qolgan, 0), s.qarz);
+        const willFull = tolov >= s.qarz - 0.5;
+        const willPay  = tolov > 0.5;
+        const cls = willFull ? 'full' : (willPay ? 'partial' : 'nopay');
+
+        html += `<div class="avto-preview-item ${cls}">
+            <span class="api-id">#${s.id}</span>
+            <span class="api-sana">${s.sana}</span>
+            <span class="api-qarz">${s.qarz.toLocaleString('ru-RU')} so'm</span>
+            <span class="api-sep">→</span>`;
+        if (willFull) {
+            html += `<span class="api-res">✅ To'liq yopiladi</span>`;
+        } else if (willPay) {
+            html += `<span class="api-res">${tolov.toLocaleString('ru-RU')} so'm</span>`;
+        } else {
+            html += `<span class="api-res red">To'lanmaydi</span>`;
+        }
+        html += `</div>`;
+        qolgan -= tolov;
+    }
+    bodyEl.innerHTML = html;
+
+    if (uzsSumma <= 0) { footerEl.style.display = 'none'; return; }
+    footerEl.style.display = 'flex';
+    if (qolgan > 0.5) {
+        document.getElementById('avtoFooterText').textContent = 'Qarzdan ortiq — umumiy kirim:';
+        document.getElementById('avtoFooterVal').textContent  = '+' + Math.round(qolgan).toLocaleString('ru-RU') + ' so\'m';
+    } else {
+        document.getElementById('avtoFooterText').textContent = '✅ Barcha qarzlar yopiladi';
+        document.getElementById('avtoFooterVal').textContent  = '';
+    }
+}
+
+/* ── Init — hammasi DOMContentLoaded ichida ── */
+document.addEventListener('DOMContentLoaded', function() {
+    /* Xaridor search event listeners */
+    searchInput = document.getElementById('xaridorSearch');
+    dropdown    = document.getElementById('xaridorDropdown');
+
+    searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        let any = false;
+        dropdown.querySelectorAll('.xaridor-item').forEach(item => {
+            const match = q === '' || item.dataset.ism.toLowerCase().includes(q) || item.dataset.tel.toLowerCase().includes(q);
+            item.style.display = match ? 'flex' : 'none';
+            if (match) any = true;
+        });
+        dropdown.classList.toggle('open', any && q.length > 0);
+    });
+
+    searchInput.addEventListener('focus', function() {
+        if (this.value.length > 0) dropdown.classList.add('open');
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('xaridorSearchWrap').contains(e.target)) {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    /* Sotuv change listener */
+    document.getElementById('sotuvSelect').addEventListener('change', onSotuvChange);
+
+    /* Form submit */
+    document.getElementById('kirimForm').addEventListener('submit', function(e) {
+        if (!document.getElementById('selectedXaridorId').value) {
+            e.preventDefault();
+            alert("Iltimos, xaridor tanlang!");
+            document.getElementById('xaridorSearch').focus();
+            return;
+        }
+        const summa = parseFloat(document.getElementById('summaInput').value);
+        if (!summa || summa <= 0) {
+            e.preventDefault();
+            alert("Iltimos, to'g'ri summa kiriting!");
+            return;
+        }
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').innerHTML = `
+            <svg style="animation:spin 1s linear infinite" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><path d="M10 2A5 5 0 1 0 11 6M11 2v3H8"/></svg>
+            Saqlanmoqda...
+        `;
+    });
+
+    /* USD kurs */
+    fetchUsdKurs();
+    setInterval(fetchUsdKurs, 10 * 60 * 1000);
+
+    /* URL params */
+    const params = new URLSearchParams(window.location.search);
+    const sotuvParam = params.get('sotuv');
+    if (sotuvParam) {
+        const sel = document.getElementById('sotuvSelect');
+        sel.value = sotuvParam;
+        onSotuvChange();
+    }
+});
+</script>
+
+{% endblock content %}

@@ -1,0 +1,1638 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/sotuv_list.css'%}">
+
+<style>
+    .container-fluid {
+        max-width: 100%;
+        padding: 1rem 2rem;
+        background: var(--bg-primary);
+        min-height: 100vh;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    /* USD Kurs Banner */
+    .usd-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: linear-gradient(135deg, #0f0f0f, #344357);
+        border: 1px solid #fdef93;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .usd-banner-icon {
+        width: 32px; height: 32px;
+        background: #3b82f6; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-size: 14px; flex-shrink: 0;
+    }
+    .usd-banner-text { flex: 1; }
+    .usd-banner-title {
+        font-size: 13px; font-weight: 700; color: #1e40af;
+    }
+    .usd-banner-rate {
+        font-size: 12px; color: #3b82f6;
+    }
+    .usd-refresh-btn {
+        background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8;
+        border-radius: 6px; padding: 5px 10px; cursor: pointer;
+        font-size: 12px; font-weight: 600; transition: background .15s;
+        display: flex; align-items: center; gap: 5px;
+    }
+    .usd-refresh-btn:hover { background: #dbeafe; }
+    .usd-kurs-badge {
+        background: #1d4ed8; color: white;
+        border-radius: 6px; padding: 5px 12px;
+        font-size: 13px; font-weight: 700; white-space: nowrap;
+    }
+
+    /* Form Section */
+    .form-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control,
+    .form-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        outline: none;
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    }
+
+    /* Tabs */
+    .tabs-container {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-weight: 500;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+        position: relative;
+        top: 2px;
+    }
+
+    .tab-btn.active {
+        color: var(--text-primary);
+        border-bottom-color: #4a9eff;
+    }
+
+    /* Products Table */
+    .products-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .search-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.5rem 0.75rem;
+        min-width: 260px;
+    }
+
+    .search-box input {
+        border: none;
+        background: none;
+        color: var(--text-primary);
+        outline: none;
+        width: 100%;
+        font-size: 0.875rem;
+    }
+
+    .btn-add {
+        background: #4a9eff;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .btn-add:hover { background: #3a8eef; }
+
+    .products-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .products-table thead {
+        background: var(--bg-tertiary);
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .products-table th {
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .products-table th:first-child {
+        width: 50px;
+        text-align: center;
+    }
+
+    .products-table tbody tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.15s;
+    }
+
+    .products-table tbody tr:hover { background: var(--hover-bg); }
+
+    .products-table tbody tr:nth-child(odd) { background: var(--accent-yellow); }
+    .products-table tbody tr:nth-child(even) { background: var(--bg-primary); }
+
+    .products-table td { padding: 0.75rem; color: var(--text-primary); }
+
+    .product-number {
+        text-align: center;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    /* Searchable Select */
+    .custom-select-wrapper { position: relative; width: 100%; }
+
+    .searchable-select { position: relative; width: 100%; }
+
+    .select-trigger {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 38px;
+    }
+
+    .select-trigger:hover { border-color: #4a9eff; }
+
+    .select-trigger.active {
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    }
+
+    .select-value {
+        color: var(--text-primary);
+        font-size: 0.8125rem;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .select-value.placeholder { color: var(--text-secondary); }
+
+    .select-trigger svg {
+        color: var(--text-secondary);
+        flex-shrink: 0;
+        transition: transform 0.2s;
+    }
+
+    .select-trigger.active svg { transform: rotate(180deg); }
+
+    .select-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        max-height: 320px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .select-search {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+    }
+
+    .select-search svg { color: var(--text-secondary); flex-shrink: 0; }
+
+    .select-search-input {
+        flex: 1;
+        border: none;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        outline: none;
+        font-size: 0.8125rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    .select-options { overflow-y: auto; max-height: 250px; }
+
+    .select-options::-webkit-scrollbar { width: 8px; }
+    .select-options::-webkit-scrollbar-track { background: var(--bg-secondary); }
+    .select-options::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    .select-options::-webkit-scrollbar-thumb:hover { background: #4a9eff; }
+
+    .select-option {
+        padding: 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        font-size: 0.8125rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-color);
+    }
+    .select-option:last-child { border-bottom: none; }
+    .select-option:hover { background: var(--hover-bg); }
+    .select-option.selected { background: #4a9eff; color: white; }
+    .select-option.no-results {
+        color: var(--text-secondary);
+        cursor: default;
+        text-align: center;
+    }
+    .select-option.no-results:hover { background: transparent; }
+
+    .product-select-hidden { display: none !important; }
+
+    /* ── Narx inputi + valyuta ── */
+    .narx-cell-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .narx-input-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .inline-input {
+        width: 90px;
+        padding: 0.4rem 0.6rem;
+        text-align: right;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.8125rem;
+        font-weight: 500;
+    }
+
+    .inline-input:focus {
+        outline: none;
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+    }
+
+    /* Valyuta toggle (So'm / USD) */
+    .currency-toggle {
+        display: flex;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .currency-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+        transition: all .15s;
+        white-space: nowrap;
+    }
+    .currency-btn.active {
+        background: #3b82f6;
+        color: white;
+    }
+
+    /* Narx konversiya label */
+    .narx-convert-label {
+        font-size: 11px;
+        color: #6b7280;
+        min-height: 15px;
+        padding-left: 2px;
+    }
+    .narx-convert-label.usd-mode { color: #3b82f6; }
+
+    /* ── */
+    .miqdor-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .stock-info { font-size: 0.75rem; color: var(--text-secondary); }
+    .stock-warning { color: #ef4444; font-size: 0.75rem; margin-top: 2px; }
+
+    .remove-btn {
+        background: none;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        padding: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .products-table tbody tr:hover .remove-btn { opacity: 1; }
+    .remove-btn:hover { color: #dc2626; }
+
+    /* Summary */
+    .summary-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2rem;
+    }
+
+    .summary-box { min-width: 320px; }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+    }
+
+    .summary-label { color: var(--text-secondary); font-size: 0.9375rem; }
+
+    .summary-value {
+        font-weight: 600;
+        font-size: 1.125rem;
+        color: var(--text-primary);
+    }
+
+    .summary-total {
+        border-top: 2px solid var(--border-color);
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+    }
+
+    .summary-total .summary-value {
+        font-size: 1.5rem;
+        color: #10b981;
+    }
+
+    /* USD jami */
+    .summary-usd-hint {
+        font-size: 12px; color: #6b7280;
+        text-align: right; margin-top: 4px;
+    }
+
+    /* Qisman to'lov */
+    .qisman-tolash-row {
+        display: none;
+        margin-top: 8px;
+        padding: 10px 14px;
+        background: #0f0f0f;
+        border: 1px solid #f59e0b;
+        border-radius: 6px;
+    }
+    .qisman-tolash-row label {
+        font-size: 13px; font-weight: 600; color: #92400e; margin-bottom: 5px; display: block;
+    }
+    .qisman-input-row { display: flex; gap: 8px; align-items: center; }
+    .qisman-convert { font-size: 12px; color: #b45309; margin-top: 4px; }
+
+    /* Actions */
+    .actions-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .btn-submit {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+        background: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+
+    .btn-cancel {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-cancel:hover { background: var(--hover-bg); }
+
+    .product-cell-wrapper { position: relative; }
+
+    @media (max-width: 1024px) {
+        .form-grid { grid-template-columns: 1fr; }
+        .summary-grid { grid-template-columns: 1fr; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="breadcrumb">
+            <a href="/">Bosh sahifa</a>
+            <span>/</span>
+            <span>Sotuvlar</span>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}"
+                     style="margin: 1rem 0; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Bugungi sotuv</div>
+                <div class="stat-value">{{ bugungi_sotuv|floatformat:0|intcomma }} so'm</div>
+                <small style="color:var(--text-secondary)">{{ bugungi_soni }} ta sotuv</small>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Bu oylik sotuv</div>
+                <div class="stat-value">{{ oylik_sotuv|floatformat:0|intcomma }} so'm</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><a href="{% url 'main:sotuv_list' %}">Sotuvlar ro'yxati →</a></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Jami sotuv</div>
+                <div class="stat-value">{{ jami_sotuv|floatformat:0|intcomma }} so'm</div>
+            </div>
+        </div>
+
+        <!-- USD Kurs Banner -->
+        <div class="usd-banner">
+            <div class="usd-banner-icon">$</div>
+            <div class="usd-banner-text">
+                <div class="usd-banner-title">USD → So'm kursi (CBU)</div>
+                <div class="usd-banner-rate" id="usdBannerSub">Yuklanmoqda...</div>
+            </div>
+            <div class="usd-kurs-badge" id="usdKursBadge">...</div>
+            <button class="usd-refresh-btn" type="button" onclick="fetchUsdKurs()">
+                <svg id="usdRefreshIcon" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 2.5A5.5 5.5 0 1 0 12 7M12 2v3h-3"/>
+                </svg>
+                Yangilash
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'main:sotuv_qoshish' %}" id="sotuvForm">
+            {% csrf_token %}
+            <!-- Hidden: USD kurs formda yuboriladi -->
+            <input type="hidden" name="usd_kurs" id="form_usd_kurs" value="0">
+
+            <!-- Xaridor -->
+            <div class="form-section">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Xaridor turi</label>
+                        <select name="xaridor_turi" id="xaridorTuri" class="form-select" required>
+                            <option value="mavjud">Mavjud xaridor</option>
+                            <option value="yangi">Yangi xaridor</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="mavjudXaridor">
+                        <label class="form-label">Xaridor</label>
+                        <select name="xaridor" class="form-select" required>
+                            <option value="">Tanlang...</option>
+                            {% for xaridor in xaridorlar %}
+                                <option value="{{ xaridor.id }}">
+                                    {{ xaridor.ism }}{% if xaridor.telefon %} - {{ xaridor.telefon }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div id="yangiXaridor" style="display:none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Ism</label>
+                            <input type="text" name="xaridor_ism" class="form-control" placeholder="Ism">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Telefon</label>
+                            <input type="tel" name="xaridor_telefon" class="form-control" placeholder="+998">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Manzil</label>
+                        <input type="text" name="xaridor_manzil" class="form-control" placeholder="Manzil">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs-container">
+                <button type="button" class="tab-btn active">Mahsulotlar</button>
+                <button type="button" class="tab-btn">Qo'shimcha</button>
+            </div>
+
+            <!-- Products -->
+            <div class="products-section">
+                <div class="table-toolbar">
+                    <div class="search-box" id="globalSearchBox">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+                        </svg>
+                        <input type="text" id="globalSearchInput" placeholder="Mahsulot qidirish...">
+                    </div>
+                    <button type="button" class="btn-add" id="addProductBtn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M8 3v10M3 8h10"/>
+                        </svg>
+                        Qo'shish
+                    </button>
+                </div>
+
+                <table class="products-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Mahsulot</th>
+                            <th style="width:100px">Miqdor</th>
+                            <th style="width:200px">Narx</th>
+                            <th>Jami</th>
+                            <th style="width:36px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <tr class="product-row" data-index="0">
+                            <td class="product-number">1</td>
+                            <td>
+                                <div class="custom-select-wrapper">
+                                    <select name="mahsulot_0"
+                                            class="form-select product-select-hidden"
+                                            data-index="0"
+                                            required
+                                            style="display:none;">
+                                        <option value="">Tanlang...</option>
+                                        {% for mahsulot in mahsulotlar %}
+                                            <option value="{{ mahsulot.id }}"
+                                                    data-narx="{{ mahsulot.price }}"
+                                                    data-soni="{{ mahsulot.stock }}"
+                                                    data-nomi="{{ mahsulot.product.nomi|lower }}  {{ mahsulot.rang|lower }}"
+                                                    data-sku="{{ mahsulot.product.sku|default:''|lower }}">
+                                                {{ mahsulot.product.nomi }} {{ mahsulot.rang }} - {{ mahsulot.price|intcomma }} so'm ({{ mahsulot.stock }} ta) {{mahsulot.sku}}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="searchable-select" data-index="0">
+                                        <div class="select-trigger" data-index="0">
+                                            <span class="select-value placeholder">Mahsulot tanlang...</span>
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M4 6l4 4 4-4"/>
+                                            </svg>
+                                        </div>
+                                        <div class="select-dropdown" data-index="0" style="display:none;">
+                                            <div class="select-search">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+                                                </svg>
+                                                <input type="text" class="select-search-input" data-index="0" placeholder="Qidirish..." autocomplete="off">
+                                            </div>
+                                            <div class="select-options" data-index="0"></div>
+                                        </div>
+                                    </div>
+                                    <div class="stock-warning" data-index="0"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="miqdor-wrap">
+                                    <input type="number"
+                                           name="miqdor_0"
+                                           class="inline-input miqdor-input"
+                                           data-index="0"
+                                           min="1"
+                                           placeholder="0">
+                                    <span class="stock-info" data-index="0"></span>
+                                </div>
+                            </td>
+                            <td>
+                                <!-- Narx + valyuta toggle -->
+                                <div class="narx-cell-wrap">
+                                    <div class="narx-input-row">
+                                        <input type="number"
+                                               name="narx_0"
+                                               class="inline-input narx-input"
+                                               data-index="0"
+                                               step="0.01"
+                                               min="0"
+                                               placeholder="0.00">
+                                        <div class="currency-toggle">
+                                            <button type="button"
+                                                    class="currency-btn active"
+                                                    data-index="0"
+                                                    data-currency="uzs"
+                                                    onclick="setCurrency(0,'uzs')">
+                                                So'm
+                                            </button>
+                                            <button type="button"
+                                                    class="currency-btn"
+                                                    data-index="0"
+                                                    data-currency="usd"
+                                                    onclick="setCurrency(0,'usd')">
+                                                USD
+                                            </button>
+                                        </div>
+                                        <!-- Hidden: narx_turi -->
+                                        <input type="hidden" name="narx_turi_0" class="narx-turi-hidden" data-index="0" value="uzs">
+                                    </div>
+                                    <div class="narx-convert-label" data-index="0"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <span class="item-total" data-index="0">0 so'm</span>
+                                    <span class="item-total-usd" data-index="0" style="font-size:11px; color:#6b7280;"></span>
+                                </div>
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary -->
+            <div class="summary-section" id="summarySection" style="display:none;">
+                <div class="summary-grid">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">Izoh</label>
+                            <textarea name="izoh" class="form-control" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">To'lov holati</label>
+                            <select name="tolov_holati" id="tolov_holati_select" class="form-select"
+                                    onchange="onTolovHolatiChange()">
+                                <option value="tolandi">To'landi ✅</option>
+                                <option value="qisman">Qisman to'landi 🟡</option>
+                                <option value="tolanmadi">To'lanmadi ❌</option>
+                            </select>
+                            <!-- Qisman to'lov miqdori -->
+                            <div class="qisman-tolash-row" id="qismanRow">
+                                <label>Boshlang'ich to'lov miqdori:</label>
+                                <div class="qisman-input-row">
+                                    <input type="number" name="tolangan_summa" id="qismanSummaInput"
+                                           class="form-control" placeholder="0" min="0" step="0.01"
+                                           style="max-width:160px;" oninput="updateQismanConvert()">
+                                    <select name="qisman_valyuta" id="qismanValyuta"
+                                            class="form-select" style="max-width:90px;"
+                                            onchange="updateQismanConvert()">
+                                        <option value="uzs">So'm</option>
+                                        <option value="usd">USD</option>
+                                    </select>
+                                </div>
+                                <div class="qisman-convert" id="qismanConvert"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-row">
+                            <span class="summary-label">Jami summa:</span>
+                            <div style="text-align:right;">
+                                <span class="summary-value" id="jamiSumma">0 so'm</span>
+                                <div class="summary-usd-hint" id="jamiSummaUsd"></div>
+                            </div>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Chegirma:</span>
+                            <input type="number" name="chegirma" id="chegirmaInput"
+                                   class="inline-input" min="0" step="0.01" value="0"
+                                   style="width:120px;" oninput="calculateTotal()">
+                        </div>
+                        <div class="summary-row summary-total">
+                            <span class="summary-label">Jami:</span>
+                            <div style="text-align:right;">
+                                <span class="summary-value" id="yakuniySumma">0 so'm</span>
+                                <div class="summary-usd-hint" id="yakuniySummaUsd"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-bar">
+                <button type="button" class="btn-cancel"
+                        onclick="window.location.href='{% url 'main:sotuvlar' %}'">Bekor qilish</button>
+                <button type="submit" class="btn-submit">Sotuvni saqlash</button>
+            </div>
+
+            <input type="hidden" name="items" id="itemsData">
+        </form>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// USD KURS
+// ============================================================
+let USD_KURS = 0;
+let productIndex = 1;
+
+async function fetchUsdKurs() {
+    const icon = document.getElementById('usdRefreshIcon');
+    if (icon) icon.style.animation = 'spin 1s linear infinite';
+
+    try {
+        const resp = await fetch('/uyapi/usd-kurs/');
+        const data = await resp.json();
+        USD_KURS = parseFloat(data.rate) || 0;
+
+        if (USD_KURS > 0) {
+            const fmt = USD_KURS.toLocaleString('uz-UZ', { minimumFractionDigits: 2 });
+            document.getElementById('usdKursBadge').textContent = `1 USD = ${fmt} so'm`;
+            document.getElementById('usdBannerSub').textContent = `Bugungi kurs (cbu.uz)`;
+            document.getElementById('form_usd_kurs').value = USD_KURS;
+        } else {
+            document.getElementById('usdKursBadge').textContent = 'Kurs olinmadi';
+        }
+    } catch(e) {
+        document.getElementById('usdKursBadge').textContent = 'Xatolik';
+    }
+
+    if (icon) icon.style.animation = '';
+    // Barcha qatorlarni yangilash
+    document.querySelectorAll('.product-row').forEach(row => {
+        const idx = parseInt(row.dataset.index);
+        calculateItemTotal(idx);
+    });
+    calculateTotal();
+}
+
+// ============================================================
+// VALYUTA TOGGLING
+// ============================================================
+function setCurrency(index, currency) {
+    // Hidden inputni yangilash
+    const hidden = document.querySelector(`.narx-turi-hidden[data-index="${index}"]`);
+    if (hidden) hidden.value = currency;
+
+    // Tugmalarni yangilash
+    document.querySelectorAll(`.currency-btn[data-index="${index}"]`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.currency === currency);
+    });
+
+    // Narx inputini yangilash
+    const narxInput = document.querySelector(`input[name="narx_${index}"]`);
+    if (narxInput) {
+        if (currency === 'usd') {
+            narxInput.placeholder = '0.0000';
+            narxInput.step = '0.0001';
+        } else {
+            narxInput.placeholder = '0.00';
+            narxInput.step = '0.01';
+        }
+    }
+
+    calculateItemTotal(index);
+}
+
+// ============================================================
+// MAHSULOT TANLASH - searchable select
+// ============================================================
+function getProductsFromSelect(selectElement) {
+    return Array.from(selectElement.querySelectorAll('option'))
+        .filter(o => o.value)
+        .map(o => ({
+            id: o.value,
+            name: o.textContent.trim(),
+            searchName: (o.dataset.nomi || '').toLowerCase(),
+            sku: (o.dataset.sku || '').toLowerCase(),
+            price: parseFloat(o.dataset.narx) || 0,
+            stock: parseInt(o.dataset.soni) || 0,
+        }));
+}
+
+function setupSearchableSelect(wrapper, index) {
+    const hiddenSelect = wrapper.querySelector('.product-select-hidden');
+    const trigger = wrapper.querySelector('.select-trigger');
+    const dropdown = wrapper.querySelector('.select-dropdown');
+    const searchInput = wrapper.querySelector('.select-search-input');
+    const optionsContainer = wrapper.querySelector('.select-options');
+
+    const products = getProductsFromSelect(hiddenSelect);
+
+    trigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const isActive = trigger.classList.contains('active');
+
+        document.querySelectorAll('.select-trigger.active').forEach(t => {
+            t.classList.remove('active');
+            t.closest('.searchable-select').querySelector('.select-dropdown').style.display = 'none';
+        });
+
+        if (!isActive) {
+            trigger.classList.add('active');
+            dropdown.style.display = 'block';
+            searchInput.value = '';
+            searchInput.focus();
+            renderOptions(products, optionsContainer, hiddenSelect, trigger, dropdown, index);
+        }
+    });
+
+    searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        const filtered = q === '' ? products : products.filter(p =>
+            p.searchName.includes(q) || p.sku.includes(q) || p.name.toLowerCase().includes(q)
+        );
+        renderOptions(filtered, optionsContainer, hiddenSelect, trigger, dropdown, index);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!wrapper.contains(e.target)) {
+            trigger.classList.remove('active');
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function renderOptions(products, container, selectElement, trigger, dropdown, index) {
+    if (products.length === 0) {
+        container.innerHTML = '<div class="select-option no-results">Mahsulot topilmadi</div>';
+        return;
+    }
+
+    container.innerHTML = products.map(p => `
+        <div class="select-option"
+             data-value="${p.id}"
+             data-name="${p.name}"
+             data-price="${p.price}"
+             data-stock="${p.stock}">
+            ${p.name}
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.select-option').forEach(opt => {
+        opt.addEventListener('click', function() {
+            if (this.classList.contains('no-results')) return;
+
+            const price = parseFloat(this.dataset.price) || 0;
+            const stock = parseInt(this.dataset.stock) || 0;
+
+            selectElement.value = this.dataset.value;
+            trigger.querySelector('.select-value').textContent = this.dataset.name;
+            trigger.querySelector('.select-value').classList.remove('placeholder');
+            trigger.classList.remove('active');
+            dropdown.style.display = 'none';
+
+            // Narx avtomatik — so'mda
+            const narxInput = document.querySelector(`input[name="narx_${index}"]`);
+            if (narxInput) {
+                // Hozirgi valyutaga qarab narxni to'g'ri o'rnatish
+                const tur = document.querySelector(`.narx-turi-hidden[data-index="${index}"]`)?.value || 'uzs';
+                if (tur === 'usd' && USD_KURS > 0) {
+                    narxInput.value = (price / USD_KURS).toFixed(4);
+                } else {
+                    narxInput.value = price;
+                }
+            }
+
+            const stockEl = document.querySelector(`.stock-info[data-index="${index}"]`);
+            if (stockEl) stockEl.textContent = `Mavjud: ${stock} ta`;
+
+            const miqdorInput = document.querySelector(`input[name="miqdor_${index}"]`);
+            if (miqdorInput) miqdorInput.focus();
+
+            calculateItemTotal(index);
+        });
+    });
+}
+
+// ============================================================
+// HISOBLASH
+// ============================================================
+function calculateItemTotal(index) {
+    const row = document.querySelector(`.product-row[data-index="${index}"]`);
+    if (!row) return;
+
+    const miqdor = parseFloat(row.querySelector('.miqdor-input')?.value) || 0;
+    const narxRaw = parseFloat(row.querySelector('.narx-input')?.value) || 0;
+    const tur = row.querySelector('.narx-turi-hidden')?.value || 'uzs';
+
+    // So'mdagi narx
+    let narxSom;
+    if (tur === 'usd' && USD_KURS > 0) {
+        narxSom = narxRaw * USD_KURS;
+    } else {
+        narxSom = narxRaw;
+    }
+
+    const totalSom = miqdor * narxSom;
+    const totalUsd = USD_KURS > 0 ? totalSom / USD_KURS : 0;
+
+    // Narx konversiya label
+    const convertLabel = row.querySelector('.narx-convert-label');
+    if (convertLabel) {
+        if (tur === 'usd' && USD_KURS > 0 && narxRaw > 0) {
+            convertLabel.textContent = `= ${Math.round(narxRaw * USD_KURS).toLocaleString('uz-UZ')} so'm`;
+            convertLabel.className = 'narx-convert-label usd-mode';
+        } else if (tur === 'uzs' && USD_KURS > 0 && narxRaw > 0) {
+            convertLabel.textContent = `≈ $${(narxRaw / USD_KURS).toFixed(4)}`;
+            convertLabel.className = 'narx-convert-label';
+        } else {
+            convertLabel.textContent = '';
+            convertLabel.className = 'narx-convert-label';
+        }
+    }
+
+    // Jami
+    const totalEl = row.querySelector('.item-total');
+    if (totalEl) totalEl.textContent = totalSom > 0 ? Math.round(totalSom).toLocaleString('uz-UZ') + ' so\'m' : '0 so\'m';
+
+    const totalUsdEl = row.querySelector('.item-total-usd');
+    if (totalUsdEl) totalUsdEl.textContent = (USD_KURS > 0 && totalSom > 0) ? `≈ $${totalUsd.toFixed(2)}` : '';
+
+    // Stock ogohlantirish
+    const select = row.querySelector('.product-select-hidden');
+    const stockWarning = row.querySelector('.stock-warning');
+    if (select && select.value && stockWarning) {
+        const opt = select.options[select.selectedIndex];
+        const stock = parseInt(opt?.dataset?.soni) || 0;
+        if (miqdor > stock) {
+            stockWarning.textContent = `⚠️ Omborda faqat ${stock} ta mavjud!`;
+        } else if (miqdor > 0) {
+            stockWarning.textContent = '';
+        }
+    }
+
+    calculateTotal();
+}
+
+function calculateTotal() {
+    let totalSom = 0;
+
+    document.querySelectorAll('.product-row').forEach(row => {
+        const miqdor = parseFloat(row.querySelector('.miqdor-input')?.value) || 0;
+        const narxRaw = parseFloat(row.querySelector('.narx-input')?.value) || 0;
+        const tur = row.querySelector('.narx-turi-hidden')?.value || 'uzs';
+        const narxSom = (tur === 'usd' && USD_KURS > 0) ? narxRaw * USD_KURS : narxRaw;
+        totalSom += miqdor * narxSom;
+    });
+
+    const summarySection = document.getElementById('summarySection');
+
+    if (totalSom > 0) {
+        summarySection.style.display = 'block';
+        document.getElementById('jamiSumma').textContent = Math.round(totalSom).toLocaleString('uz-UZ') + ' so\'m';
+        document.getElementById('jamiSummaUsd').textContent =
+            USD_KURS > 0 ? `≈ $${(totalSom / USD_KURS).toFixed(2)}` : '';
+
+        const chegirma = parseFloat(document.getElementById('chegirmaInput').value) || 0;
+        const yakuniy = Math.max(0, totalSom - chegirma);
+        document.getElementById('yakuniySumma').textContent = Math.round(yakuniy).toLocaleString('uz-UZ') + ' so\'m';
+        document.getElementById('yakuniySummaUsd').textContent =
+            USD_KURS > 0 ? `≈ $${(yakuniy / USD_KURS).toFixed(2)}` : '';
+    } else {
+        summarySection.style.display = 'none';
+    }
+}
+
+// ============================================================
+// TO'LOV HOLATI - Qisman
+// ============================================================
+function onTolovHolatiChange() {
+    const val = document.getElementById('tolov_holati_select').value;
+    const row = document.getElementById('qismanRow');
+    row.style.display = val === 'qisman' ? 'block' : 'none';
+}
+
+function updateQismanConvert() {
+    const summa = parseFloat(document.getElementById('qismanSummaInput').value) || 0;
+    const val = document.getElementById('qismanValyuta').value;
+    const el = document.getElementById('qismanConvert');
+    if (!el) return;
+    if (summa <= 0) { el.textContent = ''; return; }
+    if (val === 'usd' && USD_KURS > 0) {
+        el.textContent = `= ${Math.round(summa * USD_KURS).toLocaleString('uz-UZ')} so'm`;
+    } else if (USD_KURS > 0) {
+        el.textContent = `≈ $${(summa / USD_KURS).toFixed(2)}`;
+    } else {
+        el.textContent = '';
+    }
+}
+
+// ============================================================
+// MAHSULOT QO'SHISH
+// ============================================================
+document.getElementById('addProductBtn').addEventListener('click', function() {
+    const tbody = document.getElementById('productsTableBody');
+    const firstRow = tbody.querySelector('.product-row');
+    const newRow = firstRow.cloneNode(true);
+
+    newRow.setAttribute('data-index', productIndex);
+    newRow.querySelector('.product-number').textContent = productIndex + 1;
+
+    newRow.querySelectorAll('[data-index]').forEach(el => el.dataset.index = productIndex);
+
+    newRow.querySelectorAll('[name]').forEach(input => {
+        const n = input.getAttribute('name');
+        if (n) input.setAttribute('name', n.replace(/_\d+$/, `_${productIndex}`));
+    });
+
+    newRow.querySelectorAll('input:not([type=hidden])').forEach(inp => inp.value = '');
+    newRow.querySelectorAll('.narx-turi-hidden').forEach(h => h.value = 'uzs');
+
+    const select = newRow.querySelector('.product-select-hidden');
+    if (select) select.selectedIndex = 0;
+
+    const vs = newRow.querySelector('.select-value');
+    if (vs) { vs.textContent = 'Mahsulot tanlang...'; vs.classList.add('placeholder'); }
+
+    // Narx valyuta resetlash
+    newRow.querySelectorAll('.currency-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.currency === 'uzs');
+    });
+
+    newRow.querySelector('.item-total').textContent = '0 so\'m';
+    const usdTotal = newRow.querySelector('.item-total-usd');
+    if (usdTotal) usdTotal.textContent = '';
+    const convertLabel = newRow.querySelector('.narx-convert-label');
+    if (convertLabel) convertLabel.textContent = '';
+
+    const stockWarning = newRow.querySelector('.stock-warning');
+    if (stockWarning) stockWarning.textContent = '';
+
+    newRow.querySelector('td:last-child').innerHTML = `
+        <button type="button" class="remove-btn"
+                onclick="this.closest('tr').remove(); updateRowNumbers(); calculateTotal();">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+            </svg>
+        </button>`;
+
+    tbody.appendChild(newRow);
+
+    const wrapper = newRow.querySelector('.custom-select-wrapper');
+    setupSearchableSelect(wrapper, productIndex);
+    setupRowEvents(newRow, productIndex);
+
+    // Currency toggle onclick ni yangilash
+    newRow.querySelectorAll('.currency-btn').forEach(btn => {
+        const idx = productIndex;
+        btn.onclick = function() { setCurrency(idx, this.dataset.currency); };
+    });
+
+    productIndex++;
+    updateRowNumbers();
+});
+
+function setupRowEvents(row, index) {
+    row.querySelector('.miqdor-input')?.addEventListener('input', () => calculateItemTotal(index));
+    row.querySelector('.narx-input')?.addEventListener('input', () => calculateItemTotal(index));
+}
+
+function updateRowNumbers() {
+    document.querySelectorAll('.product-row').forEach((row, i) => {
+        row.querySelector('.product-number').textContent = i + 1;
+    });
+}
+
+document.getElementById('chegirmaInput').addEventListener('input', calculateTotal);
+
+// ============================================================
+// FORM SUBMIT
+// ============================================================
+document.getElementById('sotuvForm').addEventListener('submit', function(e) {
+    const items = [];
+
+    document.querySelectorAll('.product-row').forEach(row => {
+        const select = row.querySelector('.product-select-hidden');
+        const miqdor = row.querySelector('.miqdor-input')?.value;
+        const narxRaw = row.querySelector('.narx-input')?.value;
+        const tur = row.querySelector('.narx-turi-hidden')?.value || 'uzs';
+
+        if (select?.value && miqdor && narxRaw) {
+            items.push({
+                variant_id: select.value,
+                miqdor: parseInt(miqdor),
+                narx: parseFloat(narxRaw),
+                narx_turi: tur,
+            });
+        }
+    });
+
+    if (items.length === 0) {
+        e.preventDefault();
+        alert('Iltimos, kamida bitta mahsulot qo\'shing!');
+        return;
+    }
+
+    // Qisman to'lov - USD bo'lsa so'mga aylantirish
+    const tolovHolati = document.getElementById('tolov_holati_select').value;
+    if (tolovHolati === 'qisman') {
+        const qismanSumma = parseFloat(document.getElementById('qismanSummaInput').value) || 0;
+        const qismanVal = document.getElementById('qismanValyuta').value;
+        if (qismanVal === 'usd' && USD_KURS > 0) {
+            document.getElementById('qismanSummaInput').value = (qismanSumma * USD_KURS).toFixed(2);
+        }
+    }
+
+    document.getElementById('itemsData').value = JSON.stringify(items);
+});
+
+// ============================================================
+// XARIDOR TURI
+// ============================================================
+document.getElementById('xaridorTuri').addEventListener('change', function() {
+    const mavjud = document.getElementById('mavjudXaridor');
+    const yangi = document.getElementById('yangiXaridor');
+
+    if (this.value === 'yangi') {
+        mavjud.style.display = 'none';
+        yangi.style.display = 'block';
+        mavjud.querySelector('select').removeAttribute('required');
+        yangi.querySelector('input[name="xaridor_ism"]').setAttribute('required', 'required');
+    } else {
+        mavjud.style.display = 'block';
+        yangi.style.display = 'none';
+        mavjud.querySelector('select').setAttribute('required', 'required');
+        yangi.querySelector('input[name="xaridor_ism"]').removeAttribute('required');
+    }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+const firstWrapper = document.querySelector('.custom-select-wrapper');
+if (firstWrapper) {
+    setupSearchableSelect(firstWrapper, 0);
+    setupRowEvents(document.querySelector('.product-row'), 0);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    fetchUsdKurs();
+    setInterval(fetchUsdKurs, 10 * 60 * 1000);
+});
+</script>
+
+<script>
+    // ============================================================
+// SOTUV FORMASI - DRAFT SAVER (localStorage)
+// Quyidagi kodni <script> teglar ichiga, mavjud script oxiriga qo'shing
+// ============================================================
+
+const DRAFT_KEY = 'sotuv_form_draft';
+const DRAFT_VERSION = '1.0';
+
+// ─── DRAFT SAQLASH ───────────────────────────────────────────
+function saveDraft() {
+    try {
+        const draft = {
+            version: DRAFT_VERSION,
+            savedAt: new Date().toISOString(),
+
+            // Xaridor
+            xaridorTuri: document.getElementById('xaridorTuri')?.value || 'mavjud',
+            xaridorId: document.querySelector('select[name="xaridor"]')?.value || '',
+            xaridorIsm: document.querySelector('input[name="xaridor_ism"]')?.value || '',
+            xaridorTelefon: document.querySelector('input[name="xaridor_telefon"]')?.value || '',
+            xaridorManzil: document.querySelector('input[name="xaridor_manzil"]')?.value || '',
+
+            // To'lov
+            tolovHolati: document.getElementById('tolov_holati_select')?.value || 'tolandi',
+            tolanganSumma: document.getElementById('qismanSummaInput')?.value || '',
+            qismanValyuta: document.getElementById('qismanValyuta')?.value || 'uzs',
+
+            // Izoh & Chegirma
+            izoh: document.querySelector('textarea[name="izoh"]')?.value || '',
+            chegirma: document.getElementById('chegirmaInput')?.value || '0',
+
+            // Mahsulot qatorlari
+            rows: collectRows(),
+        };
+
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {
+        console.warn('Draft saqlashda xato:', e);
+    }
+}
+
+function collectRows() {
+    const rows = [];
+    document.querySelectorAll('.product-row').forEach(row => {
+        const idx = parseInt(row.dataset.index);
+        const select = row.querySelector('.product-select-hidden');
+        const selectedOpt = select?.options[select?.selectedIndex];
+
+        rows.push({
+            index: idx,
+            productId: select?.value || '',
+            productName: row.querySelector('.select-value')?.textContent?.trim() || '',
+            miqdor: row.querySelector('.miqdor-input')?.value || '',
+            narx: row.querySelector('.narx-input')?.value || '',
+            narxTuri: row.querySelector('.narx-turi-hidden')?.value || 'uzs',
+        });
+    });
+    return rows;
+}
+
+// ─── DRAFT TIKLASH ───────────────────────────────────────────
+function restoreDraft() {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+
+        const draft = JSON.parse(raw);
+        if (!draft || draft.version !== DRAFT_VERSION) return;
+
+        // Qanchalik eski?
+        const savedAt = new Date(draft.savedAt);
+        const hoursPassed = (Date.now() - savedAt) / 1000 / 3600;
+        if (hoursPassed > 24) {
+            localStorage.removeItem(DRAFT_KEY);
+            return;
+        }
+
+        // Biror qiymat bormi?
+        const hasData = draft.xaridorIsm || draft.xaridorId ||
+                        (draft.rows && draft.rows.some(r => r.productId));
+        if (!hasData) return;
+
+        // Foydalanuvchidan so'rash
+        const timeAgo = formatTimeAgo(savedAt);
+        const confirmed = confirm(
+            `📋 Saqlangan draft topildi (${timeAgo})\n\nAvvalgi kiritgan ma'lumotlaringizni tiklaysizmi?`
+        );
+        if (!confirmed) {
+            localStorage.removeItem(DRAFT_KEY);
+            return;
+        }
+
+        applyDraft(draft);
+
+    } catch (e) {
+        console.warn('Draft tiklashda xato:', e);
+    }
+}
+
+function applyDraft(draft) {
+    // ─ Xaridor turi
+    const xaridorTuriEl = document.getElementById('xaridorTuri');
+    if (xaridorTuriEl && draft.xaridorTuri) {
+        xaridorTuriEl.value = draft.xaridorTuri;
+        xaridorTuriEl.dispatchEvent(new Event('change'));
+    }
+
+    // ─ Mavjud xaridor
+    if (draft.xaridorTuri === 'mavjud' && draft.xaridorId) {
+        const sel = document.querySelector('select[name="xaridor"]');
+        if (sel) sel.value = draft.xaridorId;
+    }
+
+    // ─ Yangi xaridor
+    if (draft.xaridorTuri === 'yangi') {
+        setVal('input[name="xaridor_ism"]', draft.xaridorIsm);
+        setVal('input[name="xaridor_telefon"]', draft.xaridorTelefon);
+        setVal('input[name="xaridor_manzil"]', draft.xaridorManzil);
+    }
+
+    // ─ Izoh & Chegirma
+    setVal('textarea[name="izoh"]', draft.izoh);
+    const chegEl = document.getElementById('chegirmaInput');
+    if (chegEl && draft.chegirma) { chegEl.value = draft.chegirma; }
+
+    // ─ To'lov holati
+    const tolovEl = document.getElementById('tolov_holati_select');
+    if (tolovEl && draft.tolovHolati) {
+        tolovEl.value = draft.tolovHolati;
+        tolovEl.dispatchEvent(new Event('change'));
+        if (draft.tolovHolati === 'qisman') {
+            setVal('#qismanSummaInput', draft.tolanganSumma);
+            const qv = document.getElementById('qismanValyuta');
+            if (qv && draft.qismanValyuta) qv.value = draft.qismanValyuta;
+            updateQismanConvert();
+        }
+    }
+
+    // ─ Mahsulot qatorlari
+    if (draft.rows && draft.rows.length > 0) {
+        restoreRows(draft.rows);
+    }
+
+    calculateTotal();
+    showDraftBadge(formatTimeAgo(new Date(draft.savedAt)));
+}
+
+function restoreRows(rows) {
+    const tbody = document.getElementById('productsTableBody');
+
+    // 1-qator allaqachon bor, uni birinchi row uchun ishlatamiz
+    // Qo'shimcha qatorlar kerak bo'lsa yaratamiz
+    rows.forEach((rowData, i) => {
+        let row;
+        if (i === 0) {
+            row = tbody.querySelector('.product-row[data-index="0"]');
+        } else {
+            // Yangi qator yaratish (addProductBtn click ni simulatsiya qilish)
+            document.getElementById('addProductBtn').click();
+            row = tbody.querySelector(`.product-row[data-index="${i}"]`) ||
+                  [...tbody.querySelectorAll('.product-row')].pop();
+        }
+
+        if (!row) return;
+        const idx = parseInt(row.dataset.index);
+
+        // Mahsulot tanlash
+        if (rowData.productId) {
+            const hiddenSelect = row.querySelector('.product-select-hidden');
+            if (hiddenSelect) {
+                hiddenSelect.value = rowData.productId;
+                const valEl = row.querySelector('.select-value');
+                if (valEl && rowData.productName) {
+                    valEl.textContent = rowData.productName;
+                    valEl.classList.remove('placeholder');
+                }
+            }
+        }
+
+        // Miqdor
+        const miqdorInput = row.querySelector('.miqdor-input');
+        if (miqdorInput && rowData.miqdor) miqdorInput.value = rowData.miqdor;
+
+        // Narx turi (valyuta)
+        if (rowData.narxTuri) {
+            setCurrency(idx, rowData.narxTuri);
+        }
+
+        // Narx
+        const narxInput = row.querySelector('.narx-input');
+        if (narxInput && rowData.narx) narxInput.value = rowData.narx;
+
+        calculateItemTotal(idx);
+    });
+}
+
+// ─── DRAFT BADGE (UI) ────────────────────────────────────────
+function showDraftBadge(timeAgo) {
+    // Eski badge bo'lsa o'chirish
+    const old = document.getElementById('draftStatusBadge');
+    if (old) old.remove();
+
+    const badge = document.createElement('div');
+    badge.id = 'draftStatusBadge';
+    badge.innerHTML = `
+        <span style="font-size:13px;">✅ Draft tiklandi (${timeAgo})</span>
+        <button onclick="clearDraft()" title="Draftni o'chirish"
+                style="background:none;border:none;cursor:pointer;color:#b45309;font-size:16px;line-height:1;padding:0 0 0 8px;">×</button>
+    `;
+    Object.assign(badge.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: '#fef9c3',
+        border: '1px solid #fde047',
+        borderRadius: '6px',
+        padding: '8px 14px',
+        marginBottom: '1rem',
+        color: '#92400e',
+        fontWeight: '600',
+    });
+
+    const form = document.getElementById('sotuvForm');
+    form.insertBefore(badge, form.firstChild);
+}
+
+function showAutoSaveBadge() {
+    let badge = document.getElementById('autoSaveBadge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'autoSaveBadge';
+        Object.assign(badge.style, {
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#1e293b',
+            color: '#94a3b8',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '12px',
+            fontWeight: '600',
+            zIndex: '9999',
+            opacity: '0',
+            transition: 'opacity 0.3s',
+            pointerEvents: 'none',
+        });
+        document.body.appendChild(badge);
+    }
+    badge.textContent = '💾 Draft saqlandi';
+    badge.style.opacity = '1';
+    clearTimeout(badge._timer);
+    badge._timer = setTimeout(() => { badge.style.opacity = '0'; }, 1800);
+}
+
+// ─── DRAFT O'CHIRISH ─────────────────────────────────────────
+function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    const badge = document.getElementById('draftStatusBadge');
+    if (badge) badge.remove();
+    console.info('Draft o\'chirildi.');
+}
+
+// ─── YORDAMCHI ───────────────────────────────────────────────
+function setVal(selector, value) {
+    if (!value) return;
+    const el = document.querySelector(selector);
+    if (el) el.value = value;
+}
+
+function formatTimeAgo(date) {
+    const diff = Math.round((Date.now() - date) / 1000);
+    if (diff < 60) return `${diff} soniya oldin`;
+    if (diff < 3600) return `${Math.round(diff / 60)} daqiqa oldin`;
+    if (diff < 86400) return `${Math.round(diff / 3600)} soat oldin`;
+    return `${Math.round(diff / 86400)} kun oldin`;
+}
+
+// ─── AUTO-SAVE (3 soniyada bir) ──────────────────────────────
+let autoSaveTimer = null;
+function scheduleSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+        saveDraft();
+        showAutoSaveBadge();
+    }, 3000);
+}
+
+// ─── EVENTLAR ────────────────────────────────────────────────
+function attachDraftListeners() {
+    // Forma ichidagi barcha input/select/textarea o'zgarishlarini kuzatish
+    document.getElementById('sotuvForm').addEventListener('input', scheduleSave);
+    document.getElementById('sotuvForm').addEventListener('change', scheduleSave);
+
+    // Mahsulot qo'shish/o'chirish
+    const observer = new MutationObserver(() => scheduleSave());
+    observer.observe(document.getElementById('productsTableBody'), { childList: true });
+}
+
+// ─── FORMA SUBMIT: DRAFT O'CHIRISH ───────────────────────────
+// Muvaffaqiyatli saqlanganda draftni tozalash
+const _origSubmit = document.getElementById('sotuvForm').addEventListener.bind(
+    document.getElementById('sotuvForm')
+);
+document.getElementById('sotuvForm').addEventListener('submit', function() {
+    // submit validatsiyadan o'tsa (e.preventDefault() chaqirilmasa) draft tozalanadi
+    // Biz bu yerda faqat flag qo'yamiz; sahifa navigate qilib ketadi
+    sessionStorage.setItem('sotuvSaved', '1');
+    localStorage.removeItem(DRAFT_KEY);
+}, true); // capturing phase — avvalroq ishlaydi
+
+// ─── INIT ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    // Agar sahifa muvaffaqiyatli saqlangandan keyin qaytib kelgan bo'lsa, draft saqlamaymiz
+    if (sessionStorage.getItem('sotuvSaved') === '1') {
+        sessionStorage.removeItem('sotuvSaved');
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+    }
+
+    restoreDraft();
+    attachDraftListeners();
+});
+</script>
+{% endblock content %}

@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/sotuv/sotuv_detail.css'%}">
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Sotuv #{{ sotuv.id }}</div>
+        <div class="header-actions">
+            <button onclick="window.print()" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 5V2h8v3M4 11H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1"/>
+                    <rect x="4" y="9" width="8" height="5"/>
+                </svg>
+                Chop etish
+            </button>
+            <a href="{% url 'main:sotuv_pdf' sotuv.id %}" class="btn btn-secondary" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                    <path d="M7 7h2M7 10h2"/>
+                </svg>
+                PDF yuklab olish
+            </a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <div class="breadcrumb">
+                <a href="/">Bosh sahifa</a>
+                <span>/</span>
+                <a href="{% url 'main:sotuvlar' %}">Sotuvlar</a>
+                <span>/</span>
+                <span>Sotuv #{{ sotuv.id }}</span>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            {% if message.tags == 'success' %}
+                                <path d="M7 10l3 3 6-6"/><circle cx="10" cy="10" r="8"/>
+                            {% else %}
+                                <path d="M10 6v4m0 4h.01"/><circle cx="10" cy="10" r="8"/>
+                            {% endif %}
+                        </svg>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Status Card -->
+            <div class="status-card">
+                <div class="status-header">
+                    <div>
+                        <h1>Sotuv #{{ sotuv.id }}</h1>
+                        <p>{{ sotuv.sana|date:"d.m.Y H:i" }}</p>
+                    </div>
+                    <div class="status-badge status-{{ sotuv.tolov_holati }}">
+                        {% if sotuv.tolov_holati == 'tolandi' %}
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 4L6 11L3 8"/>
+                            </svg>
+                            To'landi
+                        {% elif sotuv.tolov_holati == 'qisman' %}
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="8" cy="8" r="7"/><path d="M8 4v4l3 3"/>
+                            </svg>
+                            Qisman
+                        {% else %}
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="8" cy="8" r="7"/><path d="M8 4v4"/>
+                            </svg>
+                            To'lanmadi
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-grid">
+                <!-- Xaridor ma'lumotlari -->
+                <div class="info-card">
+                    <div class="card-header">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 18a7 7 0 0 1 14 0"/>
+                            </svg>
+                            Xaridor
+                        </h3>
+                        <a href="{% url 'main:xaridor_detail' sotuv.xaridor.id %}" class="btn btn-sm btn-secondary">
+                            Ko'rish
+                        </a>
+                    </div>
+                    <div class="info-content">
+                        <div class="info-row">
+                            <span class="label">Ism:</span>
+                            <span class="value">{{ sotuv.xaridor.ism }}</span>
+                        </div>
+                        {% if sotuv.xaridor.telefon %}
+                        <div class="info-row">
+                            <span class="label">Telefon:</span>
+                            <span class="value">
+                                <a href="tel:{{ sotuv.xaridor.telefon }}">{{ sotuv.xaridor.telefon }}</a>
+                            </span>
+                        </div>
+                        {% endif %}
+                        {% if sotuv.xaridor.manzil %}
+                        <div class="info-row">
+                            <span class="label">Manzil:</span>
+                            <span class="value">{{ sotuv.xaridor.manzil }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Sotuv ma'lumotlari -->
+                <div class="info-card">
+                    <div class="card-header">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="14" height="13" rx="2"/>
+                                <path d="M3 8h14"/>
+                            </svg>
+                            Sotuv ma'lumotlari
+                        </h3>
+                        <button onclick="editSotuv()" class="btn btn-sm btn-secondary">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 1l3 3L6 11H3v-3L10 1z"/>
+                            </svg>
+                            Tahrirlash
+                        </button>
+                    </div>
+                    <div class="info-content">
+                        <div class="info-row">
+                            <span class="label">Sana:</span>
+                            <span class="value">{{ sotuv.sana|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">To'lov holati:</span>
+                            <span class="value">
+                                <span class="badge badge-{{ sotuv.tolov_holati }}">
+                                    {% if sotuv.tolov_holati == 'tolandi' %}To'landi
+                                    {% elif sotuv.tolov_holati == 'qisman' %}Qisman
+                                    {% else %}To'lanmadi{% endif %}
+                                </span>
+                            </span>
+                        </div>
+                        {% if sotuv.izoh %}
+                        <div class="info-row">
+                            <span class="label">Izoh:</span>
+                            <span class="value">{{ sotuv.izoh }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="info-row">
+                            <span class="label">Yaratildi:</span>
+                            <span class="value">{{ sotuv.created_at|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        {% if sotuv.updated_at != sotuv.created_at %}
+                        <div class="info-row">
+                            <span class="label">Yangilandi:</span>
+                            <span class="value">{{ sotuv.updated_at|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mahsulotlar jadvali -->
+            <div class="products-card">
+                <div class="card-header">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="16" height="14" rx="2"/>
+                            <path d="M2 7h16M6 3v4M14 3v4"/>
+                        </svg>
+                        Sotilgan mahsulotlar ({{ sotuv.items.count }})
+                    </h3>
+                    <button onclick="showAddItemModal()" class="btn btn-sm btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M7 2v10M2 7h10"/>
+                        </svg>
+                        Mahsulot qo'shish
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="products-table">
+                        <thead>
+                            <tr>
+                                <th>Mahsulot</th>
+                                <th>Variant</th>
+                                <th>Miqdor</th>
+                                <th>Narx</th>
+                                <th>Jami</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in sotuv.items.all %}
+                            <tr id="item-{{ item.id }}">
+                                <td>
+                                    <div class="product-info">
+                                        {% if item.variant.image %}
+                                        <img src="{{ item.variant.image.url }}" alt="{{ item.mahsulot.nomi }}" class="product-thumb">
+                                        {% endif %}
+                                        <strong>{{ item.mahsulot.nomi }}</strong>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="variant-info">
+                                        {% if item.variant.rang %}
+                                        <span class="badge">{{ item.variant.rang }}</span>
+                                        {% endif %}
+                                        {% if item.variant.razmer %}
+                                        <span class="badge">{{ item.variant.razmer }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="editable-field" data-item-id="{{ item.id }}" data-field="miqdor">
+                                        {{ item.miqdor }} ta
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="editable-field" data-item-id="{{ item.id }}" data-field="narx">
+                                        {{ item.narx|intcomma }} so'm
+                                    </span>
+                                </td>
+                                <td><strong>{{ item.jami|intcomma }} so'm</strong></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button onclick="editItem({{ item.id }})" class="btn-icon" title="Tahrirlash">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 2l3 3L6 13H3v-3L11 2z"/>
+                                            </svg>
+                                        </button>
+                                        <button onclick="deleteItem({{ item.id }})" class="btn-icon btn-danger" title="O'chirish">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% if item.izoh %}
+                            <tr class="item-note">
+                                <td colspan="6">
+                                    <small>💬 {{ item.izoh }}</small>
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                                    Hali mahsulotlar qo'shilmagan
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summa kartasi -->
+            <div class="summary-card">
+                <h3>Hisob-kitob</h3>
+                <div class="summary-content">
+                    <div class="summary-row">
+                        <span>Jami summa:</span>
+                        <span>{{ sotuv.jami_summa|intcomma }} so'm</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>To'langan summa:</span>
+                        <span>{{ sotuv.tolangan_summa|intcomma }} so'm</span>
+                    </div>
+                    {% if sotuv.chegirma > 0 %}
+                    <div class="summary-row discount">
+                        <span>Chegirma:</span>
+                        <span>- {{ sotuv.chegirma|intcomma }} so'm</span>
+                    </div>
+                    {% endif %}
+                    <div class="summary-row total">
+                        <span>To'lov summasi:</span>
+                        <span>{{ sotuv.yakuniy_summa|intcomma }} so'm</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Xavfli zona -->
+            <div class="danger-zone">
+                <h3>Xavfli zona</h3>
+                <p>Sotuvni o'chirish qaytarib bo'lmaydigan jarayon. Barcha ma'lumotlar yo'qoladi va stock qaytariladi.</p>
+                <form method="post" action="{% url 'main:sotuv_ochirish' sotuv.id %}" style="margin-top: 1rem;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Rostdan ham sotuvni o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi!')">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/>
+                        </svg>
+                        Sotuvni o'chirish
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Sotuv tahrirlash modali -->
+<div id="editSotuvModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Sotuvni tahrirlash</h3>
+            <button onclick="closeModal('editSotuvModal')" class="close-btn">&times;</button>
+        </div>
+        <form method="post" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">To'lov holati</label>
+                    <select name="tolov_holati" class="form-select" required>
+                        <option value="tolandi" {% if sotuv.tolov_holati == 'tolandi' %}selected{% endif %}>To'landi</option>
+                        <option value="qisman" {% if sotuv.tolov_holati == 'qisman' %}selected{% endif %}>Qisman to'landi</option>
+                        <option value="tolanmadi" {% if sotuv.tolov_holati == 'tolanmadi' %}selected{% endif %}>To'lanmadi</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Chegirma (so'm)</label>
+                    <input type="number" name="chegirma" class="form-input" value="{{ sotuv.chegirma }}" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Izoh</label>
+                    <textarea name="izoh" class="form-input" rows="3">{{ sotuv.izoh }}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('editSotuvModal')" class="btn btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn btn-primary">Saqlash</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Item tahrirlash modali -->
+<div id="editItemModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Mahsulotni tahrirlash</h3>
+            <button onclick="closeModal('editItemModal')" class="close-btn">&times;</button>
+        </div>
+        <form id="editItemForm">
+            {% csrf_token %}
+            <input type="hidden" id="edit_item_id" name="item_id">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Miqdor</label>
+                    <input type="number" id="edit_miqdor" name="miqdor" class="form-input" min="1" required>
+                    <small id="edit_mavjud" style="color: var(--text-secondary); font-size: 0.875rem;"></small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Narx (so'm)</label>
+                    <input type="number" id="edit_narx" name="narx" class="form-input" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Izoh</label>
+                    <input type="text" id="edit_izoh" name="izoh" class="form-input">
+                </div>
+                <div id="edit_jami" style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; margin-top: 1rem;">
+                    <small style="color: var(--text-secondary)">Jami:</small>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-success);" id="edit_jami_text">0 so'm</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('editItemModal')" class="btn btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn btn-primary">Saqlash</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Mahsulot qo'shish modali -->
+<div id="addItemModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Mahsulot qo'shish</h3>
+            <button onclick="closeModal('addItemModal')" class="close-btn">&times;</button>
+        </div>
+        <form id="addItemForm">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label required">Mahsulot</label>
+                    <select id="add_variant" name="variant_id" class="form-select" required>
+                        <option value="">Tanlang...</option>
+                        {% for variant in variants %}
+                        <option value="{{ variant.id }}" 
+                                data-narx="{{ variant.price }}"
+                                data-stock="{{ variant.stock }}">
+                            {{ variant.product.nomi }} {% if variant.rang %}| {{ variant.rang }}{% endif %} {% if variant.razmer %}| {{ variant.razmer }}{% endif %} - {{ variant.price|intcomma }} so'm ({{ variant.stock }} ta)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Miqdor</label>
+                    <input type="number" id="add_miqdor" name="miqdor" class="form-input" min="1" required>
+                    <small id="add_mavjud" style="color: var(--text-secondary); font-size: 0.875rem;"></small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Narx (so'm)</label>
+                    <input type="number" id="add_narx" name="narx" class="form-input" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Izoh</label>
+                    <input type="text" id="add_izoh" name="izoh" class="form-input">
+                </div>
+                <div id="add_jami" style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; margin-top: 1rem; display: none;">
+                    <small style="color: var(--text-secondary)">Jami:</small>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-success);" id="add_jami_text">0 so'm</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('addItemModal')" class="btn btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn btn-primary">Qo'shish</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Modal funksiyalari
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    function editSotuv() {
+        openModal('editSotuvModal');
+    }
+
+    // Item tahrirlash
+    function editItem(itemId) {
+        fetch(`/api/sotuv/item/${itemId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('edit_item_id').value = itemId;
+                    document.getElementById('edit_miqdor').value = data.miqdor;
+                    document.getElementById('edit_narx').value = data.narx;
+                    document.getElementById('edit_izoh').value = data.izoh || '';
+                    document.getElementById('edit_mavjud').textContent = `Mavjud: ${data.stock} ta`;
+                    calculateEditJami();
+                    openModal('editItemModal');
+                }
+            });
+    }
+
+    // Edit jami hisoblash
+    function calculateEditJami() {
+        const miqdor = parseFloat(document.getElementById('edit_miqdor').value) || 0;
+        const narx = parseFloat(document.getElementById('edit_narx').value) || 0;
+        const jami = miqdor * narx;
+        document.getElementById('edit_jami_text').textContent = jami.toLocaleString() + ' so\'m';
+    }
+
+    document.getElementById('edit_miqdor').addEventListener('input', calculateEditJami);
+    document.getElementById('edit_narx').addEventListener('input', calculateEditJami);
+
+    // Item tahrirlash forma
+    document.getElementById('editItemForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const itemId = document.getElementById('edit_item_id').value;
+        const formData = new FormData(this);
+
+        fetch(`{% url 'main:sotuv_item_tahrirlash' 0 %}`.replace('0', itemId), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Xatolik: ' + data.error);
+            }
+        });
+    });
+
+    // Item o'chirish
+    function deleteItem(itemId) {
+        if (confirm('Mahsulotni o\'chirmoqchimisiz?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `{% url 'main:sotuv_item_ochirish' 0 %}`.replace('0', itemId);
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken;
+            
+            form.appendChild(csrfInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    // Mahsulot qo'shish modal
+    function showAddItemModal() {
+        openModal('addItemModal');
+    }
+
+    // Add variant o'zgarganda
+    document.getElementById('add_variant').addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        const narx = option.getAttribute('data-narx');
+        const stock = option.getAttribute('data-stock');
+        
+        if (narx) {
+            document.getElementById('add_narx').value = narx;
+        }
+        if (stock) {
+            document.getElementById('add_mavjud').textContent = `Mavjud: ${stock} ta`;
+        }
+        calculateAddJami();
+    });
+
+    // Add jami hisoblash
+    function calculateAddJami() {
+        const miqdor = parseFloat(document.getElementById('add_miqdor').value) || 0;
+        const narx = parseFloat(document.getElementById('add_narx').value) || 0;
+        
+        if (miqdor > 0 && narx > 0) {
+            const jami = miqdor * narx;
+            document.getElementById('add_jami_text').textContent = jami.toLocaleString() + ' so\'m';
+            document.getElementById('add_jami').style.display = 'block';
+        } else {
+            document.getElementById('add_jami').style.display = 'none';
+        }
+    }
+
+    document.getElementById('add_miqdor').addEventListener('input', calculateAddJami);
+    document.getElementById('add_narx').addEventListener('input', calculateAddJami);
+
+    // Mahsulot qo'shish forma
+    document.getElementById('addItemForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        fetch(`{% url 'main:sotuv_item_qoshish' sotuv.id %}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Xatolik: ' + data.error);
+            }
+        });
+    });
+
+    // Modal tashqarisiga bosilganda yopish
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.classList.remove('active');
+        }
+    }
+</script>
+
+{% endblock content %}

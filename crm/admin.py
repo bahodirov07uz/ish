@@ -16,7 +16,7 @@ class ProductVariantInline(admin.TabularInline):
     extra = 0
     readonly_fields = ('sku', 'barcode')
     
-    
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'description')
@@ -28,10 +28,10 @@ class CategoryAdmin(admin.ModelAdmin):
 class ProductAdmin(ImportExportModelAdmin):
     inlines = [ProductVariantInline]
     resource_class = ProductResource
-    list_display = ('nomi', 'category', 'narxi', 'status', 'created_at')
+    list_display = ('nomi', 'category', 'narxi', 'status', 'created_at','avg_profit')
     list_filter = ('category', 'status', 'created_at')
     search_fields = ('nomi', 'description')
-    readonly_fields = ('created_at', 'avg_profit')
+    readonly_fields = ('created_at',)
     fieldsets = (
         ('Asosiy maʼlumotlar', {
             'fields': ('nomi', 'category', 'description', 'status', 'image')
@@ -104,23 +104,24 @@ class EskiIshAdmin(admin.ModelAdmin):
 @admin.register(Ish)
 class IshAdmin(ImportExportModelAdmin):
     resource_class = IshResource
-    list_display = ('mahsulot', 'ishchi', 'sana', 'soni', 'narxi')
-    list_filter = ('sana', 'ishchi__turi')
+    list_display = ('mahsulot', 'ishchi', 'sana', 'soni', 'narxi','status')
+    list_filter = (Last15DaysFilter, 'ishchi__turi','ishchi__ism','status')
     search_fields = ('mahsulot__nomi', 'ishchi__ism')
     list_per_page = 20
 
-@admin.register(ChiqimTuri)
-class ChiqimTuriAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
-    list_per_page = 20
 
 @admin.register(Avans)
 class AvansAdmin(admin.ModelAdmin):
-    list_display = ("ishchi", "amount")
+    list_display = ('name',)
+    search_fields = ('name',)
+    list_per_page = 20
+    list_filter = ["ishchi__ism"]
+    list_display = ("ishchi", "amount",'created',"ended",'is_active')
     autocomplete_fields = ['ishchi']
     fields = ['ishchi', 'amount', 'created', 'ended', 'is_active']
 
+@admin.register(ChiqimTuri)
+class ChiqimTuriAdmin(admin.ModelAdmin):
     def formfield_for_dbfield(self, db_field, **kwargs):
         if db_field.name == "amount":
             kwargs["widget"] = forms.TextInput(attrs={
@@ -133,10 +134,20 @@ class AvansAdmin(admin.ModelAdmin):
 
     class Media:
         js = ("js/money_mask.js",)
-            
 
+class ChiqimItemInline(admin.TabularInline):
+    model = ChiqimItem
+    extra = 1
+                
+
+@admin.register(ChiqimItem)
+class ChiqimItemAdmin(admin.ModelAdmin):
+    list_display = ('name','price_uzs','chiqim')
+    
+    
 @admin.register(Chiqim)
 class ChiqimAdmin(ExportMixin,admin.ModelAdmin):
+    inlines = [ChiqimItemInline]
     resource_class = ChiqimResource
     list_display = ('name', 'category', 'price', 'created')
     list_filter = ('category', Last15DaysFilter,'created')
@@ -162,7 +173,7 @@ class SotuvItemInline(admin.TabularInline):
 class SotuvAdmin(ImportExportModelAdmin):
     """Sotuv admin paneli"""
     resource_class = SotuvResource
-    list_display = ('id', 'xaridor', 'jami_summa', 'chegirma', 'yakuniy_summa', 'tolov_holati', 'sana')
+    list_display = ('id', 'xaridor', 'jami_summa', 'jami_summa_usd', 'yakuniy_summa', 'tolov_holati', 'sana')
     list_filter = ('tolov_holati', 'sana')
     search_fields = ('xaridor__ism', 'xaridor__telefon', 'id')
     readonly_fields = ('jami_summa', 'yakuniy_summa', 'created_at', 'updated_at')
@@ -171,10 +182,10 @@ class SotuvAdmin(ImportExportModelAdmin):
     
     fieldsets = (
         ('Asosiy ma\'lumotlar', {
-            'fields': ('xaridor', 'tolov_holati', 'sana')
+            'fields': ('xaridor', 'tolov_holati', 'sana','tolangan_summa')
         }),
         ('Summa', {
-            'fields': ('jami_summa', 'chegirma', 'yakuniy_summa')
+            'fields': ('jami_summa', 'chegirma', 'yakuniy_summa','jami_summa_usd')
         }),
         ('Qo\'shimcha', {
             'fields': ('izoh', 'created_at', 'updated_at'),
@@ -228,9 +239,19 @@ class KirimAdmin(admin.ModelAdmin):
 
 @admin.register(IshXomashyo)
 class IshXomashyoAdmin(admin.ModelAdmin):
-    list_display = ("ish","variant","miqdor")
+
+    
+    list_display = ("ish","get_xodim","miqdor")
 
     list_per_page = 20
+
+    def get_xodim(self, obj):
+            # obj bu IshXomashyo obyekti. 
+            # obj.ish orqali Ishga, undan esa xodimga o'tamiz
+            return obj.ish.ishchi.ism if obj.ish.ishchi else "Biriktirilmagan"
+        
+        # Admin panelda ustun nomi qanday ko'rinishi
+    get_xodim.short_description = "Xodim ismi"
 
 admin.site.register(Feature)
 admin.site.register(TeriSarfi)

@@ -2,131 +2,692 @@
 {% load static %}
 {% load humanize %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/xaridor_detail.css' %}">
-    <div class="main-content">
-        <header class="header">
-            <div class="header-title">Xaridor tafsilotlari</div>
-        </header>
 
-        <main class="content">
-            <div class="page">
-                <div class="breadcrumb">
-                    <a href="/">Bosh sahifa</a>
-                    <span>/</span>
-                    <a href="{% url 'main:xaridorlar' %}">Xaridorlar</a>
-                    <span>/</span>
-                    <span>{{ xaridor.ism }}</span>
-                </div>
+<style>
+/* ─── Xaridor Detail Page ─── */
+.xd-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
 
-                <div class="page-header">
-                    <h2>Xaridor ma'lumotlari</h2>
-                </div>
+/* Profile card */
+.profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: sticky;
+    top: 1.5rem;
+}
+.profile-top {
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    padding: 2rem 1.5rem 1rem;
+    text-align: center;
+}
+.profile-avatar {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(4px);
+    border: 3px solid rgba(255,255,255,0.4);
+    color: white; font-weight: 800; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 0.75rem;
+}
+.profile-name {
+    color: white; font-size: 1.1rem; font-weight: 700; margin: 0;
+}
+.profile-body { padding: 1.25rem; }
+.profile-info-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+}
+.profile-info-item:last-child { border-bottom: none; }
+.profile-info-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--bg-secondary);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); flex-shrink: 0;
+}
+.profile-info-label { font-size: 11px; color: var(--text-secondary); }
+.profile-info-value { font-weight: 600; color: var(--text-primary); margin-top: 1px; }
 
-                <div class="customer-grid">
-                    <div class="card">
-                        <div class="customer-avatar">{{ xaridor.ism|slice:":1"|upper }}</div>
-                        <h3 class="customer-name">{{ xaridor.ism }}</h3>
+/* Stats strip */
+.stats-strip {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border-color);
+}
+.strip-stat {
+    padding: 0.85rem 1rem;
+    text-align: center;
+    border-right: 1px solid var(--border-color);
+}
+.strip-stat:last-child { border-right: none; }
+.strip-stat:nth-child(3),
+.strip-stat:nth-child(4) {
+    border-top: 1px solid var(--border-color);
+}
+.strip-label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); font-weight: 600; }
+.strip-value { font-size: 14px; font-weight: 800; margin-top: 3px; }
 
-                        <div class="info-item">
-                            <div class="info-icon">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M2 4h12M4 8h8M6 12h4"/>
-                                </svg>
-                            </div>
-                            <div class="info-content">
-                                <div class="info-label">Telefon</div>
-                                <div class="info-value">{{ xaridor.telefon|default:"—" }}</div>
-                            </div>
+/* Action buttons */
+.profile-actions { padding: 1rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; gap: 8px; }
+.btn-action {
+    flex: 1; padding: 7px 10px; border-radius: 7px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    text-decoration: none; border: none; font-family: inherit;
+    transition: all .15s;
+}
+.btn-action-primary { background: #059669; color: white; }
+.btn-action-primary:hover { background: #047857; color: white; }
+.btn-action-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 1.5px solid var(--border-color); }
+.btn-action-secondary:hover { background: var(--bg-hover); }
+
+/* Right column */
+.right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* Section card */
+.section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.section-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.section-card-header h3 {
+    margin: 0; font-size: 0.95rem; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+}
+.section-card-header .header-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Badge */
+.badge-count {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 11px; font-weight: 700;
+}
+
+/* Qarz summary banner */
+.qarz-banner {
+    margin: 1rem 1.25rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #fef3c7, #fffbeb);
+    border: 1.5px solid #fcd34d;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.qarz-banner-label { font-size: 12px; color: #92400e; font-weight: 600; }
+.qarz-banner-amount { font-size: 1.4rem; font-weight: 800; color: #dc2626; }
+.qarz-banner-sub { font-size: 11px; color: #b45309; margin-top: 2px; }
+
+/* Qarzli sotuvlar jadvali */
+.qarz-table { width: 100%; border-collapse: collapse; }
+.qarz-table th {
+    padding: 0.7rem 1.25rem;
+    text-align: left; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text-secondary); font-weight: 700;
+    background: var(--bg-secondary);
+}
+.qarz-table td {
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+}
+.qarz-table tbody tr:hover { background: var(--bg-hover); }
+
+/* Holat badge */
+.holat-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+}
+.holat-tolanmagan { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.holat-qisman     { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
+.holat-tolandi    { background: #f0fdf4; color: #059669; border: 1px solid #86efac; }
+
+/* Kirimlar */
+.kirim-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+}
+.kirim-row:first-child { border-top: none; }
+.kirim-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #f0fdf4; color: #059669;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.kirim-info { flex: 1; }
+.kirim-summa { font-weight: 800; color: #059669; white-space: nowrap; }
+.kirim-sotuv-link { font-size: 11px; color: var(--color-primary); text-decoration: none; }
+.kirim-sotuv-link:hover { text-decoration: underline; }
+.kirim-sana { font-size: 11px; color: var(--text-secondary); }
+
+/* Top mahsulotlar */
+.top-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.8rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+.top-item:first-child { border-top: none; }
+.top-rank {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--color-primary); color: white;
+    font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.top-name { font-weight: 600; font-size: 13px; flex: 1; }
+.top-miqdor { font-size: 11px; color: var(--text-secondary); }
+.top-summa { font-weight: 700; font-size: 13px; color: var(--color-success); white-space: nowrap; }
+
+/* Sotuv accordion */
+.sotuv-accordion { border-top: 1px solid var(--border-color); }
+.sotuv-acc-header {
+    padding: 0.9rem 1.25rem;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background .1s;
+    user-select: none;
+}
+.sotuv-acc-header:hover { background: var(--bg-hover); }
+.sotuv-acc-header.open { background: var(--bg-secondary); }
+.sotuv-acc-header.selected {
+    background: #eff6ff !important;
+    border-left: 3px solid #1d4ed8;
+}
+.sotuv-acc-header .acc-id { font-weight: 700; font-size: 13px; }
+.sotuv-acc-header .acc-sana { font-size: 11px; color: var(--text-secondary); }
+.sotuv-acc-header .acc-summa { font-weight: 700; color: var(--color-success); margin-left: auto; white-space: nowrap; }
+.sotuv-acc-header .acc-arrow {
+    color: var(--text-secondary);
+    transition: transform .2s;
+    flex-shrink: 0;
+}
+.sotuv-acc-header.open .acc-arrow { transform: rotate(180deg); }
+.sotuv-acc-body {
+    display: none;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+.sotuv-acc-body.open { display: block; }
+.sotuv-items-table { width: 100%; border-collapse: collapse; }
+.sotuv-items-table th {
+    padding: 0.6rem 1.5rem;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--text-secondary); font-weight: 700; text-align: left;
+    background: var(--bg-card);
+}
+.sotuv-items-table td {
+    padding: 0.7rem 1.5rem;
+    font-size: 12px;
+    border-top: 1px solid var(--border-color);
+}
+.sotuv-acc-footer {
+    padding: 0.6rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
+    font-size: 12px;
+}
+.sotuv-acc-footer-stat { display: flex; flex-direction: column; gap: 2px; }
+.sotuv-acc-footer-stat span:first-child { color: var(--text-secondary); font-size: 11px; }
+.sotuv-acc-footer-stat span:last-child { font-weight: 700; }
+
+/* Accordion click zone */
+.acc-click-zone {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1; cursor: pointer; min-width: 0;
+}
+
+/* Checkbox */
+.sotuv-check {
+    width: 16px; height: 16px;
+    cursor: pointer;
+    accent-color: #1d4ed8;
+    flex-shrink: 0;
+}
+
+/* Tanlash toolbar */
+.selection-toolbar {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 4px;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(29,78,216,0.3);
+    flex-wrap: wrap;
+}
+.selection-toolbar.visible { display: flex; }
+.sel-count { color: white; font-size: 13px; font-weight: 700; flex: 1; }
+.sel-count span {
+    background: rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 2px 10px;
+    margin-right: 6px;
+}
+.btn-sel-clear {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    transition: all .15s;
+}
+.btn-sel-clear:hover { background: rgba(255,255,255,0.25); }
+.btn-chek-yuklab {
+    background: white; color: #1d4ed8;
+    border: none; border-radius: 7px;
+    padding: 7px 14px;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; gap: 6px;
+    transition: all .15s; text-decoration: none;
+}
+.btn-chek-yuklab:hover { background: #eff6ff; color: #1d4ed8; }
+
+/* Select all button */
+.btn-select-all {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--border-color);
+    border-radius: 7px;
+    padding: 5px 10px;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    color: var(--text-primary);
+    display: flex; align-items: center; gap: 5px;
+    transition: all .15s;
+}
+.btn-select-all:hover { background: var(--bg-hover); }
+
+/* Sel stats */
+.sel-stats-item { color: rgba(255,255,255,0.85); font-size: 12px; }
+.sel-stats-item strong { color: white; }
+
+/* Empty state */
+.empty-state {
+    text-align: center; padding: 2.5rem 1.5rem;
+    color: var(--text-secondary); font-size: 13px;
+}
+
+@media (max-width: 1100px) { .xd-layout { grid-template-columns: 1fr; } .profile-card { position: static; } }
+@media (max-width: 600px) { .qarz-table, .sotuv-items-table { font-size: 11px; } .sel-stats-item { display: none; } }
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Xaridor tafsilotlari</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <a href="{% url 'main:xaridorlar' %}" style="display:flex; align-items:center; gap:6px; color:var(--text-secondary); text-decoration:none; font-size:13px;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5"/></svg>
+                Xaridorlar
+            </a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <div class="breadcrumb">
+                <a href="/">Bosh sahifa</a><span>/</span>
+                <a href="{% url 'main:xaridorlar' %}">Xaridorlar</a><span>/</span>
+                <span>{{ xaridor.ism }}</span>
+            </div>
+
+            <div class="xd-layout">
+
+                <!-- ─── LEFT: Profile ─── -->
+                <div>
+                    <div class="profile-card">
+                        <div class="profile-top">
+                            <div class="profile-avatar">{{ xaridor.ism|slice:":1"|upper }}</div>
+                            <p class="profile-name">{{ xaridor.ism }}</p>
                         </div>
 
-                        <div class="info-item">
-                            <div class="info-icon">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 13c0-3 2-5 6-5s6 2 6 5"/>
-                                </svg>
-                            </div>
-                            <div class="info-content">
-                                <div class="info-label">Manzil</div>
-                                <div class="info-value">{{ xaridor.manzil|default:"—" }}</div>
-                            </div>
-                        </div>
-
-                        <div class="info-item">
-                            <div class="info-icon">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="4" width="10" height="9" rx="1"/>
-                                    <path d="M3 7h10M6 4v3M10 4v3"/>
-                                </svg>
-                            </div>
-                            <div class="info-content">
-                                <div class="info-label">Ro'yxatdan o'tgan</div>
-                                <div class="info-value">{{ xaridor.created_at|date:"d.m.Y" }}</div>
-                            </div>
-                        </div>
-
-                        {% if xaridor.izoh %}
-                            <div class="info-item">
-                                <div class="info-icon">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M2 3h12v8H5l-3 3V3z"/>
-                                    </svg>
+                        <div class="profile-body">
+                            <div class="profile-info-item">
+                                <div class="profile-info-icon">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M2 3h10v9H2zM5 3V1h4v2M5 7h4M5 10h2"/></svg>
                                 </div>
-                                <div class="info-content">
-                                    <div class="info-label">Izoh</div>
-                                    <div class="info-value">{{ xaridor.izoh }}</div>
+                                <div>
+                                    <div class="profile-info-label">Telefon</div>
+                                    <div class="profile-info-value">{{ xaridor.telefon|default:"—" }}</div>
                                 </div>
                             </div>
-                        {% endif %}
-
-                        <div class="stats-grid">
-                            <div class="stat-item">
-                                <div class="stat-label">Xaridlar</div>
-                                <div class="stat-value">{{ xaridlar_soni }} ta</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">Jami summa</div>
-                                <div class="stat-value" style="color: var(--color-success)">{{ jami_xarid|intcomma }} so'm</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <div class="card-header">
-                                <h3>Eng ko'p sotib olingan</h3>
-                            </div>
-                            
-                            {% if top_mahsulotlar %}
-                                <div class="top-products">
-                                    {% for item in top_mahsulotlar %}
-                                        <div class="product-item">
-                                            <div class="product-name">{{ item.mahsulot__nomi }}</div>
-                                            <div class="product-stats">
-                                                <div class="product-quantity">{{ item.jami_miqdor }} ta</div>
-                                                <div class="product-summa">{{ item.jami_summa|intcomma }} so'm</div>
-                                            </div>
-                                        </div>
-                                    {% endfor %}
+                            <div class="profile-info-item">
+                                <div class="profile-info-icon">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M7 1C4.2 1 2 3.2 2 6c0 4 5 8 5 8s5-4 5-8c0-2.8-2.2-5-5-5z"/><circle cx="7" cy="6" r="1.5"/></svg>
                                 </div>
-                            {% else %}
-                                <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Ma'lumot yo'q</p>
+                                <div>
+                                    <div class="profile-info-label">Manzil</div>
+                                    <div class="profile-info-value">{{ xaridor.manzil|default:"—" }}</div>
+                                </div>
+                            </div>
+                            <div class="profile-info-item">
+                                <div class="profile-info-icon">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="11" rx="1"/><path d="M2 6h10M5 2v3M9 2v3"/></svg>
+                                </div>
+                                <div>
+                                    <div class="profile-info-label">Ro'yxatdan o'tgan</div>
+                                    <div class="profile-info-value">{{ xaridor.created_at|date:"d.m.Y" }}</div>
+                                </div>
+                            </div>
+                            {% if xaridor.izoh %}
+                            <div class="profile-info-item">
+                                <div class="profile-info-icon">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M2 2h10v8H4l-2 2V2z"/></svg>
+                                </div>
+                                <div>
+                                    <div class="profile-info-label">Izoh</div>
+                                    <div class="profile-info-value">{{ xaridor.izoh }}</div>
+                                </div>
+                            </div>
                             {% endif %}
                         </div>
 
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Xarid tarixi</h3>
-                                <span class="badge">{{ sotuvlar.count }} ta</span>
+                        <!-- Stats strip -->
+                        <div class="stats-strip">
+                            <div class="strip-stat">
+                                <div class="strip-label">Xaridlar</div>
+                                <div class="strip-value" style="color:var(--color-primary);">{{ xaridlar_soni }} ta</div>
                             </div>
-                            
-                            {% if sotuvlar %}
+                            <div class="strip-stat">
+                                <div class="strip-label">Jami xarid</div>
+                                <div class="strip-value" style="color:var(--color-success); font-size:12px;">{{ jami_xarid|floatformat:0|intcomma }}</div>
+                            </div>
+                            <div class="strip-stat">
+                                <div class="strip-label">To'langan</div>
+                                <div class="strip-value" style="color:#059669; font-size:12px;">{{ jami_tolangan|intcomma }}</div>
+                            </div>
+                            <div class="strip-stat">
+                                <div class="strip-label">Qarz</div>
+                                <div class="strip-value" style="color:{% if umumiy_qarz > 0 %}#dc2626{% else %}#059669{% endif %}; font-size:12px;">
+                                    {% if umumiy_qarz > 0 %}{{ umumiy_qarz|floatformat:0|intcomma }}{% else %}0{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="profile-actions">
+                            <a href="{% url 'main:kirim_qoshish' %}?xaridor={{ xaridor.id }}" class="btn-action btn-action-primary">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10"/></svg>
+                                Kirim
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── RIGHT: Content ─── -->
+                <div class="right-col">
+
+                    <!-- ── Qarz banner ── -->
+                    {% if umumiy_qarz > 0 %}
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <h3>
+                                <span class="header-icon" style="background:#fef3c7; color:#d97706;">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M7 4v4M7 10h.01"/></svg>
+                                </span>
+                                Qarzlar
+                            </h3>
+                            <span class="badge-count">{{ qarzli_sotuvlar|length }} ta sotuv</span>
+                        </div>
+
+                        <!-- Umumiy qarz banner -->
+                        <div class="qarz-banner">
+                            <div>
+                                <div class="qarz-banner-label">⚠ Umumiy qarz</div>
+                                <div class="qarz-banner-amount">{{ umumiy_qarz|floatformat:0|intcomma }} so'm</div>
+                                <div class="qarz-banner-sub">
+                                    Jami: {{ jami_xarid|floatformat:0|intcomma }} so'm · To'langan: {{ jami_tolangan|floatformat:0|intcomma }} so'm
+                                </div>
+                            </div>
+                            <a href="{% url 'main:kirim_qoshish' %}?xaridor={{ xaridor.id }}"
+                               style="background:#dc2626; color:white; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; display:flex; align-items:center; gap:6px;">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10"/></svg>
+                                Qarz to'lash
+                            </a>
+                        </div>
+
+                        <!-- Qarzli sotuvlar jadvali -->
+                        <div style="overflow-x:auto;">
+                            <table class="qarz-table">
+                                <thead>
+                                    <tr>
+                                        <th>Sotuv</th>
+                                        <th>Sana</th>
+                                        <th>Jami summa</th>
+                                        <th>To'langan</th>
+                                        <th>Qarz</th>
+                                        <th>Holat</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sotuv in qarzli_sotuvlar %}
+                                    <tr>
+                                        <td><a href="{% url 'main:sotuv_detail' sotuv.id %}" style="font-weight:700; color:var(--color-primary); text-decoration:none;">#{{ sotuv.id }}</a></td>
+                                        <td style="color:var(--text-secondary);">{{ sotuv.sana|date:"d.m.Y" }}</td>
+                                        <td style="font-weight:600;">{{ sotuv.yakuniy_summa|intcomma }} so'm</td>
+                                        <td style="color:#059669; font-weight:600;">{{ sotuv.tolangan_summa|intcomma }} so'm</td>
+                                        <td style="color:#dc2626; font-weight:800;">{{ sotuv.qarz_summa|intcomma }} so'm</td>
+                                        <td>
+                                            {% if sotuv.tolov_holati == 'tolanmadi' %}
+                                                <span class="holat-badge holat-tolanmagan">● To'lanmagan</span>
+                                            {% elif sotuv.tolov_holati == 'qisman' %}
+                                                <span class="holat-badge holat-qisman">◐ Qisman</span>
+                                            {% else %}
+                                                <span class="holat-badge holat-tolandi">✓ To'landi</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'main:kirim_qoshish' %}?sotuv={{ sotuv.id }}"
+                                               style="background:#059669; color:white; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; text-decoration:none; white-space:nowrap;">
+                                                To'lash
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- ── Kirimlar ── -->
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <h3>
+                                <span class="header-icon" style="background:#f0fdf4; color:#059669;">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10"/></svg>
+                                </span>
+                                Kirimlar tarixi
+                            </h3>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-weight:700; font-size:13px; color:#059669;">{{ jami_kirim|intcomma }} so'm</span>
+                                <span class="badge-count">{{ kirimlar|length }} ta</span>
+                            </div>
+                        </div>
+
+                        {% if kirimlar %}
+                            {% for kirim in kirimlar %}
+                            <div class="kirim-row">
+                                <div class="kirim-icon">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10"/></svg>
+                                </div>
+                                <div class="kirim-info">
+                                    <div style="font-weight:600;">{{ kirim.izoh|default:"Kirim"|truncatechars:40 }}</div>
+                                    <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+                                        <span class="kirim-sana">{{ kirim.sana|date:"d.m.Y H:i" }}</span>
+                                        {% if kirim.sotuv %}
+                                        <a href="{% url 'main:sotuv_detail' kirim.sotuv.id %}" class="kirim-sotuv-link">
+                                            Sotuv #{{ kirim.sotuv.id }}
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="kirim-summa">+{{ kirim.summa|intcomma }} so'm</div>
+                                    {% if kirim.summa_usd %}
+                                    <div style="font-size:11px; color:#6b7280; text-align:right;">≈ ${{ kirim.summa_usd|floatformat:2 }}</div>
+                                    {% endif %}
+                                    <div style="font-size:10px; text-align:right; margin-top:2px;">
+                                        <span style="background:{% if kirim.valyuta == 'usd' %}#dbeafe{% else %}#f0fdf4{% endif %}; color:{% if kirim.valyuta == 'usd' %}#1d4ed8{% else %}#059669{% endif %}; border-radius:4px; padding:1px 5px; font-weight:700;">
+                                            {{ kirim.valyuta|upper }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state">
+                                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 40 40" style="opacity:.3; margin-bottom:8px;"><rect x="5" y="5" width="30" height="30" rx="4"/><path d="M5 15h30M15 5v10M25 5v10M12 25h6M12 31h16"/></svg>
+                                <p>Hali kirimlar yo'q</p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ── Top mahsulotlar ── -->
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <h3>
+                                <span class="header-icon" style="background:#eff6ff; color:#3b82f6;">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M2 12V6l5-5 5 5v6H9V9H5v3H2z"/></svg>
+                                </span>
+                                Eng ko'p sotib olingan
+                            </h3>
+                        </div>
+                        {% if top_mahsulotlar %}
+                            {% for item in top_mahsulotlar %}
+                            <div class="top-item">
+                                <div class="top-rank">{{ forloop.counter }}</div>
+                                <div class="top-name">{{ item.mahsulot__nomi }}</div>
+                                <div class="top-miqdor">{{ item.jami_miqdor }} ta</div>
+                                <div class="top-summa">{{ item.jami_summa|floatformat:0|intcomma }} so'm</div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state"><p>Ma'lumot yo'q</p></div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ── Xarid tarixi (accordion + PDF tanlash) ── -->
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <h3>
+                                <span class="header-icon" style="background:#f5f3ff; color:#7c3aed;">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="11" rx="1"/><path d="M2 6h10M5 2v3M9 2v3M4 9h6M4 11h4"/></svg>
+                                </span>
+                                Xarid tarixi
+                            </h3>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                {% if sotuvlar %}
+                                <button class="btn-select-all" onclick="selectAllSotuvlar()" id="btnSelectAll">
+                                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="2"/><path d="M3 6l2 2 4-4"/></svg>
+                                    Hammasini tanlash
+                                </button>
+                                {% endif %}
+                                <span class="badge-count">{{ xaridlar_soni }} ta</span>
+                            </div>
+                        </div>
+
+                        {% if sotuvlar %}
+
+                        <!-- Sticky tanlash paneli -->
+                        <div class="selection-toolbar" id="selectionToolbar">
+                            <div class="sel-count">
+                                <span id="selCountBadge">0</span>
+                                sotuv tanlandi
+                            </div>
+                            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                                <div class="sel-stats-item">Jami: <strong id="selJami">0</strong></div>
+                                <div class="sel-stats-item">To'langan: <strong id="selTolangan" style="color:#86efac;">0</strong></div>
+                                <div class="sel-stats-item">Qarz: <strong id="selQarz" style="color:#fca5a5;">0</strong></div>
+                            </div>
+                            <button class="btn-sel-clear" onclick="clearSelection()">Bekor qilish</button>
+                            <form method="post" action="{% url 'main:xaridor_umumiy_chek' xaridor.id %}" id="chekForm" style="margin:0;">
+                                {% csrf_token %}
+                                <input type="hidden" name="sotuv_ids" id="sotuvIdsInput" value="">
+                                <button type="submit" class="btn-chek-yuklab" onclick="submitChekForm(event)">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13">
+                                        <path d="M6.5 1v8M3 6l3.5 3.5L10 6"/><path d="M1 11h11"/>
+                                    </svg>
+                                    PDF Chek yuklash
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="sotuv-accordion">
                             {% for sotuv in sotuvlar %}
-                                <div class="sotuv-box">
-                                    <h4>Sotuv #{{ sotuv.id }} - {{ sotuv.sana|date:"d.m.Y" }}</h4>
-                                    <table>
+                            <div class="sotuv-acc-header"
+                                 data-id="{{ sotuv.id }}"
+                                 data-jami="{{ sotuv.yakuniy_summa }}"
+                                 data-tolangan="{{ sotuv.tolangan_summa }}"
+                                 data-qarz="{{ sotuv.qarz_summa|default:0 }}">
+
+                                <!-- Checkbox — faqat tanlash uchun, accordion ochmaydi -->
+                                <input type="checkbox"
+                                       class="sotuv-check"
+                                       id="chk-{{ sotuv.id }}"
+                                       data-id="{{ sotuv.id }}"
+                                       onclick="toggleCheck(event, this)">
+
+                                <!-- Accordion zone -->
+                                <div class="acc-click-zone" onclick="toggleAcc(this.closest('.sotuv-acc-header'))">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13" style="color:var(--text-secondary); flex-shrink:0;"><rect x="1" y="1" width="11" height="11" rx="1"/><path d="M4 4h5M4 6.5h5M4 9h3"/></svg>
+                                    <div>
+                                        <div class="acc-id">Sotuv #{{ sotuv.id }}</div>
+                                        <div class="acc-sana">{{ sotuv.sana|date:"d.m.Y H:i" }}</div>
+                                    </div>
+                                    <div style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                        {% if sotuv.tolov_holati == 'tolanmagan' or sotuv.tolov_holati == 'tolanmadi' %}
+                                            <span class="holat-badge holat-tolanmagan" style="font-size:10px;">To'lanmagan</span>
+                                        {% elif sotuv.tolov_holati == 'qisman' %}
+                                            <span class="holat-badge holat-qisman" style="font-size:10px;">Qisman</span>
+                                        {% else %}
+                                            <span class="holat-badge holat-tolandi" style="font-size:10px;">To'landi</span>
+                                        {% endif %}
+                                        <span class="acc-summa">{{ sotuv.yakuniy_summa|intcomma }} so'm</span>
+                                        <svg class="acc-arrow" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><path d="M2 4.5l4.5 4.5 4.5-4.5"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sotuv-acc-body" id="acc-{{ sotuv.id }}">
+                                <div style="overflow-x:auto;">
+                                    <table class="sotuv-items-table">
                                         <thead>
                                             <tr>
                                                 <th>Mahsulot</th>
+                                                <th>Variant</th>
                                                 <th>Miqdor</th>
                                                 <th>Narx</th>
                                                 <th>Jami</th>
@@ -135,23 +696,157 @@
                                         <tbody>
                                             {% for item in sotuv.items.all %}
                                             <tr>
-                                                <td>{{ item.mahsulot.nomi }} ({{ item.variant }})</td>
-                                                <td>{{ item.miqdor }}</td>
-                                                <td>{{ item.narx }}</td>
-                                                <td>{{ item.jami }}</td>
+                                                <td style="font-weight:600;">{{ item.mahsulot.nomi }}</td>
+                                                <td style="color:var(--text-secondary);">{{ item.variant|default:"—" }}</td>
+                                                <td>{{ item.miqdor }} ta</td>
+                                                <td>{{ item.narx|intcomma }} so'm</td>
+                                                <td style="font-weight:700;">{{ item.jami|intcomma }} so'm</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
+                                <div class="sotuv-acc-footer">
+                                    <div class="sotuv-acc-footer-stat">
+                                        <span>Jami summa</span>
+                                        <span style="color:var(--color-success);">{{ sotuv.yakuniy_summa|intcomma }} so'm</span>
+                                    </div>
+                                    <div class="sotuv-acc-footer-stat">
+                                        <span>To'langan</span>
+                                        <span style="color:#059669;">{{ sotuv.tolangan_summa|intcomma }} so'm</span>
+                                    </div>
+                                    {% if sotuv.qarz_summa > 0 %}
+                                    <div class="sotuv-acc-footer-stat">
+                                        <span>Qarz</span>
+                                        <span style="color:#dc2626;">{{ sotuv.qarz_summa|intcomma }} so'm</span>
+                                    </div>
+                                    {% endif %}
+                                    <a href="{% url 'main:sotuv_detail' sotuv.id %}" style="font-size:12px; color:var(--color-primary); text-decoration:none; font-weight:600;">
+                                        Batafsil →
+                                    </a>
+                                </div>
+                            </div>
                             {% endfor %}
-                            {% else %}
-                                <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali xaridlar yo'q</p>
-                            {% endif%}
                         </div>
+
+                        {% else %}
+                            <div class="empty-state">
+                                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 40 40" style="opacity:.3; margin-bottom:8px;"><rect x="5" y="8" width="30" height="26" rx="3"/><path d="M5 16h30M15 8v8M25 8v8"/></svg>
+                                <p>Hali xaridlar yo'q</p>
+                            </div>
+                        {% endif %}
                     </div>
-                </div>
-            </div>
-        </main>
-    </div>
+
+                </div><!-- /right-col -->
+            </div><!-- /xd-layout -->
+        </div>
+    </main>
+</div>
+
+<script>
+// ─── Accordion ───
+function toggleAcc(header) {
+    const id = header.dataset.id;
+    const body = document.getElementById('acc-' + id);
+    const isOpen = body.classList.contains('open');
+    document.querySelectorAll('.sotuv-acc-body').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.sotuv-acc-header').forEach(h => h.classList.remove('open'));
+    if (!isOpen) {
+        body.classList.add('open');
+        header.classList.add('open');
+    }
+}
+
+// ─── PDF tanlash ───
+let selectedIds = new Set();
+
+function toggleCheck(event, checkbox) {
+    event.stopPropagation();
+    const id = parseInt(checkbox.dataset.id);
+    const header = checkbox.closest('.sotuv-acc-header');
+    if (checkbox.checked) {
+        selectedIds.add(id);
+        header.classList.add('selected');
+    } else {
+        selectedIds.delete(id);
+        header.classList.remove('selected');
+    }
+    updateToolbar();
+}
+
+function selectAllSotuvlar() {
+    const checkboxes = document.querySelectorAll('.sotuv-check');
+    const allChecked = checkboxes.length === selectedIds.size;
+    checkboxes.forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        const header = cb.closest('.sotuv-acc-header');
+        if (allChecked) {
+            cb.checked = false;
+            selectedIds.delete(id);
+            header.classList.remove('selected');
+        } else {
+            cb.checked = true;
+            selectedIds.add(id);
+            header.classList.add('selected');
+        }
+    });
+    updateToolbar();
+}
+
+function clearSelection() {
+    selectedIds.clear();
+    document.querySelectorAll('.sotuv-check').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.sotuv-acc-header').classList.remove('selected');
+    });
+    updateToolbar();
+}
+
+function formatNum(n) {
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+function updateToolbar() {
+    const toolbar = document.getElementById('selectionToolbar');
+    if (!toolbar) return;
+    if (selectedIds.size === 0) {
+        toolbar.classList.remove('visible');
+        return;
+    }
+    toolbar.classList.add('visible');
+    document.getElementById('selCountBadge').textContent = selectedIds.size;
+
+    let jami = 0, tolangan = 0, qarz = 0;
+    selectedIds.forEach(id => {
+        const h = document.querySelector(`.sotuv-acc-header[data-id="${id}"]`);
+        if (h) {
+            jami     += parseFloat(h.dataset.jami)     || 0;
+            tolangan += parseFloat(h.dataset.tolangan) || 0;
+            qarz     += parseFloat(h.dataset.qarz)     || 0;
+        }
+    });
+    document.getElementById('selJami').textContent     = formatNum(jami)     + " so'm";
+    document.getElementById('selTolangan').textContent = formatNum(tolangan) + " so'm";
+    document.getElementById('selQarz').textContent     = formatNum(qarz)     + " so'm";
+
+    const total = document.querySelectorAll('.sotuv-check').length;
+    const btn = document.getElementById('btnSelectAll');
+    if (btn) {
+        const allSel = selectedIds.size === total;
+        btn.innerHTML = (allSel
+            ? '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="2"/><path d="M3 6l2 2 4-4"/></svg> Bekor qilish'
+            : '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="2"/><path d="M3 6l2 2 4-4"/></svg> Hammasini tanlash');
+    }
+}
+
+function submitChekForm(event) {
+    if (selectedIds.size === 0) {
+        event.preventDefault();
+        alert("Kamida bitta sotuv tanlang!");
+        return;
+    }
+    document.getElementById('sotuvIdsInput').value = Array.from(selectedIds).join(',');
+}
+</script>
+
 {% endblock content %}

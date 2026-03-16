@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.db.models import Sum, Count, Q, F, ExpressionWrapper,DecimalField
-from django.http import JsonResponse
+from django.http import JsonResponse,HttpResponse
 from datetime import date, timedelta,datetime
 from decimal import Decimal,InvalidOperation
 from django.utils import timezone
@@ -16,6 +16,7 @@ from crm import models as m
 from crm.models import Chiqim, ChiqimTuri,IshXomashyo
 from xomashyo.models import Xomashyo, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
 import logging
+from .utils import get_usd_rate
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,30 @@ class HomeView(LoginRequiredMixin, ListView):
 
         monthly_sales = m.Sotuv.objects.filter(sana__gte=current_month_start)
         monthly_outlays = m.Chiqim.objects.filter(created__gte=current_month_start)
+        
+        last_month_end = current_month_start - timedelta(microseconds=1)
+        # O'tgan oyning birinchi kuni
+        last_month_start = (current_month_start - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        last_month_sales = m.Sotuv.objects.filter(
+            sana__gte=last_month_start,
+            sana__lte=last_month_end
+        )
 
-        # ✅ Profit: Sotuv -> items -> variant(avg_profit) * miqdor
+        # 3. Foydani hisoblash (Reusable logic)
+        def calculate_profit(queryset):
+            return queryset.aggregate(
+                total=Sum(
+                    ExpressionWrapper(
+                        F('items__variant__product__avg_profit') * F('items__miqdor'),
+                        output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
+            )['total'] or 0
+            
+            
+        last_month_profit = calculate_profit(last_month_sales)
+        
         total_profit = monthly_sales.aggregate(
             total=Sum(
                 ExpressionWrapper(
@@ -74,21 +97,25 @@ class HomeView(LoginRequiredMixin, ListView):
                     output_field=DecimalField(max_digits=12, decimal_places=2)
                 )
             )
+            
         )['total'] or 0
 
-        context['salary_sum'] = m.Ish.objects.aggregate(umumiy=Sum('narxi'))['umumiy'] or 0
+        context['salary_sum'] = m.Ish.objects.filter(status='yangi').aggregate(umumiy=Sum('narxi'))['umumiy'] or 0
+        context['avanslar'] = m.Avans.objects.filter(is_active=True).aggregate(total=Sum('amount'))['total'] or 0
         context['monthly_outlays'] = monthly_outlays.aggregate(total=Sum('price'))['total'] or 0
         context['monthly_sales'] = monthly_sales
+        context["prev_sales"] = last_month_profit
         context['total_profit'] = total_profit
         context['products'] = m.ProductVariant.objects.all().aggregate(total_son=Sum('stock'))['total_son'] or 0
         context['employees'] = m.Ishchi.objects.filter(is_active=True).count()
 
         return context
 
+from django.db import transaction
+
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
 def oylik_yopish(request, pk):
-
     ishchi = get_object_or_404(m.Ishchi, pk=pk)
 
     if request.method == "POST":
@@ -96,36 +123,42 @@ def oylik_yopish(request, pk):
             messages.warning(request, 'Oylik allaqachon yopilgan!')
             return redirect('main:employee_detail', pk=pk)
 
-        umumiy_oylik = sum(ish.narxi for ish in m.Ish.objects.filter(ishchi=ishchi))
-        ishlari = m.Ish.objects.filter(ishchi=ishchi)
+        # Tranzaksiya ichida bajarish: birortasi xato bo'lsa, hech narsa saqlanmaydi
+        with transaction.atomic():
+            ishlari = m.Ish.objects.filter(ishchi=ishchi, status='active') # Faqat aktivlarini olish
+            umumiy_oylik = sum(ish.narxi for ish in ishlari)
 
-        oylik_yozuv = m.Oyliklar.objects.create(
-            ishchi=ishchi,
-            oylik=umumiy_oylik,
-            yopilgan=True
-        )
-
-        for ish in ishlari:
-            m.EskiIsh.objects.create(
-                ishchi=ish.ishchi,
-                mahsulot=ish.mahsulot.nomi,
-                soni=ish.soni,
-                sana=ish.sana,
-                narxi=ish.narxi,
-                ishchi_oylik=oylik_yozuv
+            oylik_yozuv = m.Oyliklar.objects.create(
+                ishchi=ishchi,
+                oylik=umumiy_oylik,
+                berilgan=0, # Avvalgi so'rovingizdagi yangi maydon
+                yopilgan=True
             )
-            
-        ishchi.oldingi_oylik = umumiy_oylik
-        ishchi.is_oylik_open = False
-        ishchi.save()
 
-        m.Ish.objects.update(
-            status='yopilgan'
-        )
+            # Eski ishlarni yaratish
+            eski_ishlar_list = [
+                m.EskiIsh(
+                    ishchi=ish.ishchi,
+                    mahsulot=ish.mahsulot.nomi,
+                    soni=ish.soni,
+                    sana=ish.sana,
+                    narxi=ish.narxi,
+                    ishchi_oylik=oylik_yozuv
+                ) for ish in ishlari
+            ]
+            m.EskiIsh.objects.bulk_create(eski_ishlar_list)
+
+            # Faqat shu ishchining ishlarini yopish!
+            ishlari.update(status='yopilgan')
+
+            # Ishchi holatini yangilash
+            ishchi.oldingi_oylik = umumiy_oylik
+            ishchi.is_oylik_open = False
+            ishchi.save()
+
         messages.success(request, f'✅ {ishchi.ism} uchun oylik yopildi!')
 
     return redirect('main:employee_detail', pk=pk)
-
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
@@ -143,7 +176,6 @@ def yangi_oy_boshlash(request, pk):
         messages.success(request, f'✅ {ishchi.ism} uchun yangi oy boshlandi!')
 
     return redirect('main:employee_detail', pk=pk)
-
 
 # ==================== EMPLOYEES ====================
 
@@ -415,7 +447,7 @@ class IshQoshishView(AdminRequiredMixin,View):
                 # KROY VA REZAK - TeriSarfi bilan
                 # ============================================================
 
-                if ishchi_turi in ['kroy', 'rezak']:
+                elif ishchi_turi in ['kroy', 'rezak']:
                     # Multiple teri sarflarini olish
                     teri_xomashyo_ids = request.POST.getlist('teri_xomashyo[]')
                     teri_variant_ids = request.POST.getlist('teri_variant[]')
@@ -607,12 +639,12 @@ class IshQoshishView(AdminRequiredMixin,View):
                     # ASTAR CHIQIMI
                     # ============================================================
                     if astar_xomashyo and astar_sarfi > 0:
-                        if astar_variant:
-                            astar_variant.miqdori -= astar_sarfi
-                            astar_variant.save(update_fields=['miqdori'])
-                        else:
-                            astar_xomashyo.miqdori -= astar_sarfi
-                            astar_xomashyo.save(update_fields=['miqdori', 'updated_at'])
+                        # if astar_variant:
+                        #     astar_variant.miqdori -= astar_sarfi
+                        #     astar_variant.save(update_fields=['miqdori'])
+                        # else:
+                        #     astar_xomashyo.miqdori -= astar_sarfi
+                        #     astar_xomashyo.save(update_fields=['miqdori', 'updated_at'])
 
                         IshXomashyo.objects.create(
                             ish=ish,
@@ -974,10 +1006,10 @@ class IshQoshishView(AdminRequiredMixin,View):
 
 #  SOTUVLAR 
 
-class SotuvListView(AdminRequiredMixin, ListView):
+class SotuvQoshish(AdminRequiredMixin, ListView):
     """Sotuvlar ro'yxati"""
     model = m.Sotuv
-    template_name = 'sotuv_list.html'
+    template_name = 'sotuv/sotuvlar.html'
     context_object_name = 'sotuvlar'
     ordering = ['-sana']
     paginate_by = 50
@@ -1041,15 +1073,159 @@ class SotuvListView(AdminRequiredMixin, ListView):
         
         return context
 
+class SotuvListView(AdminRequiredMixin, ListView):
+    """Sotuvlar ro'yxati - Filterlar va qidiruv bilan"""
+    template_name = "sotuv/sotuv_list.html"
+    model = m.Sotuv
+    context_object_name = "sotuvlar"
+    paginate_by = 20  # Har sahifada 20 ta
+    
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related('xaridor').prefetch_related(
+            'items__variant__product'
+        )
+        
+        # 1. QIDIRUV
+        search = self.request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(id__icontains=search) |
+                Q(xaridor__ism__icontains=search) |
+                Q(xaridor__telefon__icontains=search)
+            )
+        
+        # 2. SANA FILTRI (tez filterlar)
+        date_filter = self.request.GET.get('date')
+        if date_filter == 'bugun':
+            queryset = queryset.filter(sana__date=date.today())
+        elif date_filter == 'hafta':
+            week_ago = date.today() - timedelta(days=7)
+            queryset = queryset.filter(sana__date__gte=week_ago)
+        elif date_filter == 'oy':
+            queryset = queryset.filter(
+                sana__year=date.today().year,
+                sana__month=date.today().month
+            )
+        
+        # 3. SANA ORALIG'I (batafsil)
+        date_from = self.request.GET.get('date_from')
+        date_to = self.request.GET.get('date_to')
+        
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                queryset = queryset.filter(sana__date__gte=date_from_obj)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                queryset = queryset.filter(sana__date__lte=date_to_obj)
+            except ValueError:
+                pass
+        
+        # 4. TO'LOV HOLATI
+        tolov_holati = self.request.GET.get('tolov_holati')
+        if tolov_holati in ['tolandi', 'qisman', 'tolanmadi']:
+            queryset = queryset.filter(tolov_holati=tolov_holati)
+        
+        # 5. XARIDOR
+        xaridor = self.request.GET.get('xaridor')
+        if xaridor:
+            try:
+                queryset = queryset.filter(xaridor_id=int(xaridor))
+            except ValueError:
+                pass
+        
+        # 6. SUMMA ORALIG'I
+        min_summa = self.request.GET.get('min_summa')
+        max_summa = self.request.GET.get('max_summa')
+        
+        if min_summa:
+            try:
+                queryset = queryset.filter(yakuniy_summa__gte=Decimal(min_summa))
+            except:
+                pass
+        
+        if max_summa:
+            try:
+                queryset = queryset.filter(yakuniy_summa__lte=Decimal(max_summa))
+            except:
+                pass
+        
+        # 7. SARALASH
+        ordering = self.request.GET.get('ordering', '-sana')
+        if ordering in ['-sana', 'sana', '-yakuniy_summa', 'yakuniy_summa']:
+            queryset = queryset.order_by(ordering)
+        else:
+            queryset = queryset.order_by('-sana')
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = date.today()
+        
+        # Statistika - Bugun
+        bugungi_queryset = m.Sotuv.objects.filter(sana__date=today)
+        context['bugungi_sotuv'] = bugungi_queryset.aggregate(
+            Sum('yakuniy_summa')
+        )['yakuniy_summa__sum'] or 0
+        context['bugungi_soni'] = bugungi_queryset.count()
+        
+        # Statistika - Hafta
+        week_ago = today - timedelta(days=7)
+        haftalik_queryset = m.Sotuv.objects.filter(sana__date__gte=week_ago)
+        context['haftalik_sotuv'] = haftalik_queryset.aggregate(
+            Sum('yakuniy_summa')
+        )['yakuniy_summa__sum'] or 0
+        context['haftalik_soni'] = haftalik_queryset.count()
+        
+        # Statistika - Oy
+        oylik_queryset = m.Sotuv.objects.filter(
+            sana__year=today.year,
+            sana__month=today.month
+        )
+        context['oylik_sotuv'] = oylik_queryset.aggregate(
+            Sum('yakuniy_summa')
+        )['yakuniy_summa__sum'] or 0
+        context['oylik_soni'] = oylik_queryset.count()
+        
+        # Statistika - Jami
+        context['jami_sotuv'] = m.Sotuv.objects.aggregate(
+            Sum('yakuniy_summa')
+        )['yakuniy_summa__sum'] or 0
+        context['jami_soni'] = m.Sotuv.objects.count()
+        
+        # Xaridorlar (filterlar uchun)
+        context['xaridorlar'] = m.Xaridor.objects.all().order_by('ism')[:100]
+        
+        return context
+
 class SotuvDetailView(AdminRequiredMixin,DetailView):
     model = m.Sotuv
     template_name = "sotuv/sotuv.html"
-    
+   
+
+@login_required(login_url='login')
+def get_usd_kurs(request):
+    """Real-time USD kursini qaytarish"""
+    rate = get_usd_rate()
+    return JsonResponse({
+        'rate': str(rate),
+        'formatted': f"{rate:,.2f}"
+    })
+
+
+# ================================================================
+# YANGILANGAN: sotuv_qoshish - USD bilan
+# ================================================================
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url="login")
 def sotuv_qoshish(request):
-    """Yangi sotuv yaratish (bir nechta mahsulot bilan)"""
+    """Yangi sotuv yaratish (USD kurs bilan)"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -1077,62 +1253,114 @@ def sotuv_qoshish(request):
                         return redirect('main:sotuvlar')
                     xaridor = get_object_or_404(m.Xaridor, id=xaridor_id)
                 
-                # 2. Asosiy sotuvni yaratish
+                # 2. USD kursini olish (frontenddan yoki API dan)
+                usd_kurs_str = request.POST.get('usd_kurs', '0')
+                try:
+                    usd_kurs = Decimal(str(usd_kurs_str)) if usd_kurs_str else get_usd_rate()
+                except:
+                    usd_kurs = get_usd_rate()
+                
+                if not usd_kurs or usd_kurs == 0:
+                    usd_kurs = get_usd_rate()
+                
+                # 3. Asosiy sotuvni yaratish
                 chegirma = request.POST.get('chegirma', 0)
                 izoh = request.POST.get('izoh', '')
                 tolov_holati = request.POST.get('tolov_holati', 'tolandi')
+                tolangan_summa_str = request.POST.get('tolangan_summa', '0')
                 
-                sotuv = m.Sotuv.objects.create(
+                try:
+                    tolangan_summa = Decimal(str(tolangan_summa_str)) if tolangan_summa_str else Decimal('0')
+                except:
+                    tolangan_summa = Decimal('0')
+                
+                sotuv = m.Sotuv(
                     xaridor=xaridor,
                     chegirma=Decimal(str(chegirma)) if chegirma else 0,
                     izoh=izoh,
-                    tolov_holati=tolov_holati
+                    tolov_holati=tolov_holati,
+                    usd_kurs=usd_kurs,
+                    tolangan_summa=tolangan_summa,
                 )
                 
-                # 3. Mahsulotlarni qo'shish (frontenddan JSON formatda keladi)
+                # Oldin save qilmasdan, keyingi logika uchun flagni o'rnatamiz
+                # (SotuvItem save da sotuv.id kerak, shuning uchun oldin save qilamiz)
+                # Kirim yaratishni manual boshqaramiz
+                sotuv._skip_kirim = True  # Kirimni keyinroq qo'shamiz
+                sotuv.save()
+                
+                # 4. Mahsulotlarni qo'shish
                 items_json = request.POST.get('items')
                 if not items_json:
-                    # Eski format - bitta mahsulot
                     variant_id = request.POST.get('mahsulot')
                     miqdor = request.POST.get('miqdor')
                     narx = request.POST.get('narx')
+                    narx_turi = request.POST.get('narx_turi', 'uzs')
                     
                     if not all([variant_id, miqdor, narx]):
                         raise ValueError('Mahsulot, miqdor va narx majburiy!')
                     
                     variant = get_object_or_404(m.ProductVariant, id=variant_id)
-                    
                     m.SotuvItem.objects.create(
                         sotuv=sotuv,
                         mahsulot=variant.product,
                         variant=variant,
                         miqdor=int(miqdor),
-                        narx=Decimal(str(narx))
+                        narx=Decimal(str(narx)),
+                        narx_turi=narx_turi,
                     )
                 else:
-                    # Yangi format - bir nechta mahsulot
                     items = json.loads(items_json)
-                    
                     for item in items:
                         variant = get_object_or_404(m.ProductVariant, id=item['variant_id'])
+                        narx_turi = item.get('narx_turi', 'uzs')
+                        narx_val = Decimal(str(item['narx']))
                         
                         m.SotuvItem.objects.create(
                             sotuv=sotuv,
                             mahsulot=variant.product,
                             variant=variant,
                             miqdor=int(item['miqdor']),
-                            narx=Decimal(str(item['narx']))
+                            narx=narx_val,
+                            narx_turi=narx_turi,
                         )
                 
-                # 4. Summani yangilash (SotuvItem.save() da avtomatik bo'ladi)
+                # 5. Summani yangilash
                 sotuv.refresh_from_db()
+                
+                # 6. Kirimlarni yaratish (manual)
+                if tolov_holati == 'tolandi':
+                    m.Kirim.objects.create(
+                        sotuv=sotuv,
+                        xaridor=xaridor,
+                        summa=sotuv.yakuniy_summa,
+                        summa_usd=sotuv.yakuniy_summa_usd,
+                        usd_kurs=usd_kurs,
+                        valyuta='uzs',
+                        sana=sotuv.sana,
+                        izoh=f"Sotuv #{sotuv.id} - To'liq to'lov"
+                    )
+                    sotuv.tolangan_summa = sotuv.yakuniy_summa
+                    sotuv.save(update_fields=['tolangan_summa'])
+                    
+                elif tolov_holati == 'qisman' and tolangan_summa > 0:
+                    m.Kirim.objects.create(
+                        sotuv=sotuv,
+                        xaridor=xaridor,
+                        summa=tolangan_summa,
+                        summa_usd=round(tolangan_summa / usd_kurs, 4) if usd_kurs > 0 else 0,
+                        usd_kurs=usd_kurs,
+                        valyuta='uzs',
+                        sana=sotuv.sana,
+                        izoh=f"Sotuv #{sotuv.id} - Qisman to'lov"
+                    )
                 
                 messages.success(
                     request,
                     f"✅ Sotuv #{sotuv.id} muvaffaqiyatli yaratildi! "
-                    f"Summa: {sotuv.yakuniy_summa:,.0f} so'm"
+                    f"Summa: {sotuv.yakuniy_summa:,.0f} so'm "
+                    f"(≈ {sotuv.yakuniy_summa_usd:.2f} USD)"
                 )
-                
                 return redirect('main:sotuvlar')
                 
         except ValueError as e:
@@ -1141,6 +1369,311 @@ def sotuv_qoshish(request):
             messages.error(request, f'❌ Kutilmagan xatolik: {str(e)}')
     
     return redirect('main:sotuvlar')
+
+# ================================================================
+# YANGILANGAN: sotuv_pdf - USD va kirimlar ro'yxati bilan
+# ================================================================
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url="login")
+def sotuv_pdf(request, sotuv_id):
+    """Sotuv PDF - USD narxlar va kirimlar ro'yxati bilan"""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch, cm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+        from io import BytesIO
+        
+        sotuv = get_object_or_404(m.Sotuv, id=sotuv_id)
+        kirimlar = sotuv.kirimlar.all().order_by('sana')
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            rightMargin=1.5*cm, leftMargin=1.5*cm,
+            topMargin=1.5*cm, bottomMargin=1.5*cm
+        )
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # ---- Stillar ----
+        title_style = ParagraphStyle(
+            'Title', parent=styles['Heading1'],
+            fontSize=20, textColor=colors.HexColor('#1e40af'),
+            spaceAfter=8, alignment=TA_CENTER
+        )
+        subtitle_style = ParagraphStyle(
+            'Subtitle', parent=styles['Normal'],
+            fontSize=9, textColor=colors.HexColor('#6b7280'),
+            spaceAfter=16, alignment=TA_CENTER
+        )
+        section_style = ParagraphStyle(
+            'Section', parent=styles['Heading2'],
+            fontSize=11, textColor=colors.HexColor('#374151'),
+            spaceBefore=12, spaceAfter=6
+        )
+        small_style = ParagraphStyle(
+            'Small', parent=styles['Normal'],
+            fontSize=8, textColor=colors.HexColor('#6b7280')
+        )
+        
+        usd_kurs = sotuv.usd_kurs or Decimal('0')
+        has_usd = usd_kurs > 0
+        
+        # ---- Sarlavha ----
+        elements.append(Paragraph(f"SOTUV CHEKI #{sotuv.id}", title_style))
+        if has_usd:
+            elements.append(Paragraph(
+                f"USD kurs: 1 USD = {usd_kurs:,.2f} so'm (CBU, {sotuv.sana.strftime('%d.%m.%Y')})",
+                subtitle_style
+            ))
+        
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e5e7eb')))
+        elements.append(Spacer(1, 0.3*cm))
+        
+        # ---- Xaridor ma'lumotlari ----
+        holat_color = {
+            'tolandi': '#059669',
+            'qisman': '#d97706',
+            'tolanmadi': '#dc2626',
+        }.get(sotuv.tolov_holati, '#374151')
+        
+        info_data = [
+            ['Xaridor:', sotuv.xaridor.ism],
+            ['Telefon:', sotuv.xaridor.telefon or '-'],
+            ['Manzil:', sotuv.xaridor.manzil or '-'],
+            ['Sana:', sotuv.sana.strftime('%d.%m.%Y %H:%M')],
+            ['To\'lov holati:', sotuv.get_tolov_holati_display()],
+        ]
+        
+        info_table = Table(info_data, colWidths=[4*cm, 12*cm])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('TEXTCOLOR', (1, 4), (1, 4), colors.HexColor(holat_color)),
+            ('FONTNAME', (1, 4), (1, 4), 'Helvetica-Bold'),
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 0.4*cm))
+        
+        # ---- Mahsulotlar jadvali ----
+        elements.append(Paragraph("Mahsulotlar", section_style))
+        
+        if has_usd:
+            header = ['№', 'Mahsulot', 'Miqdor', "Narx (so'm)", 'Narx (USD)', "Jami (so'm)", 'Jami (USD)']
+            col_widths = [0.8*cm, 5.5*cm, 1.5*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.5*cm]
+        else:
+            header = ['№', 'Mahsulot', 'Miqdor', 'Narx', 'Jami']
+            col_widths = [0.8*cm, 7*cm, 2*cm, 3.5*cm, 4*cm]
+        
+        product_data = [header]
+        
+        for idx, item in enumerate(sotuv.items.all(), 1):
+            if has_usd:
+                row = [
+                    str(idx),
+                    str(item.variant),
+                    f"{item.miqdor} ta",
+                    f"{item.narx:,.0f}",
+                    f"${item.narx_usd:.4f}" if item.narx_usd else f"${round(item.narx/usd_kurs, 4):.4f}",
+                    f"{item.jami:,.0f}",
+                    f"${item.jami_usd:.4f}" if item.jami_usd else f"${round(item.jami/usd_kurs, 4):.4f}",
+                ]
+            else:
+                row = [
+                    str(idx),
+                    str(item.variant),
+                    f"{item.miqdor} ta",
+                    f"{item.narx:,.0f} so'm",
+                    f"{item.jami:,.0f} so'm",
+                ]
+            product_data.append(row)
+        
+        prod_table = Table(product_data, colWidths=col_widths)
+        prod_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ]))
+        elements.append(prod_table)
+        elements.append(Spacer(1, 0.3*cm))
+        
+        # ---- Summa xulosasi ----
+        elements.append(Paragraph("To'lov xulosasi", section_style))
+        
+        qarz = sotuv.qarz_summa
+        
+        if has_usd:
+            summary_data = [
+                ["Jami summa:", f"{sotuv.jami_summa:,.0f} so'm", f"${sotuv.jami_summa_usd:.2f}"],
+            ]
+            if sotuv.chegirma > 0:
+                chegirma_usd = round(sotuv.chegirma / usd_kurs, 2)
+                summary_data.append(["Chegirma:", f"- {sotuv.chegirma:,.0f} so'm", f"-${chegirma_usd:.2f}"])
+            summary_data.extend([
+                ["To'lov summasi:", f"{sotuv.yakuniy_summa:,.0f} so'm", f"${sotuv.yakuniy_summa_usd:.2f}"],
+                ["To'langan:", f"{sotuv.tolangan_summa:,.0f} so'm", 
+                 f"${round(sotuv.tolangan_summa/usd_kurs, 2):.2f}" if usd_kurs > 0 else "-"],
+                ["Qarz:", f"{qarz:,.0f} so'm", 
+                 f"${sotuv.qarz_summa_usd:.2f}" if usd_kurs > 0 else "-"],
+            ])
+            sum_table = Table(summary_data, colWidths=[5*cm, 5*cm, 5*cm])
+        else:
+            summary_data = [
+                ["Jami summa:", f"{sotuv.jami_summa:,.0f} so'm"],
+            ]
+            if sotuv.chegirma > 0:
+                summary_data.append(["Chegirma:", f"- {sotuv.chegirma:,.0f} so'm"])
+            summary_data.extend([
+                ["To'lov summasi:", f"{sotuv.yakuniy_summa:,.0f} so'm"],
+                ["To'langan:", f"{sotuv.tolangan_summa:,.0f} so'm"],
+                ["Qarz:", f"{qarz:,.0f} so'm"],
+            ])
+            sum_table = Table(summary_data, colWidths=[7*cm, 7*cm])
+        
+        # Rang berish: qarz qatori
+        qarz_row_idx = len(summary_data) - 1
+        tolangan_row_idx = len(summary_data) - 2
+        yakuniy_row_idx = len(summary_data) - 3 if sotuv.chegirma > 0 else len(summary_data) - 2 - 1
+        
+        sum_style = [
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            # To'lov summasi - bold
+            ('FONTNAME', (0, -3), (-1, -3), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -3), (-1, -3), colors.HexColor('#dbeafe')),
+            # To'langan - yashil
+            ('TEXTCOLOR', (1, -2), (-1, -2), colors.HexColor('#059669')),
+            ('FONTNAME', (1, -2), (-1, -2), 'Helvetica-Bold'),
+        ]
+        
+        # Qarz rangi
+        if qarz > 0:
+            sum_style.append(('TEXTCOLOR', (1, -1), (-1, -1), colors.HexColor('#dc2626')))
+            sum_style.append(('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'))
+            sum_style.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#fef2f2')))
+        else:
+            sum_style.append(('TEXTCOLOR', (1, -1), (-1, -1), colors.HexColor('#059669')))
+            sum_style.append(('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'))
+            sum_style.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0fdf4')))
+        
+        sum_table.setStyle(TableStyle(sum_style))
+        elements.append(sum_table)
+        
+        # ---- Kirimlar ro'yxati ----
+        if kirimlar.exists():
+            elements.append(Spacer(1, 0.4*cm))
+            elements.append(Paragraph("Kirimlar tarixi", section_style))
+            
+            if has_usd:
+                kirim_header = ['#', 'Sana', "Summa (so'm)", 'Summa (USD)', 'Valyuta', 'Izoh']
+                kirim_col_widths = [0.8*cm, 3.5*cm, 3.5*cm, 3.5*cm, 2*cm, 5*cm]
+            else:
+                kirim_header = ['#', 'Sana', 'Summa', 'Izoh']
+                kirim_col_widths = [0.8*cm, 4*cm, 4*cm, 9.5*cm]
+            
+            kirim_data = [kirim_header]
+            jami_kirim = Decimal('0')
+            
+            for idx, kirim in enumerate(kirimlar, 1):
+                jami_kirim += kirim.summa
+                if has_usd:
+                    kirim_data.append([
+                        str(idx),
+                        kirim.sana.strftime('%d.%m.%Y %H:%M'),
+                        f"{kirim.summa:,.0f}",
+                        f"${kirim.summa_usd:.2f}" if kirim.summa_usd else "-",
+                        kirim.get_valyuta_display() if hasattr(kirim, 'get_valyuta_display') else kirim.valyuta.upper(),
+                        kirim.izoh or '-',
+                    ])
+                else:
+                    kirim_data.append([
+                        str(idx),
+                        kirim.sana.strftime('%d.%m.%Y %H:%M'),
+                        f"{kirim.summa:,.0f} so'm",
+                        kirim.izoh or '-',
+                    ])
+            
+            # Jami qatori
+            if has_usd:
+                jami_usd = round(jami_kirim / usd_kurs, 2) if usd_kurs > 0 else Decimal('0')
+                kirim_data.append([
+                    '', 'JAMI:',
+                    f"{jami_kirim:,.0f}",
+                    f"${jami_usd:.2f}",
+                    '', ''
+                ])
+            else:
+                kirim_data.append(['', 'JAMI:', f"{jami_kirim:,.0f} so'm", ''])
+            
+            kirim_table = Table(kirim_data, colWidths=kirim_col_widths)
+            kirim_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (5, 1), (5, -1), 'LEFT'),  # Izoh left
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f0fdf4')]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                # Jami qatori
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dcfce7')),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ]))
+            elements.append(kirim_table)
+        
+        # ---- Pastki izoh (USD kurs) ----
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e5e7eb')))
+        
+        if has_usd:
+            elements.append(Paragraph(
+                f"* barcha usd narxlar 1 usd = {usd_kurs:,.2f} so'm kurs asosida hisoblangan "
+                f"(cbu.uz, {sotuv.sana.strftime('%d.%m.%Y')} sanasidagi kurs)",
+                small_style
+            ))
+        
+        elements.append(Paragraph(
+            f"Chek yaratildi: {sotuv.sana.strftime('%d.%m.%Y %H:%M')} | "
+            f"Sotuv #{sotuv.id}",
+            small_style
+        ))
+        
+        # PDF yaratish
+        doc.build(elements)
+        buffer.seek(0)
+        
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="sotuv_{sotuv.id}.pdf"'
+        return response
+        
+    except ImportError:
+        messages.error(request, 'PDF uchun reportlab o\'rnatilmagan. pip install reportlab')
+        return redirect('main:sotuv_detail', pk=sotuv_id)
+    except Exception as e:
+        messages.error(request, f'PDF xatolik: {str(e)}')
+        return redirect('main:sotuv_detail', pk=sotuv_id)
+
 
 
 @login_required(login_url='login')
@@ -1282,59 +1815,265 @@ def get_variant_info(request, variant_id):
 
 # ==================== KIRIMLAR ====================
 
-class KirimListView(LoginRequiredMixin, ListView):
-    """Kirimlar ro'yxati - Barcha login qilgan foydalanuvchilar"""
+
+class KirimListView(AdminRequiredMixin, ListView):
+    """Kirimlar ro'yxati - yangilangan"""
     model = m.Kirim
     template_name = 'kirim_list.html'
     context_object_name = 'kirimlar'
     ordering = ['-sana']
     paginate_by = 50
-    login_url = 'account_login'
-    
+
     def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        search = self.request.GET.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(xaridor__ism__icontains=search) |
-                Q(mahsulot__nomi__icontains=search)
-            )
-        
+        queryset = super().get_queryset().select_related('xaridor', 'sotuv')
         date_filter = self.request.GET.get('date')
         if date_filter == 'bugun':
             queryset = queryset.filter(sana__date=date.today())
         elif date_filter == 'hafta':
-            week_ago = date.today() - timedelta(days=7)
-            queryset = queryset.filter(sana__date__gte=week_ago)
+            queryset = queryset.filter(sana__date__gte=date.today() - timedelta(days=7))
         elif date_filter == 'oy':
             queryset = queryset.filter(
                 sana__year=date.today().year,
                 sana__month=date.today().month
             )
-        
-        return queryset.select_related('xaridor',  'sotuv')
-    
+        return queryset
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = date.today()
-        
+
+        # Asosiy statistikalar
         context['bugungi_kirim'] = m.Kirim.objects.filter(
             sana__date=today
         ).aggregate(Sum('summa'))['summa__sum'] or 0
-        
+
         context['oylik_kirim'] = m.Kirim.objects.filter(
-            sana__year=today.year,
-            sana__month=today.month
+            sana__year=today.year, sana__month=today.month
         ).aggregate(Sum('summa'))['summa__sum'] or 0
-        
+
         context['jami_kirim'] = m.Kirim.objects.aggregate(
             Sum('summa')
         )['summa__sum'] or 0
-        
-        
+
+        # Umumiy qarz (barcha to'lanmagan + qisman sotuvlar)
+        qarz_data = m.Sotuv.objects.exclude(
+            tolov_holati='tolandi'
+        ).aggregate(
+            umumiy=Sum(F('yakuniy_summa') - F('tolangan_summa'))
+        )
+        context['umumiy_qarz'] = qarz_data['umumiy'] or 0
+
+        # Qarzli xaridorlar ro'yxati (sotuv bo'yicha)
+        qarzli = []
+        qarzli_sotuvlar = m.Sotuv.objects.exclude(
+            tolov_holati='tolandi'
+        ).select_related('xaridor').order_by('-sana')[:20]
+
+        for sotuv in qarzli_sotuvlar:
+            qarz = sotuv.qarz_summa
+            if qarz > 0:
+                qarzli.append({
+                    'sotuv_id': sotuv.id,
+                    'xaridor__id': sotuv.xaridor.id,
+                    'xaridor__ism': sotuv.xaridor.ism,
+                    'qarz': qarz,
+                })
+        context['qarzli_xaridorlar'] = qarzli[:10]
+
+        # Top mahsulotlar (bu oy)
+        context['top_mahsulotlar'] = m.SotuvItem.objects.filter(
+            sotuv__sana__year=today.year,
+            sotuv__sana__month=today.month
+        ).values(
+            'variant__product__nomi'
+        ).annotate(
+            total_miqdor=Sum('miqdor'),
+            total_summa=Sum('jami')
+        ).order_by('-total_miqdor')[:5]
+
         return context
 
+# views.py — kirim_qoshish view
+# Faqat taqsimlash_rejimi == '1' bo'lganda yangi logika ishlaydi,
+# qolgan hamma narsa ASLIY kod bilan bir xil.
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url="login")
+def kirim_qoshish(request):
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                xaridor_id      = request.POST.get('xaridor_id')
+                sotuv_id        = request.POST.get('sotuv_id') or None
+                summa_str       = request.POST.get('summa', '0')
+                valyuta         = request.POST.get('valyuta', 'uzs')
+                izoh            = request.POST.get('izoh', '')
+                sana_str        = request.POST.get('sana', '')
+                usd_kurs_str    = request.POST.get('usd_kurs', '0')
+                taqsimlash      = request.POST.get('taqsimlash_rejimi') == '1'
+
+                if not xaridor_id:
+                    messages.error(request, 'Xaridor tanlanmagan!')
+                    return redirect('main:kirim_qoshish')
+
+                xaridor = get_object_or_404(m.Xaridor, id=xaridor_id)
+
+                try:
+                    summa = Decimal(str(summa_str))
+                except Exception:
+                    messages.error(request, "Noto'g'ri summa!")
+                    return redirect('main:kirim_qoshish')
+
+                if summa <= 0:
+                    messages.error(request, "Summa 0 dan katta bo'lishi kerak!")
+                    return redirect('main:kirim_qoshish')
+
+                # USD kurs — ASLIY
+                try:
+                    usd_kurs = Decimal(str(usd_kurs_str)) if usd_kurs_str and usd_kurs_str != '0' else get_usd_rate()
+                except Exception:
+                    usd_kurs = get_usd_rate()
+                if not usd_kurs or usd_kurs == 0:
+                    usd_kurs = get_usd_rate()
+
+                # Sana — ASLIY
+                sana = timezone.now()
+                if sana_str:
+                    try:
+                        sana = datetime.strptime(sana_str, '%Y-%m-%dT%H:%M')
+                        sana = timezone.make_aware(sana)
+                    except Exception:
+                        pass
+
+                # So'mga aylantirish — ASLIY
+                if valyuta == 'usd' and usd_kurs > 0:
+                    summa_uzs = round(summa * usd_kurs, 2)
+                    summa_usd = summa
+                else:
+                    summa_uzs = summa
+                    summa_usd = round(summa / usd_kurs, 4) if usd_kurs > 0 else Decimal('0')
+
+                # ── YANGI: Avtomatik taqsimlash rejimi ──────────────────────
+                if taqsimlash:
+                    qarzli_sotuvlar = list(
+                        m.Sotuv.objects.filter(xaridor=xaridor)
+                        .exclude(tolov_holati='tolandi')
+                        .order_by('sana')   # eng eski avval (FIFO)
+                    )
+
+                    qolgan = summa_uzs
+                    taqsimlangan = []
+
+                    for sotuv in qarzli_sotuvlar:
+                        if qolgan <= Decimal('0.5'):
+                            break
+                        sotuv_qarzi = sotuv.qarz_summa
+                        if sotuv_qarzi <= 0:
+                            continue
+
+                        tolov = min(qolgan, sotuv_qarzi)
+                        tolov_usd = round(tolov / usd_kurs, 4) if usd_kurs > 0 else Decimal('0')
+
+                        m.Kirim.objects.create(
+                            xaridor   = xaridor,
+                            sotuv     = sotuv,
+                            summa     = tolov,
+                            summa_usd = tolov_usd,
+                            usd_kurs  = usd_kurs,
+                            valyuta   = 'uzs',
+                            sana      = sana,
+                            izoh      = izoh or f"Sotuv #{sotuv.id} — avtomatik taqsimlash",
+                        )
+                        taqsimlangan.append((sotuv.id, tolov))
+                        qolgan -= tolov
+
+                    # Qarzdan ortiq qolgan pul — sotuvsiz umumiy kirim
+                    if qolgan > Decimal('0.5'):
+                        qolgan_usd = round(qolgan / usd_kurs, 4) if usd_kurs > 0 else Decimal('0')
+                        m.Kirim.objects.create(
+                            xaridor   = xaridor,
+                            sotuv     = None,
+                            summa     = qolgan,
+                            summa_usd = qolgan_usd,
+                            usd_kurs  = usd_kurs,
+                            valyuta   = 'uzs',
+                            sana      = sana,
+                            izoh      = izoh or "Qarzdan ortiq umumiy kirim",
+                        )
+
+                    if taqsimlangan:
+                        parts = ', '.join(f"#{sid}: {t:,.0f} so'm" for sid, t in taqsimlangan)
+                        extra = f" + {qolgan:,.0f} so'm umumiy" if qolgan > Decimal('0.5') else ""
+                        messages.success(request, f"✅ Taqsimlandi — {parts}{extra}")
+                    else:
+                        # Qarz yo'q — to'liq umumiy kirim
+                        messages.success(request, f"✅ {summa_uzs:,.0f} so'm umumiy kirim sifatida saqlandi.")
+
+                    return redirect('main:kirimlar')
+                # ── /YANGI ──────────────────────────────────────────────────
+
+                # ── ASLIY logika (muayyan sotuv yoki sotuvsiz) ──────────────
+                sotuv = None
+                if sotuv_id:
+                    try:
+                        sotuv = m.Sotuv.objects.get(id=int(sotuv_id), xaridor=xaridor)
+
+                        qarz = sotuv.qarz_summa
+                        if sotuv.tolov_holati == 'tolandi':
+                            messages.error(request, f"Sotuv #{sotuv.id} allaqachon to'liq to'langan!")
+                            return redirect('main:kirim_qoshish')
+
+                        if summa_uzs > qarz + Decimal('1'):
+                            messages.error(
+                                request,
+                                f"Kiritilgan summa ({summa_uzs:,.0f} so'm) qarzdan ({qarz:,.0f} so'm) ko'p!"
+                            )
+                            return redirect('main:kirim_qoshish')
+
+                    except m.Sotuv.DoesNotExist:
+                        messages.error(request, 'Tanlangan sotuv topilmadi!')
+                        return redirect('main:kirim_qoshish')
+
+                kirim_data = dict(
+                    xaridor   = xaridor,
+                    summa     = summa_uzs,
+                    summa_usd = summa_usd,
+                    usd_kurs  = usd_kurs,
+                    valyuta   = valyuta,
+                    sana      = sana,
+                    izoh      = izoh or (f"Sotuv #{sotuv.id} to'lovi" if sotuv else 'Kirim'),
+                )
+                if sotuv:
+                    kirim_data['sotuv'] = sotuv
+
+                m.Kirim.objects.create(**kirim_data)
+
+                if sotuv:
+                    sotuv.refresh_from_db()
+                    messages.success(
+                        request,
+                        f"✅ {summa_uzs:,.0f} so'm kirim qo'shildi! "
+                        f"Sotuv #{sotuv.id}: {sotuv.get_tolov_holati_display()}"
+                        + (f" (Qolgan: {sotuv.qarz_summa:,.0f} so'm)" if sotuv.qarz_summa > 0 else " — To'liq to'landi ✅")
+                    )
+                else:
+                    messages.success(request, f"✅ {summa_uzs:,.0f} so'm kirim muvaffaqiyatli qo'shildi!")
+
+                return redirect('main:kirimlar')
+
+        except Exception as e:
+            messages.error(request, f'❌ Xatolik: {str(e)}')
+            return redirect('main:kirim_qoshish')
+
+    # GET
+    context = {
+        'xaridorlar': m.Xaridor.objects.all().order_by('ism'),
+        'barcha_sotuvlar': m.Sotuv.objects.exclude(
+            tolov_holati='tolandi'
+        ).select_related('xaridor').order_by('-sana')[:500],
+        'now_iso': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+    }
+    return render(request, 'kirim_qoshish.html', context)
 # ==================== XARIDORLAR ====================
 
 class XaridorListView(LoginRequiredMixin, ListView):
@@ -1380,28 +2119,55 @@ class XaridorDetailView(LoginRequiredMixin, DetailView):
     template_name = 'xaridor_detail.html'
     context_object_name = 'xaridor'
     login_url = 'account_login'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         xaridor = self.object
-        
+
+        # Sotuvlar (items bilan)
         context['sotuvlar'] = xaridor.sotuvlar.prefetch_related(
-            'items__mahsulot', 
+            'items__mahsulot',
             'items__variant'
         ).order_by('-sana')
-        
-        context['jami_xarid'] = xaridor.sotuvlar.aggregate(
-            Sum('jami_summa')
-        )['jami_summa__sum'] or 0
-        
-        context['xaridlar_soni'] = xaridor.sotuvlar.count()
-        
 
-        
+        # Jami statistika
+        agg = xaridor.sotuvlar.aggregate(
+            jami_summa=Sum('yakuniy_summa'),
+            jami_tolangan=Sum('tolangan_summa'),
+        )
+        context['jami_xarid']    = agg['jami_summa']    or 0
+        context['jami_tolangan'] = agg['jami_tolangan'] or 0
+        context['umumiy_qarz']   = (agg['jami_summa'] or 0) - (agg['jami_tolangan'] or 0)
+        context['xaridlar_soni'] = xaridor.sotuvlar.count()
+
+        # Qarzli sotuvlar (to'lanmagan yoki qisman)
+        context['qarzli_sotuvlar'] = xaridor.sotuvlar.exclude(
+            tolov_holati='tolandi'
+        ).order_by('-sana')
+
+        # Xaridorga tegishli kirimlar
+        context['kirimlar'] = m.Kirim.objects.filter(
+            xaridor=xaridor
+        ).select_related('sotuv').order_by('-sana')
+
+        context['jami_kirim'] = m.Kirim.objects.filter(
+            xaridor=xaridor
+        ).aggregate(Sum('summa'))['summa__sum'] or 0
+
+        # Top mahsulotlar
+        context['top_mahsulotlar'] = m.SotuvItem.objects.filter(
+            sotuv__xaridor=xaridor
+        ).values(
+            'mahsulot__nomi'
+        ).annotate(
+            jami_miqdor=Sum('miqdor'),
+            jami_summa=Sum('jami')
+        ).order_by('-jami_miqdor')[:5]
+
         return context
 
-
 @login_required(login_url='login')
+@user_passes_test(is_admin,login_url="login")
 def xaridor_qoshish(request):
     """Yangi xaridor qo'shish - Barcha login qilgan foydalanuvchilar"""
     if request.method == 'POST':
@@ -1505,6 +2271,3 @@ def chiqim_ochirish(request, pk):
             messages.error(request, f'❌ Xatolik: {str(e)}')
     
     return redirect('xomashyo:chiqimlar')
-
-
-

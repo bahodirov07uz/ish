@@ -7,13 +7,12 @@ RUN pip install uv
 # Ishchi papka
 WORKDIR /app
 
+# Faqat kerakli tizim kutubxonalari (agar kerak bo'lsa)
 RUN apt-get update && apt-get install -y \
-    pkg-config \
-    default-libmysqlclient-dev \
     build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-
+# Loyihani nusxalash
 COPY . .
 
 # UV orqali kutubxonalarni o'rnatish

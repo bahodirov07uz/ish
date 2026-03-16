@@ -64,6 +64,8 @@ INSTALLED_APPS = [
     'crm.apps.CrmConfig', 
     'shop.apps.ShopConfig', 
     'xomashyo.apps.XomashyoConfig',
+    'analytics.apps.AnalyticsConfig',
+    'budget.apps.BudgetConfig'
 ]
 
 CSRF_TRUSTED_ORIGINS = [

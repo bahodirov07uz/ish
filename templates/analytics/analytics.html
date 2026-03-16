@@ -1,0 +1,873 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+
+<style>
+/* ─── Analytics page ─── */
+.an-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem;
+}
+.an-header h2 {
+    font-size: 1.35rem; font-weight: 800; margin: 0;
+    display: flex; align-items: center; gap: 10px;
+}
+.an-header h2 .icon-bg {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    display: flex; align-items: center; justify-content: center;
+    color: white; flex-shrink: 0;
+}
+.an-period {
+    font-size: 12px; color: var(--text-secondary);
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 8px; padding: 5px 12px;
+}
+
+/* ── KPI Cards ── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 6px;
+    position: relative; overflow: hidden;
+    transition: box-shadow .15s;
+}
+.kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.kpi-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: var(--kpi-color, var(--color-primary));
+}
+.kpi-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--text-secondary);
+}
+.kpi-value {
+    font-size: 1.35rem; font-weight: 800;
+    color: var(--kpi-color, var(--text-primary));
+    line-height: 1.2;
+}
+.kpi-sub {
+    font-size: 11px; color: var(--text-secondary); margin-top: 2px;
+}
+.kpi-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 700; border-radius: 5px;
+    padding: 2px 7px;
+}
+.kpi-badge.up   { background: #f0fdf4; color: #059669; }
+.kpi-badge.down { background: #fef2f2; color: #dc2626; }
+.kpi-badge.flat { background: var(--bg-secondary); color: var(--text-secondary); }
+.kpi-icon {
+    position: absolute; right: 1rem; top: 1rem; opacity: .12;
+}
+
+/* ── Section cards ── */
+.an-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1.25rem; margin-bottom: 1.25rem;
+}
+.an-grid-3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.25rem; margin-bottom: 1.25rem;
+}
+.an-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.an-card-header {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.an-card-header h3 {
+    font-size: 0.875rem; font-weight: 700; margin: 0;
+    display: flex; align-items: center; gap: 8px;
+}
+.an-card-header .h-icon {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.an-card-body { padding: 1.25rem; }
+.chart-wrap { position: relative; width: 100%; }
+
+/* ── Stat inline pairs ── */
+.stat-pair {
+    display: flex; gap: 1rem;
+    margin-bottom: 1rem;
+}
+.stat-pair-item {
+    flex: 1; padding: 0.85rem 1rem;
+    background: var(--bg-secondary); border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.stat-pair-label { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
+.stat-pair-value { font-size: 1.1rem; font-weight: 800; margin-top: 2px; }
+
+/* ── Progress bar ── */
+.prog-bar-wrap { margin-bottom: 10px; }
+.prog-bar-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; margin-bottom: 4px; font-weight: 600;
+}
+.prog-bar-track {
+    height: 6px; border-radius: 3px;
+    background: var(--bg-secondary); overflow: hidden;
+}
+.prog-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: var(--prog-color, var(--color-primary));
+    transition: width .6s ease;
+}
+
+/* ── Table ── */
+.an-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.an-table th {
+    padding: 0.55rem 0.85rem;
+    background: var(--bg-secondary);
+    font-size: 10px; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--text-secondary); font-weight: 700; text-align: left;
+}
+.an-table td {
+    padding: 0.65rem 0.85rem;
+    border-top: 1px solid var(--border-color);
+}
+.an-table tbody tr:hover { background: var(--bg-hover); }
+.qarz-badge-sm {
+    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+    border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+}
+.ok-badge-sm {
+    background: #f0fdf4; color: #059669; border: 1px solid #86efac;
+    border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+}
+
+/* ── Sotuv holat donut legend ── */
+.holat-legend {
+    display: flex; flex-direction: column; gap: 8px;
+}
+.holat-item {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px;
+}
+.holat-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    margin-right: 8px;
+}
+.holat-label { display: flex; align-items: center; }
+.holat-count { font-weight: 800; }
+
+/* ── Summary strip ── */
+.sum-strip {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    border-top: 1px solid var(--border-color);
+}
+.sum-strip-item {
+    padding: 0.85rem 1rem; text-align: center;
+    border-right: 1px solid var(--border-color);
+}
+.sum-strip-item:last-child { border-right: none; }
+.sum-strip-label { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
+.sum-strip-value { font-size: 13px; font-weight: 800; margin-top: 3px; }
+
+@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 900px)  { .an-grid-2, .an-grid-3 { grid-template-columns: 1fr; } }
+@media (max-width: 600px)  { .kpi-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Analitika</div>
+        <div style="font-size:13px; color:var(--text-secondary);">{{ today|date:"d.m.Y" }}</div>
+    </header>
+
+    <main class="content">
+        <div class="page">
+
+            <div class="an-header">
+                <h2>
+                    <span class="icon-bg">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 18 18"><path d="M2 14l4-4 3 3 4-5 3 2"/><path d="M2 2v14h14"/></svg>
+                    </span>
+                    Umumiy analitika
+                </h2>
+                <div class="an-period">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12" style="vertical-align:middle; margin-right:4px;"><rect x="1" y="2" width="10" height="9" rx="1"/><path d="M1 5h10M4 1v2M8 1v2"/></svg>
+                    {{ month_start|date:"d.m.Y" }} – {{ today|date:"d.m.Y" }}
+                </div>
+            </div>
+
+            <!-- ── KPI CARDS ── -->
+            <div class="kpi-grid">
+
+                <!-- Kirim oy -->
+                <div class="kpi-card" style="--kpi-color:#059669;">
+                    <svg class="kpi-icon" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 52 52"><path d="M26 8v36M8 26h36"/></svg>
+                    <div class="kpi-label">Kirim (bu oy)</div>
+                    <div class="kpi-value">{{ kirim_oy|floatformat:0|intcomma }} <small style="font-size:13px; font-weight:500;">so'm</small></div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        {% if kirim_osish is not None %}
+                            {% if kirim_osish >= 0 %}
+                            <span class="kpi-badge up">▲ {{ kirim_osish }}%</span>
+                            {% else %}
+                            <span class="kpi-badge down">▼ {{ kirim_osish|floatformat:1 }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="kpi-sub">≈ ${{ kirim_usd_oy|floatformat:0|intcomma }}</span>
+                    </div>
+                </div>
+
+                <!-- Chiqim oy -->
+                <div class="kpi-card" style="--kpi-color:#dc2626;">
+                    <svg class="kpi-icon" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 52 52"><path d="M8 26h36"/></svg>
+                    <div class="kpi-label">Chiqim (bu oy)</div>
+                    <div class="kpi-value">{{ chiqim_oy|floatformat:0|intcomma }} <small style="font-size:13px; font-weight:500;">so'm</small></div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        {% if chiqim_osish is not None %}
+                            {% if chiqim_osish >= 0 %}
+                            <span class="kpi-badge down">▲ {{ chiqim_osish }}%</span>
+                            {% else %}
+                            <span class="kpi-badge up">▼ {{ chiqim_osish|floatformat:1 }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="kpi-sub">Bugun: {{ chiqim_bugun|floatformat:0|intcomma }}</span>
+                    </div>
+                </div>
+
+                <!-- Net foyda -->
+                <div class="kpi-card" style="--kpi-color:{% if net_foyda_oy >= 0 %}#7c3aed{% else %}#dc2626{% endif %};">
+                    <svg class="kpi-icon" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 52 52"><path d="M8 36l10-12 8 8 10-16 8 4"/></svg>
+                    <div class="kpi-label">Net foyda (bu oy)</div>
+                    <div class="kpi-value">
+                        {% if net_foyda_oy >= 0 %}+{% endif %}{{ net_foyda_oy|floatformat:0|intcomma }}
+                        <small style="font-size:13px; font-weight:500;">so'm</small>
+                    </div>
+                    <div class="kpi-sub">Yil: {{ net_foyda_yil|floatformat:0|intcomma }} so'm</div>
+                </div>
+
+                <!-- Umumiy qarz -->
+                <div class="kpi-card" style="--kpi-color:#f59e0b;">
+                    <svg class="kpi-icon" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 52 52"><circle cx="26" cy="26" r="20"/><path d="M26 16v12M26 34h.01"/></svg>
+                    <div class="kpi-label">Xaridorlar qarzi</div>
+                    <div class="kpi-value">{{ sotuv_qarz|floatformat:0|intcomma }} <small style="font-size:13px; font-weight:500;">so'm</small></div>
+                    <div class="kpi-sub">
+                        {{ sotuv_holat.qisman }} qisman · {{ sotuv_holat.tolanmadi }} to'lanmagan
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── OYLIK TREND ── -->
+            <div class="an-card" style="margin-bottom:1.25rem;">
+                <div class="an-card-header">
+                    <h3>
+                        <span class="h-icon" style="background:#eff6ff; color:#3b82f6;">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><path d="M1 10l3-4 2.5 2.5 3-5 2.5 2"/></svg>
+                        </span>
+                        Oylik kirim / chiqim / foyda (so'nggi 12 oy)
+                    </h3>
+                    <div style="display:flex; gap:12px; font-size:11px; font-weight:700;">
+                        <span style="color:#059669;">■ Kirim</span>
+                        <span style="color:#ef4444;">■ Chiqim</span>
+                        <span style="color:#7c3aed;">■ Foyda</span>
+                    </div>
+                </div>
+                <div class="an-card-body">
+                    <div class="chart-wrap" style="height:280px;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── GRID: Kunlik + Sotuv holat ── -->
+            <div class="an-grid-2">
+
+                <!-- Kunlik kirim -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#f0fdf4; color:#059669;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><path d="M6.5 1v11M1 6.5h11"/></svg>
+                            </span>
+                            Kunlik kirim (so'nggi 30 kun)
+                        </h3>
+                        <span style="font-size:11px; color:var(--text-secondary);">Bar chart</span>
+                    </div>
+                    <div class="an-card-body">
+                        <div class="chart-wrap" style="height:200px;">
+                            <canvas id="dailyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sotuv holat -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#fef3c7; color:#d97706;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 3.5v3l2 1"/></svg>
+                            </span>
+                            Sotuv to'lov holati
+                        </h3>
+                    </div>
+                    <div class="an-card-body" style="display:flex; gap:1.5rem; align-items:center;">
+                        <div style="width:150px; height:150px; flex-shrink:0;">
+                            <canvas id="sotuvHolatChart"></canvas>
+                        </div>
+                        <div class="holat-legend" style="flex:1;">
+                            <div class="holat-item">
+                                <span class="holat-label"><span class="holat-dot" style="background:#059669;"></span>To'landi</span>
+                                <span class="holat-count" style="color:#059669;">{{ sotuv_holat.tolandi }}</span>
+                            </div>
+                            <div class="holat-item">
+                                <span class="holat-label"><span class="holat-dot" style="background:#f59e0b;"></span>Qisman</span>
+                                <span class="holat-count" style="color:#f59e0b;">{{ sotuv_holat.qisman }}</span>
+                            </div>
+                            <div class="holat-item">
+                                <span class="holat-label"><span class="holat-dot" style="background:#ef4444;"></span>To'lanmagan</span>
+                                <span class="holat-count" style="color:#ef4444;">{{ sotuv_holat.tolanmadi }}</span>
+                            </div>
+                            <div style="border-top:1px solid var(--border-color); padding-top:8px; margin-top:4px;">
+                                <div style="font-size:11px; color:var(--text-secondary);">Jami savdo</div>
+                                <div style="font-weight:800; font-size:14px;">{{ sotuv_jami_summa|floatformat:0|intcomma }} so'm</div>
+                                <div style="font-size:11px; color:#059669; margin-top:2px;">To'langan: {{ sotuv_tolangan|floatformat:0|intcomma }}</div>
+                                <div style="font-size:11px; color:#dc2626; margin-top:1px;">Qarz: {{ sotuv_qarz|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TOP MAHSULOTLAR + XARIDOR O'SISH ── -->
+            <div class="an-grid-2">
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#eff6ff; color:#3b82f6;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><path d="M1 12V6l3-3 3 3 3-5 2 2v9"/></svg>
+                            </span>
+                            Top mahsulotlar (summa bo'yicha)
+                        </h3>
+                    </div>
+                    <div class="an-card-body" style="padding:0.75rem 1.25rem;">
+                        {% for item in top_mahsulotlar %}
+                        {% with pct=item.jami_summa|default:0 %}
+                        <div class="prog-bar-wrap">
+                            <div class="prog-bar-label">
+                                <span>{{ forloop.counter }}. {{ item.mahsulot__nomi|truncatechars:28 }}</span>
+                                <span style="font-size:11px; color:var(--text-secondary);">{{ item.jami_summa|floatformat:0|intcomma }}</span>
+                            </div>
+                            <div class="prog-bar-track">
+                                <div class="prog-bar-fill"
+                                     style="--prog-color:#3b82f6; width:{% widthratio item.jami_summa top_mahsulotlar.0.jami_summa 100 %}%;">
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                        {% empty %}
+                            <div style="text-align:center; color:var(--text-secondary); padding:1.5rem; font-size:13px;">Ma'lumot yo'q</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#f5f3ff; color:#7c3aed;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="5" cy="4" r="2.5"/><path d="M1 12c0-2.8 1.8-4.5 4-4.5s4 1.7 4 4.5"/><circle cx="10" cy="5" r="1.5"/><path d="M10 8.5c1.5 0 2.5 1 2.5 2.5"/></svg>
+                            </span>
+                            Yangi xaridorlar (oylik)
+                        </h3>
+                    </div>
+                    <div class="an-card-body">
+                        <div class="chart-wrap" style="height:200px;">
+                            <canvas id="xaridorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── XOMASHYO BLOKI ── -->
+            <div class="an-grid-3" style="margin-bottom:1.25rem;">
+
+                <!-- Xomashyo KPI -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#fef3c7; color:#b45309;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><rect x="1" y="4" width="11" height="7" rx="1"/><path d="M4 4V3a2 2 0 014 0v1"/></svg>
+                            </span>
+                            Xomashyo kirim
+                        </h3>
+                    </div>
+                    <div class="an-card-body">
+                        <div class="stat-pair">
+                            <div class="stat-pair-item">
+                                <div class="stat-pair-label">Jami UZS</div>
+                                <div class="stat-pair-value" style="color:#b45309; font-size:13px;">{{ xom_kirim_uzs|floatformat:0|intcomma }}</div>
+                            </div>
+                            <div class="stat-pair-item">
+                                <div class="stat-pair-label">Jami USD</div>
+                                <div class="stat-pair-value" style="color:#1d4ed8; font-size:13px;">${{ xom_kirim_usd|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:12px; margin-bottom:6px;">
+                            <span style="color:var(--text-secondary);">To'langan:</span>
+                            <strong style="color:#059669; margin-left:6px;">{{ xom_tolangan|floatformat:0|intcomma }} so'm</strong>
+                        </div>
+                        <div style="font-size:12px; margin-bottom:1rem;">
+                            <span style="color:var(--text-secondary);">Qarz:</span>
+                            <strong style="color:#dc2626; margin-left:6px;">{{ xom_qarz|floatformat:0|intcomma }} so'm</strong>
+                        </div>
+                        <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">To'lov holati</div>
+                        <div class="prog-bar-wrap">
+                            <div class="prog-bar-label">
+                                <span style="color:#059669;">To'liq</span>
+                                <span>{{ xom_tolov_holat.toliq }}</span>
+                            </div>
+                            <div class="prog-bar-track">
+                                {% with total=xom_tolov_holat.tolanmagan|add:xom_tolov_holat.qisman|add:xom_tolov_holat.toliq %}
+                                <div class="prog-bar-fill" style="--prog-color:#059669; width:{% if total > 0 %}{% widthratio xom_tolov_holat.toliq total 100 %}{% else %}0{% endif %}%;"></div>
+                                {% endwith %}
+                            </div>
+                        </div>
+                        <div class="prog-bar-wrap">
+                            <div class="prog-bar-label">
+                                <span style="color:#f59e0b;">Qisman</span>
+                                <span>{{ xom_tolov_holat.qisman }}</span>
+                            </div>
+                            <div class="prog-bar-track">
+                                {% with total=xom_tolov_holat.tolanmagan|add:xom_tolov_holat.qisman|add:xom_tolov_holat.toliq %}
+                                <div class="prog-bar-fill" style="--prog-color:#f59e0b; width:{% if total > 0 %}{% widthratio xom_tolov_holat.qisman total 100 %}{% else %}0{% endif %}%;"></div>
+                                {% endwith %}
+                            </div>
+                        </div>
+                        <div class="prog-bar-wrap">
+                            <div class="prog-bar-label">
+                                <span style="color:#dc2626;">To'lanmagan</span>
+                                <span>{{ xom_tolov_holat.tolanmagan }}</span>
+                            </div>
+                            <div class="prog-bar-track">
+                                {% with total=xom_tolov_holat.tolanmagan|add:xom_tolov_holat.qisman|add:xom_tolov_holat.toliq %}
+                                <div class="prog-bar-fill" style="--prog-color:#dc2626; width:{% if total > 0 %}{% widthratio xom_tolov_holat.tolanmagan total 100 %}{% else %}0{% endif %}%;"></div>
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Xomashyo kategoriya -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#fef3c7; color:#b45309;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 1v5.5l3.5 2"/></svg>
+                            </span>
+                            Xomashyo kategoriya
+                        </h3>
+                    </div>
+                    <div class="an-card-body" style="display:flex; align-items:center; gap:1rem;">
+                        <div style="width:140px; height:140px; flex-shrink:0;">
+                            <canvas id="xomCatChart"></canvas>
+                        </div>
+                        <div style="flex:1; font-size:12px;">
+                            {% for item in xom_cat_qs %}
+                            <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-color);">
+                                <span>{{ item.category__name|truncatechars:18 }}</span>
+                                <strong>{{ item.jami_miqdor|floatformat:1 }}</strong>
+                            </div>
+                            {% empty %}
+                            <span style="color:var(--text-secondary);">Ma'lumot yo'q</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chiqim turlari -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#fef2f2; color:#dc2626;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><path d="M1 6.5h11M4 3l-3 3.5 3 3M9 3l3 3.5-3 3"/></svg>
+                            </span>
+                            Chiqim turlari
+                        </h3>
+                    </div>
+                    <div class="an-card-body" style="display:flex; align-items:center; gap:1rem;">
+                        <div style="width:140px; height:140px; flex-shrink:0;">
+                            <canvas id="chiqimTurChart"></canvas>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TOP XARIDORLAR ── -->
+            <div class="an-grid-2">
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#f0fdf4; color:#059669;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="5" cy="4" r="2.5"/><path d="M1 12c0-2.8 1.8-4.5 4-4.5s4 1.7 4 4.5"/></svg>
+                            </span>
+                            Top xaridorlar
+                        </h3>
+                        <span style="font-size:11px; color:var(--text-secondary);">Jami xarid bo'yicha</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="an-table">
+                            <thead><tr>
+                                <th>#</th>
+                                <th>Xaridor</th>
+                                <th>Sotuv</th>
+                                <th>Jami xarid</th>
+                                <th>Qarz</th>
+                            </tr></thead>
+                            <tbody>
+                            {% for x in top_xaridorlar %}
+                            <tr>
+                                <td style="color:var(--text-secondary); font-weight:700;">{{ forloop.counter }}</td>
+                                <td>
+                                    <a href="{% url 'main:xaridor_detail' x.xaridor__id %}" style="color:var(--color-primary); font-weight:700; text-decoration:none;">
+                                        {{ x.xaridor__ism }}
+                                    </a>
+                                    {% if x.xaridor__telefon %}<div style="font-size:10px; color:var(--text-secondary);">{{ x.xaridor__telefon }}</div>{% endif %}
+                                </td>
+                                <td style="text-align:center;">{{ x.sotuv_soni }}</td>
+                                <td style="font-weight:700; color:#059669;">{{ x.jami_xarid|floatformat:0|intcomma }}</td>
+                                <td>
+                                    {% with qarz=x.jami_xarid|add:"-0"|floatformat:0 %}
+                                    {% if x.jami_tolangan < x.jami_xarid %}
+                                        <span class="qarz-badge-sm">{{ x.jami_xarid|add:"-0"|floatformat:0|intcomma }}</span>
+                                    {% else %}
+                                        <span class="ok-badge-sm">✓</span>
+                                    {% endif %}
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding:1.5rem;">Ma'lumot yo'q</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Qarzli xaridorlar -->
+                <div class="an-card">
+                    <div class="an-card-header">
+                        <h3>
+                            <span class="h-icon" style="background:#fef2f2; color:#dc2626;">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 4v4M6.5 9.5h.01"/></svg>
+                            </span>
+                            Qarzli xaridorlar
+                        </h3>
+                        <span style="font-size:11px; color:#dc2626; font-weight:700;">{{ sotuv_qarz|floatformat:0|intcomma }} so'm</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="an-table">
+                            <thead><tr>
+                                <th>Xaridor</th>
+                                <th>Sotuv</th>
+                                <th>Qarz</th>
+                            </tr></thead>
+                            <tbody>
+                            {% for x in qarzli_xaridorlar %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'main:xaridor_detail' x.xaridor__id %}" style="color:var(--color-primary); font-weight:700; text-decoration:none;">
+                                        {{ x.xaridor__ism }}
+                                    </a>
+                                    {% if x.xaridor__telefon %}<div style="font-size:10px; color:var(--text-secondary);">{{ x.xaridor__telefon }}</div>{% endif %}
+                                </td>
+                                <td style="text-align:center;">{{ x.qarzli_sotuv_soni }}</td>
+                                <td style="font-weight:800; color:#dc2626;">{{ x.umumiy_qarz|floatformat:0|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" style="text-align:center; color:#059669; padding:1.5rem; font-weight:600;">✅ Qarzli xaridor yo'q</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── XOMASHYO QARZLARI ── -->
+            <div class="an-card" style="margin-bottom:1.25rem;">
+                <div class="an-card-header">
+                    <h3>
+                        <span class="h-icon" style="background:#fef3c7; color:#b45309;">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><rect x="1" y="4" width="11" height="7" rx="1"/><path d="M4 4V3a2 2 0 014 0v1M4.5 8h4"/></svg>
+                        </span>
+                        Xomashyo to'lanmagan qarzlar
+                    </h3>
+                    <span style="font-size:11px; color:#dc2626; font-weight:700;">{{ xom_qarz|floatformat:0|intcomma }} so'm</span>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="an-table">
+                        <thead><tr>
+                            <th>Xomashyo</th>
+                            <th>Yetkazuvchi</th>
+                            <th>Sana</th>
+                            <th>Jami narx</th>
+                            <th>To'langan</th>
+                            <th>Qoldiq</th>
+                            <th>Holat</th>
+                        </tr></thead>
+                        <tbody>
+                        {% for h in xom_qarzlar %}
+                        <tr>
+                            <td style="font-weight:600;">{{ h.xomashyo.nomi|default:"—"|truncatechars:28 }}</td>
+                            <td style="color:var(--text-secondary);">{{ h.yetkazib_beruvchi.nomi|default:"—"|truncatechars:18 }}</td>
+                            <td style="color:var(--text-secondary);">{{ h.sana|date:"d.m.Y" }}</td>
+                            <td style="font-weight:700;">{{ h.jami_narx_uzs|floatformat:0|intcomma }}</td>
+                            <td style="color:#059669; font-weight:600;">{{ h.tolangan_uzs|floatformat:0|intcomma }}</td>
+                            <td style="color:#dc2626; font-weight:800;">{{ h.qoldiq_uzs|floatformat:0|intcomma }}</td>
+                            <td>
+                                {% if h.tolov_holati == 'tolanmagan' %}
+                                    <span class="qarz-badge-sm">To'lanmagan</span>
+                                {% elif h.tolov_holati == 'qisman' %}
+                                    <span style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; border-radius:4px; padding:1px 6px; font-size:10px; font-weight:700;">Qisman</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" style="text-align:center; color:#059669; padding:1.5rem; font-weight:600;">✅ To'lanmagan xomashyo qarzi yo'q</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── YILLIK JAMI ── -->
+            <div class="an-card">
+                <div class="an-card-header">
+                    <h3>
+                        <span class="h-icon" style="background:#f5f3ff; color:#7c3aed;">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13"><rect x="1" y="2" width="11" height="9" rx="1"/><path d="M1 6h11"/></svg>
+                        </span>
+                        Yillik jami ({{ today.year }})
+                    </h3>
+                </div>
+                <div class="sum-strip">
+                    <div class="sum-strip-item">
+                        <div class="sum-strip-label">Kirim</div>
+                        <div class="sum-strip-value" style="color:#059669;">{{ kirim_yil|floatformat:0|intcomma }} so'm</div>
+                    </div>
+                    <div class="sum-strip-item">
+                        <div class="sum-strip-label">Chiqim</div>
+                        <div class="sum-strip-value" style="color:#dc2626;">{{ chiqim_yil|floatformat:0|intcomma }} so'm</div>
+                    </div>
+                    <div class="sum-strip-item">
+                        <div class="sum-strip-label">Net foyda</div>
+                        <div class="sum-strip-value" style="color:{% if net_foyda_yil >= 0 %}#7c3aed{% else %}#dc2626{% endif %};">
+                            {% if net_foyda_yil >= 0 %}+{% endif %}{{ net_foyda_yil|floatformat:0|intcomma }} so'm
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /page -->
+    </main>
+</div>
+
+<!-- ── Chart.js ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+               window.matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor  = isDark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
+const textColor  = isDark ? '#9ca3af' : '#6b7280';
+
+Chart.defaults.font.family = "'Inter', 'Segoe UI', sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = textColor;
+
+const trendLabels  = {{ trend_labels|safe }};
+const trendKirim   = {{ trend_kirim|safe }};
+const trendChiqim  = {{ trend_chiqim|safe }};
+const trendFoyda   = {{ trend_foyda|safe }};
+const dailyLabels  = {{ daily_labels|safe }};
+const dailyVals    = {{ daily_vals|safe }};
+const mahsulotLabels = {{ mahsulot_labels|safe }};
+const mahsulotVals   = {{ mahsulot_vals|safe }};
+const xomCatLabels   = {{ xom_cat_labels|safe }};
+const xomCatVals     = {{ xom_cat_vals|safe }};
+const chiqimTurLabels = {{ chiqim_tur_labels|safe }};
+const chiqimTurVals   = {{ chiqim_tur_vals|safe }};
+const xaridorLabels   = {{ xaridor_labels|safe }};
+const xaridorVals     = {{ xaridor_vals|safe }};
+
+const sotuvHolat = {
+    tolandi  : {{ sotuv_holat.tolandi }},
+    qisman   : {{ sotuv_holat.qisman }},
+    tolanmadi: {{ sotuv_holat.tolanmadi }},
+};
+
+// ── 1. Oylik trend ────────────────────────────────────────────
+new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: {
+        labels: trendLabels,
+        datasets: [
+            {
+                label: 'Kirim',
+                data: trendKirim,
+                backgroundColor: 'rgba(5,150,105,.75)',
+                borderRadius: 4,
+                order: 2,
+            },
+            {
+                label: 'Chiqim',
+                data: trendChiqim,
+                backgroundColor: 'rgba(239,68,68,.75)',
+                borderRadius: 4,
+                order: 3,
+            },
+            {
+                label: 'Foyda',
+                data: trendFoyda,
+                type: 'line',
+                borderColor: '#7c3aed',
+                backgroundColor: 'rgba(124,58,237,.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                borderWidth: 2,
+                order: 1,
+            },
+        ],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: gridColor } },
+            y: { grid: { color: gridColor },
+                 ticks: { callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v } },
+        },
+    },
+});
+
+// ── 2. Kunlik bar ────────────────────────────────────────────
+new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            label: 'Kirim',
+            data: dailyVals,
+            backgroundColor: 'rgba(5,150,105,.7)',
+            borderRadius: 3,
+        }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false },
+                 ticks: { maxTicksLimit: 10 } },
+            y: { grid: { color: gridColor },
+                 ticks: { callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v } },
+        },
+    },
+});
+
+// ── 3. Sotuv holat donut ─────────────────────────────────────
+new Chart(document.getElementById('sotuvHolatChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ["To'landi", "Qisman", "To'lanmagan"],
+        datasets: [{
+            data: [sotuvHolat.tolandi, sotuvHolat.qisman, sotuvHolat.tolanmadi],
+            backgroundColor: ['#059669','#f59e0b','#ef4444'],
+            borderWidth: 2,
+            borderColor: isDark ? '#1f2937' : '#ffffff',
+        }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        cutout: '65%',
+    },
+});
+
+// ── 4. Xomashyo kategoriya donut ─────────────────────────────
+const PIE_COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4'];
+
+new Chart(document.getElementById('xomCatChart'), {
+    type: 'doughnut',
+    data: {
+        labels: xomCatLabels,
+        datasets: [{
+            data: xomCatVals,
+            backgroundColor: PIE_COLORS,
+            borderWidth: 2,
+            borderColor: isDark ? '#1f2937' : '#ffffff',
+        }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        cutout: '55%',
+    },
+});
+
+// ── 5. Chiqim turlari donut ──────────────────────────────────
+new Chart(document.getElementById('chiqimTurChart'), {
+    type: 'doughnut',
+    data: {
+        labels: chiqimTurLabels,
+        datasets: [{
+            data: chiqimTurVals,
+            backgroundColor: ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#10b981','#f97316'],
+            borderWidth: 2,
+            borderColor: isDark ? '#1f2937' : '#ffffff',
+        }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        cutout: '55%',
+    },
+});
+
+// ── 6. Xaridor oylik o'sish ──────────────────────────────────
+new Chart(document.getElementById('xaridorChart'), {
+    type: 'line',
+    data: {
+        labels: xaridorLabels,
+        datasets: [{
+            label: "Yangi xaridorlar",
+            data: xaridorVals,
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124,58,237,.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            borderWidth: 2.5,
+        }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: gridColor } },
+            y: { grid: { color: gridColor }, ticks: { stepSize: 1 } },
+        },
+    },
+});
+</script>
+
+{% endblock content %}

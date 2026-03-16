@@ -56,6 +56,18 @@
                             </div>
                             <div class="stat-value">{{total_profit|intcomma}} so'm</div>
                         </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span>Otgan oylik foyda</span>
+                                <div class="stat-icon stat-icon-success">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M7 10l3 3 6-6"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{prev_sales|intcomma}} so'm</div>
+                        </div>
                         
                         <div class="stat-card">
                             <div class="stat-header">
@@ -84,7 +96,7 @@
                         </div>
                         <div class="stat-card">
                             <div class="stat-header">
-                                <span>Berilishi kerak (ishchilarga)</span>
+                                <span>Berilishi kerak (xodimlarga)</span>
                                 <div class="stat-icon stat-icon-success">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="10" cy="10" r="8"/>
@@ -92,7 +104,8 @@
                                     </svg>
                                 </div>
                             </div>
-                            <div class="stat-value" id="activeEmployees">{{salary_sum}}</div>
+                            <div class="stat-value" id="activeEmployees">{{salary_sum|intcomma}}</div>
+                            
                         </div>
 
                     </div>
