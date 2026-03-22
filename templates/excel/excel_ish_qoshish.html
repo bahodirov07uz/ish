@@ -1,0 +1,787 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<style>
+/* ── Excel ish qo'shish ── */
+.ei-wrap { max-width: 1100px; margin: 0 auto; }
+
+/* Qadam paneli */
+.ei-steps { display:flex; align-items:center; gap:0; margin-bottom:1.75rem; }
+.ei-step {
+    display:flex; align-items:center; gap:8px;
+    flex:1; position:relative;
+}
+.ei-step::after {
+    content:''; flex:1; height:2px;
+    background:var(--border-color); margin:0 8px;
+}
+.ei-step:last-child::after { display:none; }
+.ei-step-num {
+    width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; flex-shrink:0;
+    border:2px solid var(--border-color);
+    background:var(--bg-card); color:var(--text-secondary);
+    transition:all .2s;
+}
+.ei-step.active .ei-step-num {
+    background:#7c3aed; border-color:#7c3aed; color:white;
+}
+.ei-step.done .ei-step-num {
+    background:#059669; border-color:#059669; color:white;
+}
+.ei-step.done::after { background:#059669; }
+.ei-step-label { font-size:12px; font-weight:600; color:var(--text-secondary); white-space:nowrap; }
+.ei-step.active .ei-step-label { color:#7c3aed; }
+.ei-step.done  .ei-step-label  { color:#059669; }
+
+/* Ekranlar */
+.ei-screen { display:none; }
+.ei-screen.active { display:block; }
+
+/* Ishchi grid */
+.worker-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+    gap:10px; margin-bottom:1rem;
+}
+.worker-card {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px;
+    background:var(--bg-card); border:1.5px solid var(--border-color);
+    border-radius:var(--radius); cursor:pointer; transition:all .15s;
+}
+.worker-card:hover { border-color:#7c3aed; }
+.worker-card.selected {
+    border-color:#7c3aed;
+    background:linear-gradient(135deg, rgba(124,58,237,.06), rgba(109,40,217,.03));
+}
+.worker-avatar {
+    width:36px; height:36px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:14px; flex-shrink:0;
+}
+.wtype-kroy      { background:#fef3c7; color:#b45309; }
+.wtype-rezak     { background:#fef3c7; color:#b45309; }
+.wtype-kosib     { background:#f0fdf4; color:#059669; }
+.wtype-zakatovka { background:#eff6ff; color:#1d4ed8; }
+.wtype-pardozchi { background:#f5f3ff; color:#7c3aed; }
+.wtype-other     { background:var(--bg-secondary); color:var(--text-secondary); }
+.worker-info { flex:1; min-width:0; }
+.worker-name { font-size:13px; font-weight:700; }
+.worker-phone { font-size:11px; color:var(--text-secondary); }
+.worker-type-badge {
+    font-size:10px; font-weight:700; padding:2px 7px;
+    border-radius:4px; white-space:nowrap;
+}
+
+/* Upload area */
+.upload-area {
+    border:1.5px dashed var(--border-color); border-radius:var(--radius);
+    padding:2.5rem 1rem; text-align:center;
+    background:var(--bg-secondary); cursor:pointer; transition:all .15s;
+}
+.upload-area:hover { border-color:#7c3aed; background:#f5f3ff; }
+.upload-area.has-file { border-color:#059669; background:#f0fdf4; border-style:solid; }
+.upload-area.drag-over { border-color:#7c3aed; background:#f5f3ff; transform:scale(1.01); }
+
+/* Layout grid */
+.ei-grid-2 { display:grid; grid-template-columns:280px 1fr; gap:1.25rem; }
+.ei-card {
+    background:var(--bg-card); border:1px solid var(--border-color);
+    border-radius:var(--radius); overflow:hidden; margin-bottom:1rem;
+}
+.ei-card-header {
+    padding:.85rem 1.25rem; border-bottom:1px solid var(--border-color);
+    display:flex; align-items:center; justify-content:space-between;
+}
+.ei-card-header h3 { font-size:.875rem; font-weight:700; margin:0; }
+.ei-card-body { padding:1.25rem; }
+
+/* Stats strip */
+.stat-row { display:flex; gap:8px; margin-bottom:1rem; }
+.stat-box { flex:1; background:var(--bg-secondary); border-radius:8px; padding:10px; text-align:center; }
+.stat-num { font-size:20px; font-weight:800; }
+.stat-lbl { font-size:10px; text-transform:uppercase; color:var(--text-secondary); font-weight:700; margin-top:2px; }
+
+/* Preview table */
+.prev-table { width:100%; border-collapse:collapse; font-size:12px; }
+.prev-table th {
+    padding:.55rem .85rem; background:var(--bg-secondary);
+    font-size:10px; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--text-secondary); font-weight:700; text-align:left;
+    border-bottom:1px solid var(--border-color);
+    position:sticky; top:0; z-index:1;
+}
+.prev-table td { padding:.65rem .85rem; border-top:1px solid var(--border-color); vertical-align:top; }
+.prev-table tr.row-ok:hover td { background:var(--bg-hover); }
+.prev-table tr.row-xato td { background:#fef2f2; }
+.prev-table tr.row-ogoh td  { background:#fef9e7; }
+
+.tag { display:inline-flex; align-items:center; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; }
+.tag-ok   { background:#f0fdf4; color:#059669; border:1px solid #86efac; }
+.tag-xato { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+.tag-ogoh { background:#fef3c7; color:#b45309; border:1px solid #fcd34d; }
+
+.err-box { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 14px; margin-bottom:.75rem; font-size:12px; color:#dc2626; }
+.ogoh-box { background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; margin-bottom:.75rem; font-size:12px; color:#b45309; }
+
+/* Accordion (biriktirish) */
+.acc-block { border:1px solid var(--border-color); border-radius:var(--radius); margin-bottom:6px; overflow:hidden; }
+.acc-header { padding:9px 14px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
+.acc-header:hover { background:var(--bg-hover); }
+.acc-body { display:none; padding:10px 14px; border-top:1px solid var(--border-color); }
+.acc-body.open { display:block; }
+.xom-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.xom-lbl { font-size:12px; color:var(--text-secondary); min-width:90px; }
+
+/* Buttons */
+.btn-next {
+    background:#7c3aed; color:white; border:none; border-radius:8px;
+    padding:9px 22px; font-size:13px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition:all .15s; display:inline-flex; align-items:center; gap:6px;
+}
+.btn-next:hover { background:#6d28d9; }
+.btn-next:disabled { opacity:.4; cursor:not-allowed; }
+.btn-back {
+    background:var(--bg-secondary); color:var(--text-primary);
+    border:1.5px solid var(--border-color); border-radius:8px;
+    padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;
+    font-family:inherit; transition:all .15s;
+}
+.btn-back:hover { background:var(--bg-hover); }
+.btn-save {
+    background:#059669; color:white; border:none; border-radius:8px;
+    padding:9px 22px; font-size:13px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition:all .15s; display:inline-flex; align-items:center; gap:6px;
+}
+.btn-save:hover { background:#047857; }
+
+@media (max-width:900px) { .ei-grid-2 { grid-template-columns:1fr; } }
+</style>
+
+<div class="main-content">
+    <header class="header">
+        <div class="header-title">Excel orqali ish qo'shish</div>
+        <a href="{% url 'main:ish_qoshish' %}" style="font-size:13px; color:var(--text-secondary); text-decoration:none; display:flex; align-items:center; gap:5px;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5"/></svg>
+            Oddiy ish qo'shish
+        </a>
+    </header>
+
+    <main class="content">
+        <div class="page">
+            <div class="ei-wrap">
+
+                <!-- QADAM PANELI -->
+                <div class="ei-steps" id="stepsBar">
+                    <div class="ei-step active" id="step1Indicator">
+                        <div class="ei-step-num">1</div>
+                        <span class="ei-step-label">Ishchi & Fayl</span>
+                    </div>
+                    <div class="ei-step" id="step2Indicator">
+                        <div class="ei-step-num">2</div>
+                        <span class="ei-step-label">Preview</span>
+                    </div>
+                    <div class="ei-step" id="step3Indicator">
+                        <div class="ei-step-num">3</div>
+                        <span class="ei-step-label">Biriktirish</span>
+                    </div>
+                </div>
+
+                <!-- ═══════════ EKRAN 1: Ishchi + Upload ═══════════ -->
+                <div class="ei-screen active" id="screen1">
+                    <div class="ei-grid-2">
+                        <div>
+                            <div class="ei-card">
+                                <div class="ei-card-header">
+                                    <h3>Ishchi tanlang</h3>
+                                    <span id="selBadge" style="display:none; font-size:11px; background:#f0fdf4; color:#059669; border:1px solid #86efac; border-radius:5px; padding:2px 8px; font-weight:700;">✓ Tanlandi</span>
+                                </div>
+                                <div class="ei-card-body" style="padding:.75rem">
+                                    <input type="text" id="workerSearch" placeholder="Qidirish..." style="width:100%; margin-bottom:10px; font-size:12px; box-sizing:border-box;">
+                                    <div id="workerList">
+                                        {% for ishchi in ishchilar %}
+                                        {% with turi=ishchi.turi.nomi|lower|default:"other" %}
+                                        <div class="worker-card"
+                                             data-id="{{ ishchi.id }}"
+                                             data-ism="{{ ishchi.ism }} {{ ishchi.familiya }}"
+                                             data-turi="{{ turi }}"
+                                             onclick="selectWorker(this)">
+                                            <div class="worker-avatar wtype-{{ turi }}">{{ ishchi.ism|slice:":1"|upper }}</div>
+                                            <div class="worker-info">
+                                                <div class="worker-name">{{ ishchi.ism }} {{ ishchi.familiya }}</div>
+                                                <div class="worker-phone">{{ ishchi.telefon|default:"" }}</div>
+                                            </div>
+                                            <span class="worker-type-badge wtype-{{ turi }}" style="padding:2px 7px; border-radius:4px;">{{ ishchi.turi.nomi }}</span>
+                                        </div>
+                                        {% endwith %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <!-- Shablon yuklab olish -->
+                            <div class="ei-card">
+                                <div class="ei-card-header">
+                                    <h3>1. Shablon yuklab oling</h3>
+                                </div>
+                                <div class="ei-card-body">
+                                    <div id="templateInfo" style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                                        Avval ishchi tanlang
+                                    </div>
+                                    <a id="templateLink" href="#" class="btn-next" style="text-decoration:none; pointer-events:none; opacity:.4; font-size:12px; padding:7px 16px;" download>
+                                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 13 13"><path d="M6.5 2v7M4 6l2.5 2.5L9 6M2 11h9"/></svg>
+                                        Shablon yuklash
+                                    </a>
+                                    <div id="templateCols" style="margin-top:10px; font-size:11px; color:var(--text-secondary); line-height:1.8;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Upload -->
+                            <div class="ei-card">
+                                <div class="ei-card-header">
+                                    <h3>2. To'ldirilgan faylni yuklang</h3>
+                                </div>
+                                <div class="ei-card-body">
+                                    <div class="upload-area" id="uploadArea"
+                                         onclick="document.getElementById('xlsxInput').click()"
+                                         ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                                         ondragleave="this.classList.remove('drag-over')"
+                                         ondrop="handleDrop(event)">
+                                        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 28 28" style="opacity:.4; margin-bottom:8px;"><path d="M14 18V6M10 10l4-4 4 4M4 22h20"/></svg>
+                                        <div style="font-size:13px;">Faylni bu yerga sudrang yoki bosing</div>
+                                        <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">.xlsx, .xls qabul qilinadi</div>
+                                    </div>
+                                    <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(this)">
+                                    <div id="fileInfoRow" style="display:none; margin-top:8px; font-size:12px; color:#059669; display:flex; align-items:center; gap:6px;">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7l4 4 6-6"/></svg>
+                                        <span id="fileName"></span>
+                                        <button onclick="clearFile()" style="background:none;border:none;cursor:pointer;color:#dc2626;padding:0;margin-left:auto;display:flex;align-items:center;">
+                                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 13 13"><path d="M2 2l9 9M11 2l-9 9"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; justify-content:flex-end;">
+                                <button class="btn-next" id="parseBtn" disabled onclick="doParse()">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7h10M7 2l5 5-5 5"/></svg>
+                                    Tekshirish →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════════ EKRAN 2: Preview ═══════════ -->
+                <div class="ei-screen" id="screen2">
+                    <div id="statRow" class="stat-row"></div>
+
+                    <div id="errBox"  class="err-box"  style="display:none;"></div>
+                    <div id="ogohBox" class="ogoh-box" style="display:none;"></div>
+
+                    <!-- Filter -->
+                    <div style="display:flex; gap:8px; margin-bottom:.75rem; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;">
+                            <input type="checkbox" id="showOk"   checked onchange="filterRows()"> <span style="color:#059669;">✓ Tayyor</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;">
+                            <input type="checkbox" id="showOgoh" checked onchange="filterRows()"> <span style="color:#b45309;">⚡ Ogohlantirish</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;">
+                            <input type="checkbox" id="showXato" checked onchange="filterRows()"> <span style="color:#dc2626;">✗ Xato</span>
+                        </label>
+                    </div>
+
+                    <div class="ei-card" style="padding:0; overflow:hidden;">
+                        <div style="overflow-x:auto; max-height:420px; overflow-y:auto;">
+                            <table class="prev-table" id="previewTable">
+                                <thead><tr id="previewHead"></tr></thead>
+                                <tbody id="previewBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:1rem;">
+                        <button class="btn-back" onclick="goScreen(1)">← Orqaga</button>
+                        <button class="btn-next" id="toBiriktirBtn" disabled onclick="goScreen(3)">
+                            Xomashyo biriktirish →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ═══════════ EKRAN 3: Biriktirish + Saqlash ═══════════ -->
+                <div class="ei-screen" id="screen3">
+                    <div class="ei-grid-2">
+                        <div>
+                            <!-- Sozlamalar -->
+                            <div class="ei-card">
+                                <div class="ei-card-header"><h3>Saqlash sozlamalari</h3></div>
+                                <div class="ei-card-body">
+                                    <label style="display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border-color); cursor:pointer; font-size:13px;">
+                                        <div>
+                                            <div>Xatoli satrlarni o'tkazib yuborish</div>
+                                            <div style="font-size:11px; color:var(--text-secondary);" id="xatoCount"></div>
+                                        </div>
+                                        <input type="checkbox" id="skipXato" checked style="width:16px;height:16px;">
+                                    </label>
+                                    <label style="display:flex; align-items:center; justify-content:space-between; padding:7px 0; cursor:pointer; font-size:13px;">
+                                        <div>
+                                            <div>Ogohlantirish satrlarini ham saqlash</div>
+                                            <div style="font-size:11px; color:var(--text-secondary);" id="ogohCount"></div>
+                                        </div>
+                                        <input type="checkbox" id="inclOgoh" checked style="width:16px;height:16px;">
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Jami xulosa -->
+                            <div class="ei-card">
+                                <div class="ei-card-header"><h3>Saqlash xulosasi</h3></div>
+                                <div class="ei-card-body">
+                                    <div id="saveSummary" style="font-size:13px; color:var(--text-secondary);">Yuklanmoqda...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <!-- Xomashyo biriktirish accordion -->
+                            <div class="ei-card">
+                                <div class="ei-card-header">
+                                    <h3>Xomashyo biriktirish</h3>
+                                    <span style="font-size:11px; color:var(--text-secondary);">Avtomatik topilgan. Topilmasa tanlang.</span>
+                                </div>
+                                <div class="ei-card-body" id="biriktirishPanel">
+                                    <div style="text-align:center; color:var(--text-secondary); font-size:12px; padding:1rem;">Yuklanmoqda...</div>
+                                </div>
+                            </div>
+
+                            <!-- Success -->
+                            <div id="successBlock" style="display:none; background:#f0fdf4; border:1.5px solid #86efac; border-radius:var(--radius); padding:1.5rem; text-align:center; margin-bottom:1rem;">
+                                <div style="font-size:20px; margin-bottom:8px;">✅</div>
+                                <div style="font-size:15px; font-weight:700; color:#059669;" id="successMsg"></div>
+                                <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;" id="successSub"></div>
+                                <a href="{% url 'main:ish_qoshish' %}" style="display:inline-flex; align-items:center; gap:5px; margin-top:12px; font-size:12px; color:#7c3aed; text-decoration:none; font-weight:600;">
+                                    ← Ish qo'shish sahifasiga qayt
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:1rem;">
+                        <button class="btn-back" onclick="goScreen(2)">← Orqaga</button>
+                        <button class="btn-save" id="saveBtn" onclick="doSaqlash()">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7l4 4 6-6"/></svg>
+                            <span id="saveBtnText">Saqlash</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Xomashyo tanlash modali -->
+<div id="xomModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-card); border-radius:var(--radius); width:100%; max-width:440px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.2);">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between;">
+            <h3 style="font-size:.95rem; font-weight:700; margin:0;" id="modalTitle">Xomashyo tanlash</h3>
+            <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; color:var(--text-secondary);">✕</button>
+        </div>
+        <div style="padding:1rem 1.25rem;">
+            <input type="text" id="modalSearch" placeholder="Qidirish..." style="width:100%; margin-bottom:10px; box-sizing:border-box; font-size:12px;">
+            <div id="modalList" style="max-height:280px; overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── URL konfiguratsiya ────────────────────────────────────────
+// html da <script> blokdan oldin quyidagi tag ishlaydi:
+// Lekin JS ichida Django tag ishlamaydi, shuning uchun
+// pastdagi URLS_BASE ni o'z URL pattern nomlaringiz bilan moslashtiring.
+// Agar urls.py da:
+//   path('excel/shablon/<int:id>/', views.excel_shablon, name='excel_shablon')
+// bo'lsa quyidagi /excel/shablon/ to'g'ri.
+// Agar namespace bo'lsa (app_name='main'):
+//   {% url 'main:excel_shablon' 0 %} → /excel/shablon/0/
+// Shunda:
+//   shablon: (id) => `/excel/shablon/${id}/`
+// to'g'ri bo'ladi.
+const URLS = {
+    shablon : (id) => `/uyexcel/shablon/${id}/`,
+    parse   : (id) => `/uyexcel/parse/${id}/`,
+    saqlash : (id) => `/uyexcel/saqlash/${id}/`,
+    xomList : (turi) => `/uyapi/xomashyo-list/?turi=${turi}`,
+};
+
+// ── Global holat ──────────────────────────────────────────────
+let selIshchiId   = null;
+let selIshchiTuri = null;
+let selIshchiIsm  = '';
+let xlsxFile      = null;
+let parseResult   = null;
+let xomashyoMap   = {};    // { "mahsulot:turi": id }
+let modalCallback = null;
+
+// ── Xomashyo cache (AJAX) ─────────────────────────────────────
+const XOM_CACHE = {};
+
+async function fetchXomashyolar(turi) {
+    if (XOM_CACHE[turi]) return XOM_CACHE[turi];
+    try {
+        const r = await fetch(URLS.xomList(turi));
+        const d = await r.json();
+        XOM_CACHE[turi] = d.xomashyolar || [];
+        return XOM_CACHE[turi];
+    } catch { return []; }
+}
+
+// ── Ishchi tanlash ────────────────────────────────────────────
+const TEMPLATE_INFO = {
+    kroy:      { cols: 'mahsulot · soni · sana · teri_nomi · teri_variant_rang · teri_sarfi · astar_nomi · astar_sarfi' },
+    rezak:     { cols: 'mahsulot · soni · sana · teri_nomi · teri_variant_rang · teri_sarfi · astar_nomi · astar_sarfi' },
+    zakatovka: { cols: 'mahsulot · soni · sana · kroy_xomashyo · mustaqil_ish' },
+    kosib:     { cols: 'mahsulot · soni · sana · padoj_nomi · padoj_variant_rang · variant_rang · variant_razmer · zakatovka_nomi · mustaqil_ish' },
+    pardozchi: { cols: 'mahsulot · soni · sana · izoh' },
+};
+
+function selectWorker(el) {
+    document.querySelectorAll('.worker-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selIshchiId   = el.dataset.id;
+    selIshchiIsm  = el.dataset.ism;
+    selIshchiTuri = el.dataset.turi.toLowerCase();
+
+    document.getElementById('selBadge').style.display = 'inline';
+
+    const link = document.getElementById('templateLink');
+    link.href  = URLS.shablon(selIshchiId);
+    link.style.pointerEvents = 'auto';
+    link.style.opacity = '1';
+    link.download = `shablon_${selIshchiTuri}_${selIshchiIsm}.xlsx`;
+
+    const info   = TEMPLATE_INFO[selIshchiTuri] || TEMPLATE_INFO['pardozchi'];
+    document.getElementById('templateInfo').textContent = `${selIshchiIsm} (${selIshchiTuri}) uchun shablon`;
+    document.getElementById('templateCols').innerHTML =
+        `<b>Ustunlar:</b> ${info.cols}`;
+
+    updateParseBtn();
+}
+
+document.getElementById('workerSearch').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.worker-card').forEach(c => {
+        c.style.display = c.dataset.ism.toLowerCase().includes(q) || c.dataset.turi.includes(q) ? '' : 'none';
+    });
+});
+
+// ── Fayl ─────────────────────────────────────────────────────
+function handleFileSelect(input) {
+    if (input.files.length) setFile(input.files[0]);
+}
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadArea').classList.remove('drag-over');
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+}
+function setFile(f) {
+    if (!f.name.match(/\.(xlsx|xls)$/i)) {
+        alert('Faqat .xlsx yoki .xls fayl qabul qilinadi!'); return;
+    }
+    xlsxFile = f;
+    const area = document.getElementById('uploadArea');
+    area.classList.add('has-file');
+    area.innerHTML = `
+        <svg width="22" height="22" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 22 22" style="margin-bottom:6px;"><path d="M2 11l6 6 12-12"/></svg>
+        <div style="font-size:13px; color:#059669; font-weight:600;">${f.name}</div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-top:3px;">${(f.size/1024).toFixed(1)} KB</div>
+    `;
+    document.getElementById('fileInfoRow').style.display = 'none';
+    updateParseBtn();
+}
+function clearFile() {
+    xlsxFile = null;
+    const area = document.getElementById('uploadArea');
+    area.classList.remove('has-file');
+    area.innerHTML = `<svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 28 28" style="opacity:.4; margin-bottom:8px;"><path d="M14 18V6M10 10l4-4 4 4M4 22h20"/></svg>
+        <div style="font-size:13px;">Faylni bu yerga sudrang yoki bosing</div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">.xlsx, .xls qabul qilinadi</div>`;
+    document.getElementById('xlsxInput').value = '';
+    updateParseBtn();
+}
+
+function updateParseBtn() {
+    document.getElementById('parseBtn').disabled = !(selIshchiId && xlsxFile);
+}
+
+// ── Parse ─────────────────────────────────────────────────────
+async function doParse() {
+    const btn = document.getElementById('parseBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Tekshirilmoqda...';
+
+    const fd = new FormData();
+    fd.append('file', xlsxFile);
+
+    try {
+        const r = await fetch(URLS.parse(selIshchiId), {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrf() },
+            body: fd,
+        });
+        const data = await r.json();
+        if (data.error) { alert('Xatolik: ' + data.error); return; }
+        parseResult = data;
+        buildPreview(data);
+        goScreen(2);
+    } catch(e) {
+        alert('Tarmoq xatoligi: ' + e);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7h10M7 2l5 5-5 5"/></svg> Tekshirish →`;
+    }
+}
+
+// ── Preview qurilishi ─────────────────────────────────────────
+function buildPreview(data) {
+    // Stats
+    document.getElementById('statRow').innerHTML = `
+        <div class="stat-box"><div class="stat-num">${data.jami}</div><div class="stat-lbl">Jami</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#059669;">${data.ok_soni}</div><div class="stat-lbl">Tayyor</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#b45309;">${data.ogohlantirish_soni}</div><div class="stat-lbl">Ogohlantirish</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#dc2626;">${data.xatolar_soni}</div><div class="stat-lbl">Xato</div></div>
+    `;
+
+    // Error / warning summary
+    const xatoSatrlar = data.satrlar.filter(s => s.holat === 'xato');
+    const ogohSatrlar = data.satrlar.filter(s => s.holat === 'ogohlantirish');
+
+    const errBox = document.getElementById('errBox');
+    if (xatoSatrlar.length) {
+        errBox.style.display = 'block';
+        errBox.innerHTML = `<b>Xatolar (${xatoSatrlar.length} ta satr) — bu satrlar saqlanmaydi:</b><ul style="margin:6px 0 0 1.2rem; padding:0;">` +
+            xatoSatrlar.map(s => `<li>#${s.satr_num}: ${s.xatolar.join('; ')}</li>`).join('') + '</ul>';
+    } else { errBox.style.display = 'none'; }
+
+    const ogohBox = document.getElementById('ogohBox');
+    if (ogohSatrlar.length) {
+        ogohBox.style.display = 'block';
+        ogohBox.innerHTML = `<b>Ogohlantirishlar (${ogohSatrlar.length} ta satr):</b><ul style="margin:6px 0 0 1.2rem; padding:0;">` +
+            ogohSatrlar.map(s => `<li>#${s.satr_num}: ${s.ogohlantirishlar.join('; ')}</li>`).join('') + '</ul>';
+    } else { ogohBox.style.display = 'none'; }
+
+    // Table
+    const head = document.getElementById('previewHead');
+    const body = document.getElementById('previewBody');
+    const cols = Object.keys(data.satrlar[0]?.vals || {});
+
+    head.innerHTML = '<th>#</th><th>Holat</th>' +
+        cols.map(c => `<th>${c}</th>`).join('') +
+        '<th>Xatolar / Ogohlantirishlar</th>';
+
+    body.innerHTML = data.satrlar.map(s => {
+        const cls = s.holat === 'xato' ? 'row-xato' : s.holat === 'ogohlantirish' ? 'row-ogoh' : 'row-ok';
+        const tag = s.holat === 'xato' ? '<span class="tag tag-xato">✗ Xato</span>'
+                  : s.holat === 'ogohlantirish' ? '<span class="tag tag-ogoh">⚡ Ogohlantirish</span>'
+                  : '<span class="tag tag-ok">✓ Tayyor</span>';
+        const msgs = [...(s.xatolar || []), ...(s.ogohlantirishlar || [])].join('<br>');
+        return `<tr class="${cls}" data-holat="${s.holat}">
+            <td style="color:var(--text-secondary);">${s.satr_num}</td>
+            <td>${tag}</td>
+            ${cols.map(c => `<td>${s.vals[c] || '<span style="color:var(--text-secondary)">—</span>'}</td>`).join('')}
+            <td style="font-size:11px; color:var(--text-secondary);">${msgs}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('toBiriktirBtn').disabled = data.ok_soni + data.ogohlantirish_soni === 0;
+}
+
+function filterRows() {
+    const showOk   = document.getElementById('showOk').checked;
+    const showOgoh = document.getElementById('showOgoh').checked;
+    const showXato = document.getElementById('showXato').checked;
+    document.querySelectorAll('#previewBody tr').forEach(tr => {
+        const h = tr.dataset.holat;
+        tr.style.display = (h === 'ok' && showOk) || (h === 'ogohlantirish' && showOgoh) || (h === 'xato' && showXato) ? '' : 'none';
+    });
+}
+
+// ── Ekran 3: biriktirish paneli ───────────────────────────────
+async function buildBiriktirish() {
+    if (!parseResult) return;
+    const satrlar = parseResult.satrlar;
+    const turi = selIshchiTuri;
+
+    // Satrlarni mahsulot bo'yicha guruhlash
+    const groups = {};
+    for (const s of satrlar) {
+        if (s.holat === 'xato') continue;
+        const mn = s.vals.mahsulot_nomi || '—';
+        if (!groups[mn]) groups[mn] = { soni: 0, computed_list: [] };
+        groups[mn].soni += parseInt(s.computed.soni || 0);
+        groups[mn].computed_list.push(s.computed);
+    }
+
+    const panel = document.getElementById('biriktirishPanel');
+    let html = '';
+
+    for (const [mah, g] of Object.entries(groups)) {
+        const comp0 = g.computed_list[0] || {};
+
+        // Teri (kroy/rezak uchun)
+        let teriHtml = '';
+        if ((turi === 'kroy' || turi === 'rezak') && comp0.teri_id) {
+            const teriNomi = Object.values(parseResult.satrlar.find(s => s.computed.teri_id == comp0.teri_id)?.vals || {})[3] || '—';
+            teriHtml = `
+            <div class="xom-row">
+                <span class="xom-lbl">Teri:</span>
+                <span style="font-size:12px; color:#059669; flex:1;">${teriNomi} (avtomatik topildi)</span>
+            </div>`;
+        } else if (turi === 'kroy' || turi === 'rezak') {
+            const key = `${mah}:teri`;
+            teriHtml = `
+            <div class="xom-row">
+                <span class="xom-lbl">Teri:</span>
+                <button class="btn-back" style="font-size:11px; padding:4px 10px;" onclick="openXomModal('teri','${mah}','${key}',this)">
+                    ${xomashyoMap[key] ? '✓ Tanlangan' : 'Tanlang...'}
+                </button>
+            </div>`;
+        }
+
+        html += `
+        <div class="acc-block">
+            <div class="acc-header" onclick="toggleAcc(this)">
+                <div>
+                    <span style="font-size:13px; font-weight:700;">${mah}</span>
+                    <span style="font-size:11px; color:var(--text-secondary); margin-left:8px;">× ${g.soni} ta</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="tag tag-ok" style="font-size:10px;">Tayyor</span>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4"/></svg>
+                </div>
+            </div>
+            <div class="acc-body open">
+                ${teriHtml}
+                <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">
+                    ℹ️ Excel satrlaridagi nomlar orqali xomashyo avtomatik topiladi
+                </div>
+            </div>
+        </div>`;
+    }
+
+    if (!html) html = '<div style="text-align:center; color:var(--text-secondary); font-size:12px; padding:1rem;">Saqlash uchun satrlar yo\'q</div>';
+    panel.innerHTML = html;
+
+    // Jami xulosa
+    const ok  = parseResult.ok_soni;
+    const og  = parseResult.ogohlantirish_soni;
+    const xat = parseResult.xatolar_soni;
+    document.getElementById('xatoCount').textContent = `${xat} ta satr`;
+    document.getElementById('ogohCount').textContent = `${og} ta satr (default sarflar bilan)`;
+    document.getElementById('saveSummary').innerHTML = `
+        <div style="margin-bottom:5px;">Saqlanadigan: <b style="color:#059669;">${ok + og} ta ish yozuvi</b></div>
+        <div style="margin-bottom:5px;">O'tkaziladigan: <b style="color:#dc2626;">${xat} ta (xatoli)</b></div>
+        <div>Ishchi: <b>${selIshchiIsm}</b></div>
+    `;
+}
+
+function toggleAcc(header) {
+    const body = header.nextElementSibling;
+    body.classList.toggle('open');
+}
+
+// ── Xomashyo modal ────────────────────────────────────────────
+async function openXomModal(xomTuri, mahNomi, mapKey, btnEl) {
+    modalCallback = (id, nomi) => {
+        xomashyoMap[mapKey] = id;
+        btnEl.textContent = `✓ ${nomi}`;
+        btnEl.style.color = '#059669';
+        closeModal();
+    };
+    document.getElementById('modalTitle').textContent = `${xomTuri} tanlang — ${mahNomi}`;
+    document.getElementById('modalList').innerHTML = '<div style="text-align:center; font-size:12px; color:var(--text-secondary);">Yuklanmoqda...</div>';
+    document.getElementById('xomModal').style.display = 'flex';
+
+    const list = await fetchXomashyolar(xomTuri);
+    const search = document.getElementById('modalSearch').value.toLowerCase();
+    renderModalList(list, search);
+}
+
+function renderModalList(list, q = '') {
+    const filtered = q ? list.filter(x => x.nomi.toLowerCase().includes(q)) : list;
+    document.getElementById('modalList').innerHTML = filtered.map(x => `
+        <div onclick="modalCallback(${x.id},'${x.nomi.replace("'","\\'")}'); return false;"
+             style="padding:7px 10px; cursor:pointer; border-radius:6px; font-size:12px; display:flex; justify-content:space-between;"
+             onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
+            <span>${x.nomi}</span>
+            <span style="color:var(--text-secondary);">${x.miqdori} ${x.olchov_birligi}</span>
+        </div>
+    `).join('') || '<div style="text-align:center; font-size:12px; color:var(--text-secondary); padding:1rem;">Topilmadi</div>';
+}
+
+document.getElementById('modalSearch').addEventListener('input', async function() {
+    const list = await fetchXomashyolar('teri');
+    renderModalList(list, this.value.toLowerCase());
+});
+
+function closeModal() {
+    document.getElementById('xomModal').style.display = 'none';
+    document.getElementById('modalSearch').value = '';
+}
+
+// ── Saqlash ───────────────────────────────────────────────────
+async function doSaqlash() {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    document.getElementById('saveBtnText').textContent = '⏳ Saqlanmoqda...';
+
+    const body = {
+        satrlar                  : parseResult.satrlar,
+        xomashyo_map             : xomashyoMap,
+        skip_xatolar             : document.getElementById('skipXato').checked,
+        include_ogohlantirishlar : document.getElementById('inclOgoh').checked,
+    };
+
+    try {
+        const r = await fetch(URLS.saqlash(selIshchiId), {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body   : JSON.stringify(body),
+        });
+        const data = await r.json();
+        document.getElementById('successBlock').style.display = 'block';
+        document.getElementById('successMsg').textContent = `✅ ${data.yaratilgan} ta ish muvaffaqiyatli saqlandi!`;
+        document.getElementById('successSub').textContent = `${data.otkazilgan} ta satr o'tkazildi · Ishchi: ${selIshchiIsm}`;
+        btn.style.display = 'none';
+        document.querySelector('#screen3 .btn-back').style.display = 'none';
+    } catch(e) {
+        alert('Saqlashda xatolik: ' + e);
+        btn.disabled = false;
+        document.getElementById('saveBtnText').textContent = 'Saqlash';
+    }
+}
+
+// ── Ekran almashtirish ────────────────────────────────────────
+function goScreen(n) {
+    document.querySelectorAll('.ei-screen').forEach((s, i) => {
+        s.classList.toggle('active', i + 1 === n);
+    });
+    ['step1Indicator','step2Indicator','step3Indicator'].forEach((id, i) => {
+        const el = document.getElementById(id);
+        el.classList.toggle('active', i + 1 === n);
+        el.classList.toggle('done',   i + 1 < n);
+    });
+    if (n === 3) buildBiriktirish();
+    window.scrollTo(0, 0);
+}
+
+// ── CSRF ──────────────────────────────────────────────────────
+function getCsrf() {
+    return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+</script>
+{% endblock content %}

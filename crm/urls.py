@@ -74,3 +74,16 @@ urlpatterns = [
     path('api/usd-kurs/',views.get_usd_kurs,name="usd_kurs")
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+
+# crm/urls.py ga qo'shish kerak bo'lgan qatorlar:
+from django.urls import path
+from .excel.excel import excel_shablon, excel_parse, excel_saqlash,excel_ish_sahifa
+
+from .excel.excel import excel_shablon, excel_parse, excel_saqlash, excel_ish_sahifa
+
+urlpatterns += [
+    path('excel/',                        excel_ish_sahifa, name='excel_ish'),
+    path('excel/shablon/<int:ishchi_id>/', excel_shablon,   name='excel_shablon'),
+    path('excel/parse/<int:ishchi_id>/',   excel_parse,     name='excel_parse'),
+    path('excel/saqlash/<int:ishchi_id>/', excel_saqlash,   name='excel_saqlash'),
+]

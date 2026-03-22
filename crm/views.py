@@ -135,19 +135,7 @@ def oylik_yopish(request, pk):
                 yopilgan=True
             )
 
-            # Eski ishlarni yaratish
-            eski_ishlar_list = [
-                m.EskiIsh(
-                    ishchi=ish.ishchi,
-                    mahsulot=ish.mahsulot.nomi,
-                    soni=ish.soni,
-                    sana=ish.sana,
-                    narxi=ish.narxi,
-                    ishchi_oylik=oylik_yozuv
-                ) for ish in ishlari
-            ]
-            m.EskiIsh.objects.bulk_create(eski_ishlar_list)
-
+            
             # Faqat shu ishchining ishlarini yopish!
             ishlari.update(status='yopilgan')
 
@@ -1002,6 +990,7 @@ class IshQoshishView(AdminRequiredMixin,View):
             )
 
         return xomashyo
+
 
 
 #  SOTUVLAR 

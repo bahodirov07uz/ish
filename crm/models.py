@@ -177,9 +177,12 @@ class Oyliklar(models.Model):
     oylik = models.IntegerField(null=True, verbose_name="Oylik")
     yopilgan = models.BooleanField(default=False, verbose_name="Yopilgan")
 
+ 
+
     class Meta:
         verbose_name = "Oylik"
         verbose_name_plural = "Oyliklar"
+
 
     def __str__(self):
         return f"{self.ishchi.ism} - {self.sana} - {self.oylik}"
@@ -492,6 +495,7 @@ class ChiqimItem(models.Model):
     ITEM_TURI = [
         ('xomashyo', 'Xomashyo to\'lovi'),
         ('boshqa',   'Boshqa chiqim'),
+        ('oylik','Xodim oyliklari'),
     ]
 
     chiqim    = models.ForeignKey(
@@ -674,49 +678,7 @@ class Sotuv(models.Model):
         else:
             self.tolov_holati = 'tolanmadi'
 
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        
-        # USD summalarini hisoblash
-        if self.usd_kurs and self.usd_kurs > 0 and not is_new:
-            self.jami_summa_usd = round(Decimal(str(self.jami_summa)) / Decimal(str(self.usd_kurs)), 4)
-            self.yakuniy_summa_usd = round(Decimal(str(self.yakuniy_summa)) / Decimal(str(self.usd_kurs)), 4)
-        
-        # To'lov holatiga qarab tolangan_summani o'rnatish (yangi sotuv uchun)
-        if is_new and self.tolov_holati == 'tolandi':
-            self.tolangan_summa = self.yakuniy_summa
-        elif is_new and self.tolov_holati == 'tolanmadi':
-            self.tolangan_summa = 0
-        
-        super().save(*args, **kwargs)
-        
-        # Yangi sotuv uchun kirim yaratish (faqat to'landi holatida)
-        if is_new and self.tolov_holati == 'tolandi':
-            from .models import Kirim
-            Kirim.objects.create(
-                sotuv=self,
-                xaridor=self.xaridor,
-                summa=self.yakuniy_summa,
-                summa_usd=self.yakuniy_summa_usd,
-                usd_kurs=self.usd_kurs,
-                valyuta='uzs',
-                sana=self.sana,
-                izoh=f"Sotuv #{self.id} - To'liq to'lov"
-            )
-        elif is_new and self.tolov_holati == 'qisman' and self.tolangan_summa > 0:
-            # Qisman to'lov - boshlang'ich to'lov kirim sifatida
-            from .models import Kirim
-            Kirim.objects.create(
-                sotuv=self,
-                xaridor=self.xaridor,
-                summa=self.tolangan_summa,
-                summa_usd=round(self.tolangan_summa / self.usd_kurs, 4) if self.usd_kurs > 0 else 0,
-                usd_kurs=self.usd_kurs,
-                valyuta='uzs',
-                sana=self.sana,
-                izoh=f"Sotuv #{self.id} - Qisman to'lov"
-            )
-
+  
 class SotuvItem(models.Model):
     """Sotuv tarkibidagi alohida mahsulot"""
     sotuv = models.ForeignKey(

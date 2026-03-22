@@ -149,7 +149,7 @@ class ChiqimItemAdmin(admin.ModelAdmin):
 class ChiqimAdmin(ExportMixin,admin.ModelAdmin):
     inlines = [ChiqimItemInline]
     resource_class = ChiqimResource
-    list_display = ('name', 'category', 'price', 'created')
+    list_display = ('name', 'category', 'price','price_usd', 'created')
     list_filter = ('category', Last15DaysFilter,'created')
     search_fields = ('name',)
     list_per_page = 20
