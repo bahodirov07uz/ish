@@ -1346,7 +1346,8 @@ function saveDraft() {
             // Mahsulot qatorlari
             rows: collectRows(),
         };
-
+            console.log("Hozirgi barcha qatorlar (Full Rows):");
+            console.table(draft.rows);
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch (e) {
         console.warn('Draft saqlashda xato:', e);

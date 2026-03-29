@@ -11,3 +11,5 @@ env
 readme
 *sqlite3
 .venv
+
+*csv

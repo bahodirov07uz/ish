@@ -9,7 +9,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.contrib.auth.decorators import login_required,user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
-
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 
 from django.db.models.functions import Coalesce
@@ -245,7 +245,9 @@ def chiqim_qoshish(request):
     chiqim_turi = request.POST.get('chiqim_turi')
     izoh        = request.POST.get('izoh', '').strip()
     sana        = _parse_sana(request.POST.get('sana'))
-
+    if not sana:
+        sana = timezone.now()
+        
     try:
         rows = json.loads(request.POST.get('items', '[]'))
         if not rows:

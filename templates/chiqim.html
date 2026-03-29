@@ -199,8 +199,8 @@
                     <input type="date" name="sana" class="form-control" value="{{ today_str }}">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Yetkazib beruvchi</label>
-                    <select name="yetkazib_beruvchi" class="form-select">
+                    <label class="form-label">Yetkazib beruvchi <span style="color: #dc2626;" class="required">*</span></label>
+                    <select name="yetkazib_beruvchi" class="form-select" required>
                         <option value="">Tanlang…</option>
                         {% for yb in yetkazib_beruvchilar %}
                             <option value="{{ yb.id }}">{{ yb.nomi }}</option>

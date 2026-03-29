@@ -2,123 +2,595 @@
 {% load humanize %}
 {% block content %}
 <style>
-.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem}
-.bl-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden;transition:box-shadow .15s}
-.bl-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
-.bl-top{padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.bl-nomi{font-weight:800;font-size:.95rem}
-.bl-davr{font-size:11px;color:var(--text-secondary);margin-top:3px}
-.badge-active{background:#f0fdf4;color:#059669;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;white-space:nowrap}
-.badge-old{background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700}
-.bl-body{padding:1rem 1.25rem}
-.bl-prog-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;font-weight:600}
-.bl-track{height:8px;border-radius:4px;background:var(--bg-secondary);overflow:hidden;margin-bottom:10px}
-.bl-fill{height:100%;border-radius:4px;transition:width .4s}
+/* ── Layout ──────────────────────────────────────────────── */
+.bd-wrap{display:flex;flex-direction:column;gap:1.5rem}
+.bd-grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+.bd-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.bd-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+@media(max-width:900px){.bd-grid2{grid-template-columns:1fr}.bd-grid4{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.bd-grid3,.bd-grid4{grid-template-columns:1fr 1fr}.bd-grid2{grid-template-columns:1fr}}
+
+/* ── Card ────────────────────────────────────────────────── */
+.card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden}
+.card-head{padding:.9rem 1.25rem;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title{font-size:.85rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);display:flex;align-items:center;gap:7px}
+.card-body{padding:1.25rem}
+
+/* ── Stat boxes ──────────────────────────────────────────── */
+.stat-card{padding:1.1rem 1.25rem;border-radius:var(--radius);border:1px solid var(--border-color);background:var(--bg-card);display:flex;flex-direction:column;gap:4px}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-secondary)}
+.stat-value{font-size:1.35rem;font-weight:900;line-height:1.1}
+.stat-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
+
+/* ── Progress bar ────────────────────────────────────────── */
+.prog-wrap{margin:1rem 0 .5rem}
+.prog-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.prog-pct{font-size:1rem;font-weight:900}
+.prog-track{height:10px;border-radius:5px;background:var(--bg-secondary);overflow:hidden;position:relative}
+.prog-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1)}
 .fill-safe{background:linear-gradient(90deg,#059669,#10b981)}
 .fill-ogoh{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-.fill-xavfli{background:#ef4444}
-.fill-oshib{background:#dc2626}
-.bl-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.bl-stat{text-align:center;padding:7px;background:var(--bg-secondary);border-radius:7px}
-.bl-stat-l{font-size:10px;text-transform:uppercase;color:var(--text-secondary);font-weight:700}
-.bl-stat-v{font-size:12px;font-weight:800;margin-top:2px}
-.bl-footer{padding:.65rem 1.25rem;border-top:1px solid var(--border-color);display:flex;gap:6px}
-.btn-sm{padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;border:none;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:all .12s}
+.fill-xavfli{background:linear-gradient(90deg,#ef4444,#f87171)}
+.fill-oshib{background:#dc2626;animation:pulse-red 1.4s ease-in-out infinite}
+@keyframes pulse-red{0%,100%{opacity:1}50%{opacity:.7}}
+
+/* ── Warning strip ───────────────────────────────────────── */
+.warn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.warn-red{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
+.warn-yellow{background:#fef3c7;border:1px solid #fcd34d;color:#b45309}
+
+/* ── Badge ───────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700}
+.badge-green{background:#f0fdf4;color:#059669;border:1px solid #86efac}
+.badge-red{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.badge-yellow{background:#fef3c7;color:#b45309;border:1px solid #fcd34d}
+.badge-gray{background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border-color)}
+.badge-chiqim{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.badge-xomashyo{background:#fef3c7;color:#b45309;border:1px solid #fcd34d}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border-color);padding:0 1.25rem}
+.tab-btn{padding:.65rem 1rem;font-size:12px;font-weight:700;color:var(--text-secondary);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-family:inherit}
+.tab-btn.active{color:#7c3aed;border-bottom-color:#7c3aed}
+.tab-panel{display:none;padding:1.25rem}
+.tab-panel.active{display:block}
+
+/* ── Table ───────────────────────────────────────────────── */
+.t{width:100%;border-collapse:collapse;font-size:12px}
+.t th{padding:.5rem .85rem;background:var(--bg-secondary);font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-secondary);font-weight:700;text-align:left;white-space:nowrap}
+.t td{padding:.6rem .85rem;border-top:1px solid var(--border-color)}
+.t tbody tr:hover{background:var(--bg-hover)}
+
+/* ── Limit rows ──────────────────────────────────────────── */
+.lim-row{display:grid;grid-template-columns:1fr 180px 90px 100px 90px;align-items:center;gap:12px;padding:.75rem 1.25rem;border-top:1px solid var(--border-color)}
+.lim-row:first-child{border-top:none}
+.lim-name{font-weight:700;font-size:13px}
+.lim-meta{font-size:11px;color:var(--text-secondary);margin-top:2px}
+.lim-track{height:6px;border-radius:3px;background:var(--bg-secondary);overflow:hidden}
+.lim-fill{height:100%;border-radius:3px}
+@media(max-width:700px){.lim-row{grid-template-columns:1fr 1fr;row-gap:4px}.lim-row>:nth-child(n+3){display:none}}
+
+/* ── Limit form ──────────────────────────────────────────── */
+.lf-grid{display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:.75rem;align-items:end}
+@media(max-width:700px){.lf-grid{grid-template-columns:1fr 1fr}}
+.lf-label{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px}
+.lf-input{width:100%;padding:.55rem .85rem;border:1.5px solid var(--border-color);border-radius:7px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;transition:border-color .15s}
+.lf-input:focus{border-color:#7c3aed;background:var(--bg-card)}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;border:none;font-family:inherit;transition:all .12s;white-space:nowrap}
 .btn-p{background:#7c3aed;color:white}.btn-p:hover{background:#6d28d9;color:white}
 .btn-o{background:var(--bg-secondary);color:var(--text-primary);border:1.5px solid var(--border-color)}.btn-o:hover{background:var(--bg-hover)}
-.warning-strip{margin-top:8px;padding:6px 10px;border-radius:7px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
-.ws-red{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
-.ws-yellow{background:#fef3c7;border:1px solid #fcd34d;color:#b45309}
+.btn-danger{background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca}.btn-danger:hover{background:#fee2e2}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* ── Ishchi table colors ─────────────────────────────────── */
+.ishchi-bar{height:5px;border-radius:3px;background:linear-gradient(90deg,#7c3aed,#a78bfa);display:inline-block;vertical-align:middle}
+
+/* ── Chart containers ────────────────────────────────────── */
+.chart-box{position:relative;height:240px}
+.chart-box-lg{position:relative;height:300px}
 </style>
 
 <div class="main-content">
     <header class="header">
-        <div class="header-title">Byudjet nazorati</div>
+        <div class="header-title">Byudjet: {{ b.nomi }}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <a href="{% url 'budget:list' %}" class="btn btn-o" style="padding:5px 12px;font-size:12px;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><path d="M8 2L3 6l5 4"/></svg>
+                Byudjetlar
+            </a>
+            <a href="{% url 'budget:update' b.pk %}" class="btn btn-o" style="padding:5px 12px;font-size:12px;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><path d="M2 9l1-3L9 2l2 2-6 5-3 1z"/></svg>
+                Tahrir
+            </a>
+        </div>
     </header>
+
     <main class="content"><div class="page">
+    <div class="bd-wrap">
 
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <!-- ── 1. Header info ─────────────────────────────────────── -->
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <div>
-                <h2 style="font-size:1.3rem;font-weight:800;margin:0;display:flex;align-items:center;gap:10px;">
-                    <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" rx="2"/><path d="M2 8h14M8 8v8"/></svg>
-                    </span>
-                    Byudjetlar
-                </h2>
-                {% if faol %}<div style="font-size:12px;color:#059669;margin-top:4px;margin-left:46px;">✅ Faol: {{ faol.nomi }}</div>{% endif %}
+                <h2 style="font-size:1.25rem;font-weight:900;margin:0;">{{ b.nomi }}</h2>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+                    📅 {{ b.davr_boshi|date:"d.m.Y" }} – {{ b.davr_oxiri|date:"d.m.Y" }}
+                    {% if b.izoh %} &nbsp;·&nbsp; {{ b.izoh|truncatechars:80 }}{% endif %}
+                </div>
             </div>
-            <div style="display:flex;gap:8px;">
-                <a href="{% url 'budget:tranzaksiyalar' %}" class="btn-sm btn-o">
-                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1"/><path d="M1 5h10M5 1v10"/></svg>
-                    Tranzaksiyalar
-                </a>
-                <a href="{% url 'budget:create' %}" class="btn-sm btn-p" style="padding:7px 16px;font-size:13px;">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 13 13"><path d="M6.5 2v9M2 6.5h9"/></svg>
-                    Yangi byudjet
-                </a>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                {% if b.is_active %}
+                    <span class="badge badge-green">● Faol byudjet</span>
+                {% else %}
+                    <span class="badge badge-gray">Tugagan</span>
+                {% endif %}
+                {% if holat == 'oshib_ketdi' %}
+                    <span class="badge badge-red">🚨 Oshib ketdi</span>
+                {% elif holat == 'xavfli' %}
+                    <span class="badge badge-red">🔴 Xavfli</span>
+                {% elif holat == 'ogoh' %}
+                    <span class="badge badge-yellow">⚡ Ogoh</span>
+                {% else %}
+                    <span class="badge badge-green">✅ Xavfsiz</span>
+                {% endif %}
             </div>
         </div>
 
-        {% if byudjetlar %}
-        <div class="bl-grid">
-            {% for b in byudjetlar %}
-            {% with foiz=b.sarfi_foiz holat=b.holat %}
-            <div class="bl-card">
-                <div class="bl-top">
-                    <div>
-                        <div class="bl-nomi">{{ b.nomi }}</div>
-                        <div class="bl-davr">📅 {{ b.davr_boshi|date:"d.m.Y" }} – {{ b.davr_oxiri|date:"d.m.Y" }}</div>
-                    </div>
-                    {% if b.is_active %}<span class="badge-active">● Faol</span>
-                    {% else %}<span class="badge-old">Tugagan</span>{% endif %}
-                </div>
-                <div class="bl-body">
-                    <div class="bl-prog-label">
-                        <span style="font-weight:700;">{{ foiz }}% sarflangan</span>
-                        <span style="color:var(--text-secondary);font-size:11px;">{{ b.jami_sarfi|floatformat:0|intcomma }} / {{ b.umumiy_summa|floatformat:0|intcomma }}</span>
-                    </div>
-                    <div class="bl-track">
-                        <div class="bl-fill fill-{% if holat == 'xavfsiz' %}safe{% elif holat == 'ogoh' %}ogoh{% elif holat == 'xavfli' %}xavfli{% else %}oshib{% endif %}"
-                             style="width:{{ foiz }}%;"></div>
-                    </div>
-                    <div class="bl-stats">
-                        <div class="bl-stat">
-                            <div class="bl-stat-l">Byudjet</div>
-                            <div class="bl-stat-v" style="color:#7c3aed;">{{ b.umumiy_summa|floatformat:0|intcomma }}</div>
-                        </div>
-                        <div class="bl-stat">
-                            <div class="bl-stat-l">Sarflangan</div>
-                            <div class="bl-stat-v" style="color:#dc2626;">{{ b.jami_sarfi|floatformat:0|intcomma }}</div>
-                        </div>
-                        <div class="bl-stat">
-                            <div class="bl-stat-l">Qoldiq</div>
-                            <div class="bl-stat-v" style="color:#059669;">{{ b.qoldiq|floatformat:0|intcomma }}</div>
-                        </div>
-                    </div>
-                    {% if holat == 'oshib_ketdi' %}
-                        <div class="warning-strip ws-red">🚨 Byudjet oshib ketdi!</div>
-                    {% elif holat == 'xavfli' %}
-                        <div class="warning-strip ws-red">🔴 {{ foiz }}% — byudjet tugayapti!</div>
-                    {% elif holat == 'ogoh' %}
-                        <div class="warning-strip ws-yellow">⚡ {{ foiz }}% sarflangan</div>
-                    {% endif %}
-                </div>
-                <div class="bl-footer">
-                    <a href="{% url 'budget:detail' b.pk %}" class="btn-sm btn-p">Batafsil</a>
-                    <a href="{% url 'budget:update' b.pk %}" class="btn-sm btn-o">Tahrir</a>
+        <!-- ── 2. Stat cards ──────────────────────────────────────── -->
+        <div class="bd-grid4">
+            <div class="stat-card" style="border-top:3px solid #7c3aed;">
+                <div class="stat-label">Umumiy byudjet</div>
+                <div class="stat-value" style="color:#7c3aed;">{{ b.umumiy_summa|floatformat:0|intcomma }}</div>
+                <div class="stat-sub">so'm</div>
+            </div>
+            <div class="stat-card" style="border-top:3px solid #dc2626;">
+                <div class="stat-label">Jami sarflangan</div>
+                <div class="stat-value" style="color:#dc2626;">{{ jami_sarfi|floatformat:0|intcomma }}</div>
+                <div class="stat-sub">
+                    Chiqim: {{ chiqim_sarfi|floatformat:0|intcomma }}
+                    &nbsp;·&nbsp; Xomashyo: {{ xomashyo_sarfi|floatformat:0|intcomma }}
                 </div>
             </div>
-            {% endwith %}
-            {% endfor %}
+            <div class="stat-card" style="border-top:3px solid #059669;">
+                <div class="stat-label">Qoldiq</div>
+                <div class="stat-value" style="color:{% if qoldiq > 0 %}#059669{% else %}#dc2626{% endif %};">
+                    {{ qoldiq|floatformat:0|intcomma }}
+                </div>
+                <div class="stat-sub">so'm</div>
+            </div>
+            <div class="stat-card" style="border-top:3px solid #f59e0b;">
+                <div class="stat-label">Sarfi foiz</div>
+                <div class="stat-value" style="color:{% if holat == 'xavfsiz' %}#059669{% elif holat == 'ogoh' %}#f59e0b{% else %}#dc2626{% endif %};">
+                    {{ sarfi_foiz }}%
+                </div>
+                <div class="stat-sub">{{ b.davr_boshi|date:"d.m" }} – {{ b.davr_oxiri|date:"d.m.Y" }}</div>
+            </div>
         </div>
-        {% else %}
-        <div style="text-align:center;padding:4rem 1.5rem;color:var(--text-secondary);">
-            <svg width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 56 56" style="opacity:.25;margin-bottom:12px;"><rect x="8" y="8" width="40" height="40" rx="6"/><path d="M8 22h40M22 8v14M34 8v14M18 34h8M18 40h20"/></svg>
-            <p style="font-size:15px;font-weight:600;margin-bottom:8px;">Hali byudjet yo'q</p>
-            <a href="{% url 'budget:create' %}" class="btn-sm btn-p" style="margin-top:12px;display:inline-flex;padding:8px 20px;font-size:13px;">Byudjet yaratish</a>
+
+        <!-- ── 3. Katta progress bar ──────────────────────────────── -->
+        <div class="card">
+            <div class="card-body" style="padding:1.25rem 1.5rem;">
+                <div class="prog-meta">
+                    <span style="font-weight:800;font-size:.95rem;">Byudjet holati</span>
+                    <span class="prog-pct" style="color:{% if holat == 'xavfsiz' %}#059669{% elif holat == 'ogoh' %}#f59e0b{% else %}#dc2626{% endif %}">
+                        {{ sarfi_foiz }}%
+                    </span>
+                </div>
+                <div class="prog-track">
+                    <div class="prog-fill fill-{% if holat == 'xavfsiz' %}safe{% elif holat == 'ogoh' %}ogoh{% elif holat == 'xavfli' %}xavfli{% else %}oshib{% endif %}"
+                         style="width:{{ sarfi_foiz }}%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text-secondary);">
+                    <span>0</span>
+                    <span>{{ b.umumiy_summa|floatformat:0|intcomma }} so'm</span>
+                </div>
+
+                {% if holat == 'oshib_ketdi' %}
+                    <div class="warn warn-red" style="margin-top:12px;">
+                        🚨 Byudjet {{ jami_sarfi|floatformat:0|intcomma }} so'm sarflangan — limitdan oshib ketdi!
+                    </div>
+                {% elif holat == 'xavfli' %}
+                    <div class="warn warn-red" style="margin-top:12px;">
+                        🔴 {{ sarfi_foiz }}% sarflangan — byudjet tugayapti! Faqat {{ qoldiq|floatformat:0|intcomma }} so'm qoldi.
+                    </div>
+                {% elif holat == 'ogoh' %}
+                    <div class="warn warn-yellow" style="margin-top:12px;">
+                        ⚡ {{ sarfi_foiz }}% sarflangan. Qoldiq: {{ qoldiq|floatformat:0|intcomma }} so'm.
+                    </div>
+                {% endif %}
+
+                <!-- Manba taqsimoti -->
+                {% if jami_sarfi > 0 %}
+                <div style="display:flex;gap:16px;margin-top:16px;font-size:12px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="width:10px;height:10px;border-radius:2px;background:#dc2626;flex-shrink:0;display:inline-block;"></span>
+                        <span>Chiqim: <strong>{{ chiqim_sarfi|floatformat:0|intcomma }} so'm</strong></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;flex-shrink:0;display:inline-block;"></span>
+                        <span>Xomashyo: <strong>{{ xomashyo_sarfi|floatformat:0|intcomma }} so'm</strong></span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ── 4. Grafiklar (Tabs) ─────────────────────────────────── -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab(event,'tab-trend')">📈 Kunlik trend</button>
+                <button class="tab-btn" onclick="switchTab(event,'tab-cat')">🍩 Kategoriya</button>
+            </div>
+
+            <div id="tab-trend" class="tab-panel active">
+                <div class="chart-box-lg"><canvas id="chartTrend"></canvas></div>
+            </div>
+            <div id="tab-cat" class="tab-panel">
+                <div class="bd-grid2" style="gap:1rem;">
+                    <div class="chart-box"><canvas id="chartCat"></canvas></div>
+                    <div style="padding:.5rem 0;overflow:auto;max-height:300px;">
+                        {% for r in cats %}
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-color);gap:8px;">
+                            <div style="font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ r.kategoriya|default:"Noaniq" }}
+                                <span class="badge badge-{% if r.manba == 'chiqim' %}chiqim{% else %}xomashyo{% endif %} btn-sm" style="margin-left:4px;">{{ r.manba }}</span>
+                            </div>
+                            <div style="font-size:12px;font-weight:800;white-space:nowrap;color:#dc2626;">
+                                {{ r.jami|floatformat:0|intcomma }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p style="color:var(--text-secondary);font-size:13px;text-align:center;padding:2rem 0;">Ma'lumot yo'q</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 5. Limitlar ──────────────────────────────────────────── -->
+        <div class="card">
+            <div class="card-head">
+                <div class="card-title">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><path d="M2 7h10M7 2v10"/><circle cx="7" cy="7" r="5"/></svg>
+                    Kategoriya limitlari
+                </div>
+                <button class="btn btn-sm btn-p" onclick="toggleLimitForm()">+ Limit qo'shish</button>
+            </div>
+
+            <!-- Limit qo'shish formasi -->
+            <div id="limitForm" style="display:none;padding:1.1rem 1.25rem;background:var(--bg-secondary);border-bottom:1px solid var(--border-color);">
+                <form method="POST" action="3">
+                    {% csrf_token %}
+                    <div class="lf-grid">
+                        <div>
+                            <div class="lf-label">Limit nomi *</div>
+                            <input type="text" name="nomi" class="lf-input" placeholder="Masalan: Maosh xarajatlari" required>
+                        </div>
+                        <div>
+                            <div class="lf-label">Manba</div>
+                            <select name="manba" class="lf-input">
+                                <option value="">Hammasi</option>
+                                <option value="chiqim">Chiqim</option>
+                                <option value="xomashyo">Xomashyo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <div class="lf-label">Kategoriya</div>
+                            <input type="text" name="kategoriya" class="lf-input" list="cat-list" placeholder="Ixtiyoriy">
+                            <datalist id="cat-list">
+                                {% for r in cats %}<option value="{{ r.kategoriya }}">{% endfor %}
+                            </datalist>
+                        </div>
+                        <div>
+                            <div class="lf-label">Limit summasi (so'm) *</div>
+                            <input type="number" name="limit_summa" class="lf-input" min="1" required placeholder="10000000">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:.85rem;">
+                        <button type="submit" class="btn btn-p">✅ Saqlash</button>
+                        <button type="button" class="btn btn-o" onclick="toggleLimitForm()">Bekor</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Limitlar ro'yxati -->
+            {% if limitlar_data %}
+            {% for l in limitlar_data %}
+            <div class="lim-row">
+                <div>
+                    <div class="lim-name">{{ l.obj.nomi }}</div>
+                    <div class="lim-meta">
+                        {% if l.obj.manba %}<span class="badge badge-{% if l.obj.manba == 'chiqim' %}chiqim{% else %}xomashyo{% endif %}" style="font-size:10px;">{{ l.obj.manba }}</span>{% endif %}
+                        {% if l.obj.kategoriya %} &nbsp;· {{ l.obj.kategoriya }}{% endif %}
+                    </div>
+                </div>
+                <div>
+                    <div class="lim-track">
+                        <div class="lim-fill prog-fill fill-{% if l.holat == 'xavfsiz' %}safe{% elif l.holat == 'ogoh' %}ogoh{% elif l.holat == 'xavfli' %}xavfli{% else %}oshib{% endif %}"
+                             style="width:{{ l.foiz }}%"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-secondary);margin-top:3px;">
+                        <span>{{ l.sarfi|floatformat:0|intcomma }}</span>
+                        <span>{{ l.obj.limit_summa|floatformat:0|intcomma }}</span>
+                    </div>
+                </div>
+                <div style="font-weight:800;font-size:13px;color:{% if l.holat == 'xavfsiz' %}#059669{% elif l.holat == 'ogoh' %}#f59e0b{% else %}#dc2626{% endif %}">
+                    {{ l.foiz }}%
+                </div>
+                <div style="font-size:12px;font-weight:700;">
+                    Qoldiq: <span style="color:{% if l.qoldiq > 0 %}#059669{% else %}#dc2626{% endif %}">
+                        {{ l.qoldiq|floatformat:0|intcomma }}
+                    </span>
+                </div>
+                <div>
+                    <a href="{% url 'budget:limit_ochirish' l.obj.pk %}"
+                       class="btn btn-sm btn-danger"
+                       onclick="return confirm('Limitni o\'chirish?')">
+                        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 11 11"><path d="M2 2l7 7M9 2L2 9"/></svg>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div style="text-align:center;padding:2rem;color:var(--text-secondary);font-size:13px;">
+                Hali limit qo'shilmagan
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ── 6. Ishchi sarflari ─────────────────────────────────── -->
+        {% if ishchi_sarflar %}
+        <div class="card">
+            <div class="card-head">
+                <div class="card-title">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><circle cx="5" cy="4" r="2.5"/><path d="M1 12c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5"/><circle cx="10" cy="5" r="2"/><path d="M13 12c0-1.5-1.3-2.5-3-2.5"/></svg>
+                    Ishchilar bo'yicha sarflar
+                </div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="t">
+                    <thead><tr>
+                        <th>#</th>
+                        <th>Ishchi</th>
+                        <th>Sarfi (so'm)</th>
+                        <th>Ulushi</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for ish in ishchi_sarflar %}
+                    <tr>
+                        <td style="color:var(--text-secondary);">{{ forloop.counter }}</td>
+                        <td style="font-weight:700;">{{ ish.ishchi__ism }} {{ ish.ishchi__familiya }}</td>
+                        <td style="font-weight:800;color:#dc2626;">{{ ish.jami|floatformat:0|intcomma }}</td>
+                        <td>
+                            {% if jami_sarfi %}
+                            {% widthratio ish.jami jami_sarfi 100 as ulush %}
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div style="width:80px;height:5px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                    <div style="width:{{ ulush }}%;height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:3px;"></div>
+                                </div>
+                                <span style="font-size:11px;font-weight:700;">{{ ulush }}%</span>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
         {% endif %}
 
+        <!-- ── 7. So'nggi tranzaksiyalar ─────────────────────────── -->
+        <div class="card">
+            <div class="card-head">
+                <div class="card-title">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2"/><path d="M1 5h12M5 1v4"/></svg>
+                    So'nggi tranzaksiyalar
+                </div>
+                <a href="{% url 'budget:tranzaksiyalar' %}" class="btn btn-sm btn-o">Barchasi →</a>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="t">
+                    <thead><tr>
+                        <th>Sana</th>
+                        <th>Tur</th>
+                        <th>Nomi</th>
+                        <th>Kategoriya</th>
+                        <th>Ishchi</th>
+                        <th>Summa (UZS)</th>
+                        <th>Summa (USD)</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for t in so_tranz %}
+                    <tr>
+                        <td style="color:var(--text-secondary);white-space:nowrap;">{{ t.sana|date:"d.m.Y" }}</td>
+                        <td>
+                            <span class="badge badge-{{ t.manba }}">
+                                {% if t.manba == 'chiqim' %}Chiqim{% else %}Xomashyo{% endif %}
+                            </span>
+                        </td>
+                        <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            {{ t.nomi|truncatechars:38 }}
+                        </td>
+                        <td style="color:var(--text-secondary);">{{ t.kategoriya|default:"—" }}</td>
+                        <td style="font-weight:600;">
+                            {% if t.ishchi %}{{ t.ishchi.ism }} {{ t.ishchi.familiya }}
+                            {% elif t.foydalanuvchi %}{{ t.foydalanuvchi.get_full_name|default:t.foydalanuvchi.username }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td style="font-weight:800;color:#dc2626;white-space:nowrap;">
+                            {{ t.summa_uzs|floatformat:0|intcomma }}
+                        </td>
+                        <td style="color:#6b7280;">
+                            {% if t.summa_usd %}<span style="font-weight:700;color:#1d4ed8;">${{ t.summa_usd|floatformat:2 }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+                            Bu davr uchun tranzaksiya yo'q
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div><!-- /.bd-wrap -->
     </div></main>
 </div>
+
+<!-- ── Chart.js ──────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ── Data from Django ────────────────────────────────────────────
+const LABELS   = {{ chart_labels|safe }};
+const C_VALS   = {{ chart_chiqim|safe }};
+const X_VALS   = {{ chart_xomashyo|safe }};
+const CUM_VALS = {{ chart_cum|safe }};
+const CAT_L    = {{ cat_labels|safe }};
+const CAT_V    = {{ cat_vals|safe }};
+const B_LIMIT  = {{ byudjet_limit_j|safe }};
+
+// ── CSS var helper ──────────────────────────────────────────────
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// ── Color palette for donut ─────────────────────────────────────
+const PALETTE = [
+    '#7c3aed','#dc2626','#059669','#f59e0b','#1d4ed8',
+    '#db2777','#0891b2','#65a30d','#9333ea','#ea580c',
+    '#0284c7','#16a34a','#ca8a04','#be123c','#7e22ce',
+];
+
+// ── Trend chart ─────────────────────────────────────────────────
+const trendCtx = document.getElementById('chartTrend').getContext('2d');
+new Chart(trendCtx, {
+    data: {
+        labels: LABELS,
+        datasets: [
+            {
+                type: 'bar',
+                label: 'Chiqim',
+                data: C_VALS,
+                backgroundColor: 'rgba(220,38,38,.7)',
+                borderRadius: 3,
+                yAxisID: 'y',
+                order: 2,
+            },
+            {
+                type: 'bar',
+                label: 'Xomashyo',
+                data: X_VALS,
+                backgroundColor: 'rgba(245,158,11,.7)',
+                borderRadius: 3,
+                yAxisID: 'y',
+                order: 2,
+            },
+            {
+                type: 'line',
+                label: 'Kumulyativ',
+                data: CUM_VALS,
+                borderColor: '#7c3aed',
+                backgroundColor: 'rgba(124,58,237,.08)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: LABELS.length < 20 ? 3 : 0,
+                borderWidth: 2.5,
+                yAxisID: 'y',
+                order: 1,
+            },
+            ...(B_LIMIT > 0 ? [{
+                type: 'line',
+                label: 'Byudjet limiti',
+                data: Array(LABELS.length).fill(B_LIMIT),
+                borderColor: '#dc2626',
+                borderDash: [6,4],
+                borderWidth: 1.5,
+                pointRadius: 0,
+                fill: false,
+                yAxisID: 'y',
+                order: 0,
+            }] : []),
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.parsed.y).toLocaleString('uz')} so'm`,
+                },
+            },
+        },
+        scales: {
+            x: {
+                stacked: true,
+                grid: { display: false },
+                ticks: { font: { size: 10 }, maxRotation: 45 },
+            },
+            y: {
+                stacked: false,
+                grid: { color: 'rgba(0,0,0,.05)' },
+                ticks: {
+                    font: { size: 10 },
+                    callback: (v) => v >= 1_000_000
+                        ? (v/1_000_000).toFixed(1)+'M'
+                        : v >= 1_000 ? (v/1_000).toFixed(0)+'K' : v,
+                },
+            },
+        },
+    },
+});
+
+// ── Donut chart ─────────────────────────────────────────────────
+if (CAT_V.length > 0) {
+    const catCtx = document.getElementById('chartCat').getContext('2d');
+    new Chart(catCtx, {
+        type: 'doughnut',
+        data: {
+            labels: CAT_L,
+            datasets: [{
+                data: CAT_V,
+                backgroundColor: PALETTE.slice(0, CAT_V.length),
+                borderWidth: 2,
+                borderColor: 'var(--bg-card, #fff)',
+                hoverOffset: 8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${Number(ctx.parsed).toLocaleString('uz')} so'm`,
+                    },
+                },
+            },
+        },
+    });
+}
+
+// ── Tab switcher ────────────────────────────────────────────────
+function switchTab(e, id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    e.target.classList.add('active');
+    document.getElementById(id).classList.add('active');
+}
+
+// ── Limit form toggle ───────────────────────────────────────────
+function toggleLimitForm() {
+    const f = document.getElementById('limitForm');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {% endblock %}

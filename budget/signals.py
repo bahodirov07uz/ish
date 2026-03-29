@@ -1,34 +1,63 @@
 # budget/signals.py
 """
-Chiqim va XomashyoHarakat saqlanganda avtomatik Tranzaksiya yaratadi/yangilaydi.
-Qo'lda hech narsa qilish shart emas.
+Chiqim va XomashyoHarakat saqlanganida Tranzaksiya avtomatik yaratiladi/yangilanadi/o'chiriladi.
+
+Ulanish: budget/apps.py → BudgetConfig.ready() ichida import qilinadi.
 """
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from decimal import Decimal
 
 
-# ── CHIQIM → TRANZAKSIYA ─────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
+# CHIQIM → Tranzaksiya
+# ─────────────────────────────────────────────────────────────────
+
 @receiver(post_save, sender='crm.Chiqim')
-def chiqim_tranzaksiya_yarat(sender, instance, created, **kwargs):
+def chiqim_tranzaksiya_sync(sender, instance, created, **kwargs):
+    """
+    Chiqim saqlanganda:
+      - Yangi bo'lsa → Tranzaksiya yaratadi
+      - Mavjud bo'lsa → Tranzaksiyani yangilaydi
+    """
     from .models import Tranzaksiya
 
-    # Kategoriya nomini olish
-    kat = ''
-    if instance.category:
-        kat = instance.category.name
+    # Kategoriya nomini olish (agar mavjud bo'lsa)
+    kategoriya = ''
+    if hasattr(instance, 'category') and instance.category:
+        kategoriya = str(instance.category)
+    elif hasattr(instance, 'tur') and instance.tur:
+        kategoriya = str(instance.tur)
 
-    # Ishchi: created_by user → Ishchi bog'lanishi yo'q,
-    # shuning uchun foydalanuvchini saqlaymiz
-    defaults = {
-        'manba'         : 'chiqim',
-        'summa_uzs'     : instance.price or Decimal('0'),
-        'summa_usd'     : instance.price_usd or Decimal('0'),
-        'nomi'          : instance.name or '—',
-        'kategoriya'    : kat,
-        'sana'          : instance.created,
-        'foydalanuvchi' : instance.created_by,
-    }
+    # Ishchi (agar mavjud bo'lsa)
+    ishchi = getattr(instance, 'ishchi', None)
+
+    # Summa — modelingizga qarab field nomini to'g'rilang
+    summa_uzs = getattr(instance, 'summa', None) or getattr(instance, 'summa_uzs', 0) or getattr(instance,'price',None) or getattr(instance,'price_uzs')
+    summa_usd = getattr(instance, 'summa_usd', None) or getattr(instance,'price_usd',None) or getattr(instance,'price_usd')
+
+    # Sana
+    sana = getattr(instance, 'sana', None) or getattr(instance, 'created_at', None) or getattr(instance,'created',None)
+    if hasattr(sana, 'date'):
+        sana = sana.date()
+
+    # Nomi/tavsif
+    nomi = (
+        getattr(instance, 'nomi', None)
+        or getattr(instance, 'tavsif', None)
+        or getattr(instance, 'izoh', None)
+        or str(instance)
+    )
+
+    defaults = dict(
+        manba='chiqim',
+        ishchi=ishchi,
+        foydalanuvchi=getattr(instance, 'yaratgan', None) or getattr(instance, 'foydalanuvchi', None),
+        summa_uzs=summa_uzs,
+        summa_usd=summa_usd,
+        nomi=nomi[:500],
+        kategoriya=kategoriya[:200],
+        sana=sana,
+    )
 
     Tranzaksiya.objects.update_or_create(
         chiqim=instance,
@@ -37,44 +66,63 @@ def chiqim_tranzaksiya_yarat(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender='crm.Chiqim')
-def chiqim_tranzaksiya_ochir(sender, instance, **kwargs):
+def chiqim_tranzaksiya_delete(sender, instance, **kwargs):
+    """Chiqim o'chirilganda Tranzaksiyani ham o'chiradi (CASCADE bilan ham ishlaydi)."""
     from .models import Tranzaksiya
     Tranzaksiya.objects.filter(chiqim=instance).delete()
 
 
-# ── XOMASHYO HARAKAT → TRANZAKSIYA ──────────────────────────────
+# ─────────────────────────────────────────────────────────────────
+# XOMASHYO HARAKAT → Tranzaksiya
+# (Faqat 'kirim' emas, xarid/chiqim harakatlari uchun)
+# ─────────────────────────────────────────────────────────────────
+
+# Xomashyo harakatining qaysi turlari xarajat hisoblanadi
+XARAJAT_TURLARI = {'xarid', 'purchase', 'kirim_pul', 'chiqim'}  # → modelingizga moslashtiring
+
+
 @receiver(post_save, sender='xomashyo.XomashyoHarakat')
-def xomashyo_tranzaksiya_yarat(sender, instance, created, **kwargs):
-    # Faqat 'kirim' harakati uchun — bu pul chiqimi
-    if instance.harakat_turi != 'kirim':
-        # Kirim bo'lmagan harakatlar uchun tranzaksiya o'chiriladi (agar bor bo'lsa)
-        from .models import Tranzaksiya
+def xomashyo_tranzaksiya_sync(sender, instance, created, **kwargs):
+    """
+    XomashyoHarakat saqlanganda:
+      - Xarid/pul chiqimi bo'lsa → Tranzaksiya yaratadi/yangilaydi
+      - Boshqa tur bo'lsa → mavjud tranzaksiyani o'chiradi
+    """
+    from .models import Tranzaksiya
+
+    # Harakat turi xarajatga tegishlimi?
+    harakat_tur = str(getattr(instance, 'harakat_tur', '') or getattr(instance, 'tur', '') or '')
+    summa_uzs   = getattr(instance, 'narx', None) or getattr(instance, 'summa', None) or getattr(instance, 'summa_uzs', 0) or 0
+    summa_usd   = getattr(instance, 'narx_usd', None) or getattr(instance, 'summa_usd', None)
+
+    # Agar summa 0 yoki harakat xarajat emas → tranzaksiyani o'chir
+    is_xarajat = (harakat_tur in XARAJAT_TURLARI) or (float(summa_uzs) > 0)
+    if not is_xarajat:
         Tranzaksiya.objects.filter(xomashyo_harakat=instance).delete()
         return
 
-    from .models import Tranzaksiya
+    xomashyo = getattr(instance, 'xomashyo', None)
+    kategoriya = str(xomashyo) if xomashyo else ''
 
-    # Xomashyo nomi
-    nomi = ''
-    if instance.xomashyo:
-        nomi = instance.xomashyo.nomi
-    elif instance.xomashyo_variant:
-        nomi = str(instance.xomashyo_variant)
+    sana = getattr(instance, 'sana', None) or getattr(instance, 'created_at', None) or getattr(instance, 'created', None)
+    if hasattr(sana, 'date'):
+        sana = sana.date()
 
-    # Kategoriya
-    kat = ''
-    if instance.xomashyo and instance.xomashyo.category:
-        kat = instance.xomashyo.category.name
+    nomi = (
+        getattr(instance, 'izoh', None)
+        or (f"{xomashyo} xaridi" if xomashyo else 'Xomashyo xaridi')
+    )
 
-    defaults = {
-        'manba'           : 'xomashyo',
-        'summa_uzs'       : instance.jami_narx_uzs or Decimal('0'),
-        'summa_usd'       : instance.jami_narx_usd or Decimal('0'),
-        'nomi'            : f"Xomashyo: {nomi} ({instance.miqdori} {instance.xomashyo.get_olchov_birligi_display() if instance.xomashyo else ''})",
-        'kategoriya'      : kat,
-        'sana'            : instance.sana,
-        'foydalanuvchi'   : instance.foydalanuvchi,
-    }
+    defaults = dict(
+        manba='xomashyo',
+        ishchi=None,
+        foydalanuvchi=getattr(instance, 'yaratgan', None) or getattr(instance, 'foydalanuvchi', None),
+        summa_uzs=summa_uzs,
+        summa_usd=summa_usd,
+        nomi=str(nomi)[:500],
+        kategoriya=kategoriya[:200],
+        sana=sana,
+    )
 
     Tranzaksiya.objects.update_or_create(
         xomashyo_harakat=instance,
@@ -83,6 +131,7 @@ def xomashyo_tranzaksiya_yarat(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender='xomashyo.XomashyoHarakat')
-def xomashyo_tranzaksiya_ochir(sender, instance, **kwargs):
+def xomashyo_tranzaksiya_delete(sender, instance, **kwargs):
+    """XomashyoHarakat o'chirilganda Tranzaksiyani ham o'chiradi."""
     from .models import Tranzaksiya
     Tranzaksiya.objects.filter(xomashyo_harakat=instance).delete()

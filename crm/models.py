@@ -623,7 +623,7 @@ class Sotuv(models.Model):
             ('qisman', 'Qisman to\'landi'),
             ('tolanmadi', 'To\'lanmadi'),
         ],
-        default='tolandi',
+        default='tolanmadi',
         verbose_name="To'lov holati"
     )
     izoh = models.TextField(blank=True, null=True, verbose_name="Izoh")

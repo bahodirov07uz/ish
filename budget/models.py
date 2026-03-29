@@ -14,13 +14,12 @@ class Tranzaksiya(models.Model):
     Qo'lda yaratilmaydi.
     """
     MANBA = [
-        ('chiqim',    'Chiqim'),
-        ('xomashyo',  'Xomashyo xaridi'),
+        ('chiqim',   'Chiqim'),
+        ('xomashyo', 'Xomashyo xaridi'),
     ]
 
-    # Manba
-    manba           = models.CharField(max_length=20, choices=MANBA, verbose_name="Manba")
-    chiqim          = models.OneToOneField(
+    manba = models.CharField(max_length=20, choices=MANBA, verbose_name="Manba")
+    chiqim = models.OneToOneField(
         'crm.Chiqim', on_delete=models.CASCADE,
         null=True, blank=True, related_name='tranzaksiya',
         verbose_name="Chiqim"
@@ -31,32 +30,34 @@ class Tranzaksiya(models.Model):
         verbose_name="Xomashyo harakati"
     )
 
-    # Kim amalga oshirdi
-    ishchi          = models.ForeignKey(
+    ishchi = models.ForeignKey(
         'crm.Ishchi', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='tranzaksiyalar',
         verbose_name="Ishchi"
     )
-    foydalanuvchi   = models.ForeignKey(
+    foydalanuvchi = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, verbose_name="Foydalanuvchi"
     )
 
-    # Summa
-    summa_uzs       = models.DecimalField(max_digits=20, decimal_places=2, default=0)
-    summa_usd       = models.DecimalField(max_digits=20, decimal_places=4, default=0, null=True, blank=True)
+    summa_uzs = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    summa_usd = models.DecimalField(max_digits=20, decimal_places=4, default=0, null=True, blank=True)
 
-    # Tavsif (manba modeldan ko'chiriladi)
-    nomi            = models.CharField(max_length=500, verbose_name="Nomi/Tavsif")
-    kategoriya      = models.CharField(max_length=200, blank=True, verbose_name="Kategoriya")
+    nomi      = models.CharField(max_length=500, verbose_name="Nomi/Tavsif")
+    kategoriya = models.CharField(max_length=200, blank=True, verbose_name="Kategoriya")
 
-    sana            = models.DateField(verbose_name="Sana")
-    created_at      = models.DateTimeField(auto_now_add=True)
+    sana       = models.DateField(verbose_name="Sana",default=timezone.now())
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name        = "Tranzaksiya"
         verbose_name_plural = "Tranzaksiyalar"
         ordering            = ['-sana', '-created_at']
+        indexes = [
+            models.Index(fields=['sana']),
+            models.Index(fields=['manba']),
+            models.Index(fields=['kategoriya']),
+        ]
 
     def __str__(self):
         return f"{self.sana} | {self.nomi} | {self.summa_uzs:,.0f} so'm"
@@ -67,16 +68,16 @@ class Byudjet(models.Model):
     Davr uchun pul limiti.
     Sarflar Tranzaksiya modelidan avtomatik hisoblanadi.
     """
-    nomi            = models.CharField(max_length=255)
-    davr_boshi      = models.DateField()
-    davr_oxiri      = models.DateField()
-    umumiy_summa    = models.DecimalField(max_digits=20, decimal_places=2)
-    izoh            = models.TextField(blank=True)
-    yaratgan        = models.ForeignKey(
+    nomi         = models.CharField(max_length=255)
+    davr_boshi   = models.DateField()
+    davr_oxiri   = models.DateField()
+    umumiy_summa = models.DecimalField(max_digits=20, decimal_places=2)
+    izoh         = models.TextField(blank=True)
+    yaratgan     = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True
     )
-    created_at      = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name        = "Byudjet"
@@ -86,31 +87,46 @@ class Byudjet(models.Model):
     def __str__(self):
         return f"{self.nomi} ({self.davr_boshi} – {self.davr_oxiri})"
 
-    # ── Hisoblangan xususiyatlar ──────────────────────────────────
-
     def _tranzaksiyalar(self):
+        """Byudjet davriga tegishli barcha tranzaksiyalar."""
         return Tranzaksiya.objects.filter(
             sana__gte=self.davr_boshi,
             sana__lte=self.davr_oxiri,
         )
 
+    # ── Aggregat xususiyatlar (har biri bitta DB query) ──────────
+
+    def get_sarflar(self) -> dict:
+        """
+        Barcha summalarni BITTA query bilan qaytaradi.
+        Natija: {'jami': Decimal, 'chiqim': Decimal, 'xomashyo': Decimal}
+        """
+        from django.db.models import Case, When, DecimalField
+
+        result = self._tranzaksiyalar().aggregate(
+            jami=Coalesce(Sum('summa_uzs'), Value(Decimal('0')), output_field=DecimalField()),
+            chiqim=Coalesce(
+                Sum('summa_uzs', filter=models.Q(manba='chiqim')),
+                Value(Decimal('0')), output_field=DecimalField()
+            ),
+            xomashyo=Coalesce(
+                Sum('summa_uzs', filter=models.Q(manba='xomashyo')),
+                Value(Decimal('0')), output_field=DecimalField()
+            ),
+        )
+        return result
+
     @property
     def jami_sarfi(self) -> Decimal:
-        return self._tranzaksiyalar().aggregate(
-            s=Coalesce(Sum('summa_uzs'), Value(Decimal('0')))
-        )['s']
+        return self.get_sarflar()['jami']
 
     @property
     def chiqim_sarfi(self) -> Decimal:
-        return self._tranzaksiyalar().filter(manba='chiqim').aggregate(
-            s=Coalesce(Sum('summa_uzs'), Value(Decimal('0')))
-        )['s']
+        return self.get_sarflar()['chiqim']
 
     @property
     def xomashyo_sarfi(self) -> Decimal:
-        return self._tranzaksiyalar().filter(manba='xomashyo').aggregate(
-            s=Coalesce(Sum('summa_uzs'), Value(Decimal('0')))
-        )['s']
+        return self.get_sarflar()['xomashyo']
 
     @property
     def qoldiq(self) -> Decimal:
@@ -154,25 +170,33 @@ class Byudjet(models.Model):
 
 
 class ByudjetLimit(models.Model):
-    """Kategoriya yoki manba bo'yicha limit — ixtiyoriy."""
-    byudjet         = models.ForeignKey(Byudjet, on_delete=models.CASCADE, related_name='limitlar')
-    nomi            = models.CharField(max_length=200, verbose_name="Limit nomi")
-    # Filtr: manba va/yoki kategoriya nomi bo'yicha
-    manba           = models.CharField(
-        max_length=20, blank=True,
-        choices=[('chiqim', 'Chiqim'), ('xomashyo', 'Xomashyo'), ('', 'Barchasi')],
-        default=''
-    )
-    kategoriya      = models.CharField(max_length=200, blank=True, help_text="Bo'sh = barcha kategoriyalar")
-    limit_summa     = models.DecimalField(max_digits=20, decimal_places=2)
+    """
+    Byudjet ichidagi kategoriya/manba bo'yicha limit.
+    haqiqiy_sarfi Tranzaksiyadan hisoblanadi.
+    """
+    MANBA = [
+        ('chiqim',   'Chiqim'),
+        ('xomashyo', 'Xomashyo xaridi'),
+        ('',         'Hammasi'),
+    ]
+
+    byudjet     = models.ForeignKey(Byudjet, on_delete=models.CASCADE, related_name='limitlar')
+    nomi        = models.CharField(max_length=255, verbose_name="Limit nomi")
+    manba       = models.CharField(max_length=20, choices=MANBA, blank=True, verbose_name="Manba filtri")
+    kategoriya  = models.CharField(max_length=200, blank=True, verbose_name="Kategoriya filtri")
+    limit_summa = models.DecimalField(max_digits=20, decimal_places=2, verbose_name="Limit (so'm)")
+    created_at  = models.DateTimeField(default=timezone.now())
 
     class Meta:
-        verbose_name = "Byudjet limiti"
+        verbose_name        = "Byudjet limiti"
+        verbose_name_plural = "Byudjet limitlari"
+        ordering            = ['-limit_summa']
 
     def __str__(self):
-        return f"{self.byudjet} → {self.nomi}: {self.limit_summa:,.0f}"
+        return f"{self.byudjet.nomi} — {self.nomi}: {self.limit_summa:,.0f}"
 
-    def _qs(self):
+    def _tranzaksiyalar(self):
+        """Limit shartlariga mos tranzaksiyalar."""
         qs = Tranzaksiya.objects.filter(
             sana__gte=self.byudjet.davr_boshi,
             sana__lte=self.byudjet.davr_oxiri,
@@ -185,7 +209,7 @@ class ByudjetLimit(models.Model):
 
     @property
     def haqiqiy_sarfi(self) -> Decimal:
-        return self._qs().aggregate(
+        return self._tranzaksiyalar().aggregate(
             s=Coalesce(Sum('summa_uzs'), Value(Decimal('0')))
         )['s']
 
@@ -202,3 +226,7 @@ class ByudjetLimit(models.Model):
         if f >= 90:  return 'xavfli'
         if f >= 75:  return 'ogoh'
         return 'xavfsiz'
+
+    @property
+    def qoldiq(self) -> Decimal:
+        return max(self.limit_summa - self.haqiqiy_sarfi, Decimal('0'))

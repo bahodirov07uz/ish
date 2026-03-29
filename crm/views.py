@@ -239,7 +239,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         context['ishlar'] = m.Ish.objects.filter(ishchi=ishchi, status='yangi')
         test = ishchi.umumiy_oylik()
         # Avanslarni qo'shamiz
-        avanslar = m.Avans.objects.filter(ishchi=ishchi).order_by('-created')
+        avanslar = m.Avans.objects.filter(ishchi=ishchi,is_active=True).order_by('-created')
 
        
         total_avans = avanslar.aggregate(Sum('amount'))['amount__sum'] or 0
@@ -2063,6 +2063,8 @@ def kirim_qoshish(request):
         'now_iso': timezone.now().strftime('%Y-%m-%dT%H:%M'),
     }
     return render(request, 'kirim_qoshish.html', context)
+
+
 # ==================== XARIDORLAR ====================
 
 class XaridorListView(LoginRequiredMixin, ListView):
