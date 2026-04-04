@@ -173,8 +173,8 @@ class SotuvItemInline(admin.TabularInline):
 class SotuvAdmin(ImportExportModelAdmin):
     """Sotuv admin paneli"""
     resource_class = SotuvResource
-    list_display = ('id', 'xaridor', 'jami_summa', 'jami_summa_usd', 'yakuniy_summa', 'tolov_holati', 'sana')
-    list_filter = ('tolov_holati', 'sana')
+    list_display = ('id', 'xaridor', 'jami_summa', 'jami_summa_usd','tolangan_summa', 'tolov_holati', 'sana')
+    list_filter = ('tolov_holati', 'sana','xaridor__ism')
     search_fields = ('xaridor__ism', 'xaridor__telefon', 'id')
     readonly_fields = ('jami_summa', 'yakuniy_summa', 'created_at', 'updated_at')
     date_hierarchy = 'sana'
@@ -232,9 +232,9 @@ class SotuvItemAdmin(ImportExportModelAdmin):
 @admin.register(Kirim)
 class KirimAdmin(admin.ModelAdmin):
     list_display = ( 'xaridor', 'summa', 'sana')
-    list_filter = ('sana',)
+    list_filter = ('sana','xaridor__ism')
     search_fields = ('xaridor__ism',)
-    readonly_fields = ('summa', 'sana')
+    readonly_fields = ('summa',)
     list_per_page = 20
 
 @admin.register(IshXomashyo)

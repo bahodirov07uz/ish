@@ -1,10 +1,6 @@
 import requests
 from decimal import Decimal
 
-# ================================================================
-# UTILITY: CBU dan USD kurs olish
-# ================================================================
-
 def get_usd_rate():
     """CBU dan USD kursini olish"""
     try:

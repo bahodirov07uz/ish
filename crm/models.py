@@ -176,6 +176,7 @@ class Oyliklar(models.Model):
     )
     oylik = models.IntegerField(null=True, verbose_name="Oylik")
     yopilgan = models.BooleanField(default=False, verbose_name="Yopilgan")
+    hisoblangan = models.IntegerField(null=True, verbose_name="Hisoblangan oylik") 
 
  
 
@@ -425,7 +426,7 @@ class Ish(models.Model):
                 self.narxi = self.mahsulot.narx_zakatovka * int(self.soni)
             elif self.ishchi.turi.nomi == "kroy":
                 self.narxi = self.mahsulot.narx_kroy * int(self.soni)
-            elif self.ishchi.turi.nomi == "pardozchi":
+            elif self.ishchi.turi.nomi == "pardozchi" or 'pardoz':
                 self.narxi = self.mahsulot.narx_pardoz * int(self.soni)
             elif self.ishchi.turi.nomi == "rezak":
                 self.narxi = self.mahsulot.narx_rezak * int(self.soni)
@@ -732,12 +733,19 @@ class SotuvItem(models.Model):
         # Sotuv kursidan foydalanish
         usd_kurs = self.sotuv.usd_kurs if self.sotuv.usd_kurs else Decimal('0')
         
+        narx =  Decimal(str(self.narx or 0))
+        miqdor = int(self.miqdor or 0)
+
+
         # Narxni hisoblash (valyutaga qarab)
         if self.narx_turi == 'usd' and usd_kurs > 0:
-            self.narx_usd = self.narx  # narx USD da saqlangan
-            self.narx = round(Decimal(str(self.narx)) * usd_kurs, 2)  # so'mga aylantirish
+            self.narx_usd = self.narx 
+            self.narx = round(Decimal(str(self.narx)) * usd_kurs, 2) 
         elif usd_kurs > 0:
             self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
+        
+        narx = Decimal(str(self.narx or 0))
+        
         
         # Jami summalar
         self.jami = Decimal(str(self.narx)) * Decimal(str(self.miqdor))

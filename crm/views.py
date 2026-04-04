@@ -123,30 +123,53 @@ def oylik_yopish(request, pk):
             messages.warning(request, 'Oylik allaqachon yopilgan!')
             return redirect('main:employee_detail', pk=pk)
 
-        # Tranzaksiya ichida bajarish: birortasi xato bo'lsa, hech narsa saqlanmaydi
-        with transaction.atomic():
-            ishlari = m.Ish.objects.filter(ishchi=ishchi, status='active') # Faqat aktivlarini olish
-            umumiy_oylik = sum(ish.narxi for ish in ishlari)
+        try:
+            berilgan = int(request.POST.get('berilgan_summa', 0))
+        except (ValueError, TypeError):
+            berilgan = 0
 
-            oylik_yozuv = m.Oyliklar.objects.create(
+        with transaction.atomic():
+            ishlari = m.Ish.objects.filter(ishchi=ishchi, status='active')
+            hisoblangan = sum(ish.narxi for ish in ishlari)
+
+            # Avanslarni yopish (oylikdan alohida, lekin shu vaqtda yopiladi)
+            aktiv_avanslar = m.Avans.objects.filter(ishchi=ishchi, is_active=True)
+            aktiv_avanslar.update(is_active=False, ended=timezone.now().date())
+
+            m.Oyliklar.objects.create(
                 ishchi=ishchi,
-                oylik=umumiy_oylik,
-                berilgan=0, # Avvalgi so'rovingizdagi yangi maydon
-                yopilgan=True
+                hisoblangan=hisoblangan,
+                oylik=berilgan,        # admin kiritgan summa
+                yopilgan=True,
             )
 
-            
-            # Faqat shu ishchining ishlarini yopish!
             ishlari.update(status='yopilgan')
 
-            # Ishchi holatini yangilash
-            ishchi.oldingi_oylik = umumiy_oylik
+            if berilgan > 0:
+                oylik_turi = m.ChiqimTuri.objects.filter(name__iexact='oylik').first()
+                chiqim = m.Chiqim.objects.create(
+                    name=f"{ishchi.ism} {ishchi.familiya} — oylik ({timezone.now().strftime('%m.%Y')})",
+                    category=oylik_turi,
+                    price=berilgan,
+                    created_by=request.user,
+                )
+                m.ChiqimItem.objects.create(
+                    chiqim=chiqim,
+                    item_turi='oylik',
+                    name=f"{ishchi.ism} {ishchi.familiya} oyligi",
+                    price_uzs=berilgan,
+                )
+
             ishchi.is_oylik_open = False
             ishchi.save()
 
-        messages.success(request, f'✅ {ishchi.ism} uchun oylik yopildi!')
+        messages.success(
+            request,
+            f'✅ Oylik yopildi! Hisoblangan: {hisoblangan:,} so\'m | Berilgan: {berilgan:,} so\'m'
+        )
 
     return redirect('main:employee_detail', pk=pk)
+
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
@@ -221,33 +244,28 @@ class EmployeeUpdateView(AdminRequiredMixin, UpdateView):
         messages.success(self.request, '✅ Ma\'lumotlar yangilandi!')
         return super().form_valid(form)
 
-
 class EmployeeDetailView(LoginRequiredMixin, DetailView):
-    """Ishchi tafsilotlari - Barcha login qilgan foydalanuvchilar"""
     model = m.Ishchi
     template_name = "employee_detail.html"
     context_object_name = "ishchi"
     login_url = 'account_login'
-    
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         ishchi = self.object
-        test  = ishchi.umumiy_oylik()
+
+        hisoblangan = ishchi.umumiy_oylik()
+
+        avanslar = m.Avans.objects.filter(ishchi=ishchi).order_by('-created')
+        aktiv_avanslar = avanslar.filter(is_active=True)
+        total_avans = aktiv_avanslar.aggregate(Sum('amount'))['amount__sum'] or 0
+
         context['oy_stat'] = ishchi.oy_mahsulotlar()
         context['ish_soni'] = m.Ish.objects.filter(ishchi=ishchi, status='yangi').aggregate(total=Sum('soni'))
         context['ishlar'] = m.Ish.objects.filter(ishchi=ishchi, status='yangi')
-        test = ishchi.umumiy_oylik()
-        # Avanslarni qo'shamiz
-        avanslar = m.Avans.objects.filter(ishchi=ishchi,is_active=True).order_by('-created')
-
-       
-        total_avans = avanslar.aggregate(Sum('amount'))['amount__sum'] or 0
-
-        # Context'ga uzatish
         context['avanslar'] = avanslar
-        context['beriladi'] = test - total_avans
-        context['total_avans'] = total_avans        
+        context['hisoblangan'] = hisoblangan
+        context['total_avans'] = total_avans
         context['is_admin'] = is_admin(self.request.user)
         return context
 

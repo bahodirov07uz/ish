@@ -15,7 +15,6 @@ from crm.models import Chiqim,ChiqimItem
 from xomashyo.models import XomashyoHarakat
 from crm.models import Ish,Product
 
-# Masalan, TAPCH-01 mahsuloti uchun
-mahsulot = Product.objects.get(nomi="TAPCH-01")
-jami = Ish.objects.filter(mahsulot=mahsulot, ishchi__turi__nomi="kosib").aggregate(Sum('soni'))
-print(f"Jami kosiblar tikkan TAPCH-01 soni: {jami['soni__sum']}")
+ishlar = Ish.objects.filter(status='yangi')
+
+ishlar.update(status='yopilgan')

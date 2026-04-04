@@ -488,7 +488,7 @@ class IshchiChekView(LoginRequiredMixin, View):
             topMargin=10*mm,   bottomMargin=10*mm,
         )
  
-        BD  = colors.HexColor('#1d4ed8')
+        BD  = colors.HexColor("#ffffff")
         BL  = colors.HexColor('#eff6ff')
         GR  = colors.HexColor('#059669')
         GRL = colors.HexColor('#f0fdf4')
@@ -518,12 +518,12 @@ class IshchiChekView(LoginRequiredMixin, View):
         # ── 1. HEADER ──────────────────────────────────────────────
         hdr = Table([[
             p(f"{ishchi.ism} {ishchi.familiya}",
-              fs=13, fn='Helvetica-Bold', tc=colors.white),
+              fs=13, fn='Helvetica-Bold', tc=colors.black),
             p("OYLIK CHEK",
-              fs=13, fn='Helvetica-Bold', tc=colors.white, al=TA_CENTER),
+              fs=13, fn='Helvetica-Bold', tc=colors.black, al=TA_CENTER),
             p(f"{ishchi.turi.nomi if ishchi.turi else ''}  "
               f"<font size=8 color='#bfdbfe'>{date.today().strftime('%d.%m.%Y')}</font>",
-              fs=9, fn='Helvetica-Bold', tc=colors.white, al=TA_RIGHT),
+              fs=9, fn='Helvetica-Bold', tc=colors.black, al=TA_RIGHT),
         ]], colWidths=[70*mm, 76*mm, 40*mm])
         hdr.setStyle(TableStyle([
             ('BACKGROUND',    (0,0),(-1,-1), BD),
@@ -562,9 +562,9 @@ class IshchiChekView(LoginRequiredMixin, View):
         last_i = len(rows)
         rows.append([
             p('', fs=7), p('', fs=7),
-            p('JAMI:', fs=8, fn='Helvetica-Bold', tc=BD, al=TA_RIGHT),
-            p(f"{total_soni} ta", fs=8, fn='Helvetica-Bold', tc=BD, al=TA_CENTER),
-            p(f"{fmt(total_summa)} so'm", fs=9, fn='Helvetica-Bold', tc=BD, al=TA_RIGHT),
+            p('JAMI:', fs=8, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT),
+            p(f"{total_soni} ta", fs=8, fn='Helvetica-Bold', tc=BK, al=TA_CENTER),
+            p(f"{fmt(total_summa)} so'm", fs=9, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT),
         ])
  
         ish_t = Table(rows, colWidths=COL_ISH)
@@ -636,7 +636,7 @@ class IshchiChekView(LoginRequiredMixin, View):
         q_label = "Berilishi kerak:" if qoldi >= 0 else "Ortiqcha olgan:"
  
         xulosa = Table([
-            [p("HISOB-KITOB", fs=8, fn='Helvetica-Bold', tc=BD), ''],
+            [p("HISOB-KITOB", fs=8, fn='Helvetica-Bold', tc=BK), ''],
             [p("Ishlagan:",   fs=7, tc=GT),
              p(f"{fmt(total_summa)} so'm", fs=9, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT)],
             [p("Avans:",      fs=7, tc=GT),
@@ -679,7 +679,7 @@ class IshchiChekView(LoginRequiredMixin, View):
         # Jami: 93 + 93 = 186mm
         imzo = Table([[
             Table([
-                [p("Ishchi:", fs=8, fn='Helvetica-Bold')],
+                [p("Xodim:", fs=8, fn='Helvetica-Bold')],
                 [p(f"{ishchi.ism} {ishchi.familiya}", fs=9, fn='Helvetica-Bold')],
                 [Spacer(1, 6*mm)],
                 [p("Imzo: _______________________", fs=8, tc=GT)],
