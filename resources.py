@@ -1,6 +1,6 @@
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
-from crm.models import Ishchi, IshchiCategory,Product,ProductVariant,Category,Ish,Chiqim,Kirim,ChiqimTuri,Sotuv,Xaridor,SotuvItem
+from crm.models import Ishchi, IshchiCategory,Product,ProductVariant,Category,Ish,Chiqim,Avans,ChiqimTuri,Sotuv,Xaridor,SotuvItem
 from xomashyo.models import Xomashyo, XomashyoCategory, YetkazibBeruvchi,XomashyoHarakat,XomashyoVariant
 from django.conf import settings
 
@@ -54,6 +54,7 @@ class ProductResource(resources.ModelResource):
             'narx_zakatovka',
             'narx_kroy',
             'narx_pardoz',
+            'narx_rezak',
             'teri_sarfi',
             'astar_sarfi',
         )
@@ -228,3 +229,17 @@ class SotuvItemResource(resources.ModelResource):
         except ValueError as e:
             # Xatolik bo'lsa import jarayonini to'xtatadi va xabarni ko'rsatadi
             raise Exception(f"Qatorda xatolik: {str(e)}")
+        
+        
+class AvansResource(resources.ModelResource):
+    ishchi = fields.Field(
+        column_name="ishchi",
+        attribute="ishchi",
+        widget=ForeignKeyWidget(Ishchi,"ism")
+    )
+    
+    class Meta:
+        model = Avans
+        fields = (
+            'id','ishchi','amount','created','ended','is_active'
+        )

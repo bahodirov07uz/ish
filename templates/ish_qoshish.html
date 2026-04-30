@@ -528,6 +528,18 @@ function _signal(key) {
 }
 
 // ============================================================================
+// YORDAMCHI: selectda birinchi real optionni tanlash va change eventini yuborish
+// ============================================================================
+function _autoSelectFirst(select) {
+    // index 0 = bo'sh placeholder, index 1 = birinchi real option
+    if (select.options.length > 1) {
+        select.selectedIndex = 1;
+        // change eventini chiqarish — boshqa listenerlar (variant yuklash va h.k.) ishlashi uchun
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+// ============================================================================
 // AJAX FUNKSIYALAR — global scope, bitta joyda, AbortController bilan
 // ============================================================================
 function loadKroyXomashyolar(mahsulotId, rowNum) {
@@ -543,12 +555,13 @@ function loadKroyXomashyolar(mahsulotId, rowNum) {
                 data.xomashyolar.forEach(x => {
                     select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
                 });
+                // ✅ AUTO-SELECT: birinchi real optionni tanlash
+                _autoSelectFirst(select);
             } else {
                 select.innerHTML += '<option value="">❌ Kroy jarayoni yo\'q (mustaqil ish tanlang)</option>';
             }
             const pv = select.dataset.pendingValue;
             if (pv) { select.value = pv; delete select.dataset.pendingValue; }
-            // SearchableSelect UI ni yangilash (loop yo'q — dispatchEvent chaqirilmaydi)
             if (window.ssRefreshSelect) window.ssRefreshSelect(select);
         })
         .catch(e => { if (e.name !== 'AbortError') console.error(e); });
@@ -567,6 +580,8 @@ function loadZakatovkaXomashyolar(mahsulotId, rowNum) {
                 data.xomashyolar.forEach(x => {
                     select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
                 });
+                // ✅ AUTO-SELECT: birinchi real optionni tanlash
+                _autoSelectFirst(select);
             } else {
                 select.innerHTML += '<option value="">❌ Zakatovka yo\'q (mustaqil ish tanlang)</option>';
             }
@@ -807,7 +822,6 @@ function createNewVariant(rowNum) {
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function () {
     // Bugungi sana
-    // toISOString() UTC beradi — Toshkent UTC+5 bo'lgani uchun lokal vaqt ishlatamiz
     const _now = new Date();
     const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
     document.querySelectorAll('.date-input').forEach(inp => inp.value = today);

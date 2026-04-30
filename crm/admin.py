@@ -3,12 +3,13 @@ from django.contrib.auth.admin import UserAdmin
 from django import forms
 from import_export.admin import ImportExportModelAdmin
 from import_export.admin import ExportMixin
+from django.contrib.humanize.templatetags.humanize import intcomma
 from .models import (
     Category, Product, ProductVariant, IshchiCategory, Ishchi,
     Oyliklar, EskiIsh, Ish, ChiqimTuri, Chiqim, Xaridor, Sotuv, Kirim,IshXomashyo,Feature,Avans,TeriSarfi,SotuvItem,ChiqimItem
 )
 
-from resources import IshchiResource,ProductResource,ProductVariantResource,IshResource,ChiqimResource,SotuvResource,SotuvItemResource
+from resources import IshchiResource,ProductResource,ProductVariantResource,IshResource,ChiqimResource,SotuvResource,SotuvItemResource,AvansResource
 from crm.periodfilter import Last15DaysFilter
 
 class ProductVariantInline(admin.TabularInline):
@@ -78,7 +79,7 @@ class IshchiAdmin(ImportExportModelAdmin):
 class OyliklarAdmin(admin.ModelAdmin):
     list_display = ('ishchi', 'sana', 'oylik', 'yopilgan')
     autocomplete_fields = ["ishchi"]
-    list_filter = ('sana', 'yopilgan')
+    list_filter = ('sana', 'yopilgan','ishchi__ism')
     search_fields = ('ishchi__ism', 'ishchi__familiya')
     list_per_page = 20
     def formfield_for_dbfield(self, db_field, **kwargs):
@@ -111,7 +112,8 @@ class IshAdmin(ImportExportModelAdmin):
 
 
 @admin.register(Avans)
-class AvansAdmin(admin.ModelAdmin):
+class AvansAdmin(ImportExportModelAdmin):
+    resource_classes = [AvansResource]
     list_display = ('name',)
     search_fields = ('name',)
     list_per_page = 20
@@ -185,7 +187,7 @@ class SotuvAdmin(ImportExportModelAdmin):
             'fields': ('xaridor', 'tolov_holati', 'sana','tolangan_summa')
         }),
         ('Summa', {
-            'fields': ('jami_summa', 'chegirma', 'yakuniy_summa','jami_summa_usd')
+            'fields': ('jami_summa', 'chegirma', 'yakuniy_summa','jami_summa_usd','usd_kurs')
         }),
         ('Qo\'shimcha', {
             'fields': ('izoh', 'created_at', 'updated_at'),
@@ -231,11 +233,14 @@ class SotuvItemAdmin(ImportExportModelAdmin):
     
 @admin.register(Kirim)
 class KirimAdmin(admin.ModelAdmin):
-    list_display = ( 'xaridor', 'summa', 'sana')
+    list_display = ( 'xaridor', 'formatted_summa', 'sana','usd_kurs')
     list_filter = ('sana','xaridor__ism')
     search_fields = ('xaridor__ism',)
     readonly_fields = ('summa',)
     list_per_page = 20
+    @admin.display(description='Summa') # Ustun sarlavhasi
+    def formatted_summa(self, obj):
+        return f"{intcomma(obj.summa)} so'm"
 
 @admin.register(IshXomashyo)
 class IshXomashyoAdmin(admin.ModelAdmin):

@@ -21,11 +21,11 @@ urlpatterns = [
 
     path('jarayon-hisobot/', views.jarayon_xomashyo_hisobot, name='jarayon_hisobot'),
 
-    path('taminlash/', views.TaminlashView.as_view(), name='taminlash'),
-    path('taminlash/qoshish/', views.TaminlashQushishView.as_view(), name='taminlash_qoshish'),
-    path('taminlash/<int:taminlash_id>/', views.TaminlashDetailView.as_view(), name='taminlash_detail'),
-    path('taminlash/<int:taminlash_id>/qaytarish/', views.TaminlashQaytarishView.as_view(), name='taminlash_qaytarish'),
-    path('taminlash/item/<int:item_id>/qaytarish/', views.TaminlashItemQaytarishView.as_view(), name='taminlash_item_qaytarish'),
+    path('yetkazib-beruvchilar/', views.YetkazibBeruvchilarView.as_view(), name='yb_list'),
+    path('yetkazib-beruvchi/<int:yb_id>/', views.yetkazib_beruvchi_detail, name='yb_detail'),
+    path('yetkazib-beruvchi/<int:yb_id>/avto-tolov/', views.yb_avto_tolov, name='yb_avto_tolov'),
+    path('yetkazib-beruvchi/<int:yb_id>/harakat/<int:harakat_id>/tolov/', views.yb_harakat_tolov, name='yb_harakat_tolov'),
+
 
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

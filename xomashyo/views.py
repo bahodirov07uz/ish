@@ -5,7 +5,7 @@ from django.views.generic import ListView,DetailView,View
 from django.db.models import Sum,F,DecimalField, Q
 from datetime import date,datetime
 import decimal
-from decimal import Decimal
+from decimal import Decimal,ROUND_DOWN
 from django.db import transaction
 from django.contrib.auth.decorators import login_required,user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
@@ -14,7 +14,7 @@ from django.utils.decorators import method_decorator
 
 from django.db.models.functions import Coalesce
 from crm.models import Chiqim, ChiqimTuri,Ishchi,ChiqimItem
-from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,Taminlash,TaminlashItem,XomashyoVariant
+from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
 from crm.views import AdminRequiredMixin,is_admin
 import json
 
@@ -620,486 +620,339 @@ def jarayon_xomashyo_hisobot(request):
     return render(request, 'xomashyo/jarayon_hisobot.html', context)
 
 
-class TaminlashView(AdminRequiredMixin,View):
-    """Taminlashlar ro'yxati va boshqaruv"""
-    template_name = 'taminlash/taminlash.html'
-
-    def get(self, request, *args, **kwargs):
-        """GET so'rov - taminlashlar ro'yxati"""
-        
-        # Filtrlar
-        ishchi_id = request.GET.get('ishchi')
-        status = request.GET.get('status')
-        sana_from = request.GET.get('sana_from')
-        sana_to = request.GET.get('sana_to')
-        search = request.GET.get('search', '').strip()
-        
-        # Asosiy query
-        taminlashlar = Taminlash.objects.select_related(
-            'ishchi', 'yaratuvchi'
-        ).prefetch_related('items__xomashyo', 'items__variant').all()
-        
-        # Filtr: Ishchi
-        if ishchi_id:
-            taminlashlar = taminlashlar.filter(ishchi_id=ishchi_id)
-        
-        # Filtr: Status
-        if status:
-            taminlashlar = taminlashlar.filter(status=status)
-        
-        # Filtr: Sana oralig'i
-        if sana_from:
-            taminlashlar = taminlashlar.filter(sana__gte=sana_from)
-        if sana_to:
-            taminlashlar = taminlashlar.filter(sana__lte=sana_to)
-        
-        # Qidiruv
-        if search:
-            taminlashlar = taminlashlar.filter(
-                Q(ishchi__ism__icontains=search) |
-                Q(izoh__icontains=search) |
-                Q(items__xomashyo__nomi__icontains=search)
-            ).distinct()
-        
-        # Statistika
-        stats = {
-            'jami': taminlashlar.count(),
-            'aktiv': taminlashlar.filter(status='aktiv').count(),
-            'qaytarilgan': taminlashlar.filter(status='qaytarilgan').count(),
-            'yakunlangan': taminlashlar.filter(status='yakunlangan').count(),
-        }
-        
-        # Ishchilar ro'yxati (filtr uchun)
-        ishchilar = Ishchi.objects.filter(
-            is_oylik_open=True
-        ).order_by('ism')
-        
-        context = {
-            'taminlashlar': taminlashlar.order_by('-sana', '-id')[:100],  # Oxirgi 100 ta
-            'ishchilar': ishchilar,
-            'stats': stats,
-            'filters': {
-                'ishchi_id': ishchi_id,
-                'status': status,
-                'sana_from': sana_from,
-                'sana_to': sana_to,
-                'search': search,
-            }
-        }
-        
-        return render(request, self.template_name, context)
-
-
-class TaminlashQaytarishView(AdminRequiredMixin,View):
-    """Taminlashni qaytarish"""
-    
-    def post(self, request, taminlash_id, *args, **kwargs):
-        """POST so'rov - taminlashni qaytarish"""
-        
-        try:
-            with transaction.atomic():
-                taminlash = get_object_or_404(
-                    Taminlash.objects.select_related('ishchi').prefetch_related('items'),
-                    id=taminlash_id
-                )
-                
-                # Status tekshirish
-                if taminlash.status == 'qaytarilgan':
-                    messages.warning(request, "⚠️ Bu taminlash allaqachon qaytarilgan!")
-                    return redirect('xomashyo:taminlash')
-                
-                # Har bir item uchun qolgan miqdorni qaytarish
-                qaytarilgan_items = []
-                for item in taminlash.items.all():
-                    if item.qolgan > 0:
-                        # Omborga qaytarish
-                        if item.variant:
-                            item.variant.miqdori += item.qolgan
-                            item.variant.save(update_fields=['miqdori'])
-                        else:
-                            item.xomashyo.miqdori += item.qolgan
-                            item.xomashyo.save(update_fields=['miqdori', 'updated_at'])
-                        
-                        # Ishlatilgan va qolgan yangilash
-                        item.ishlatilgan += item.qolgan
-                        qaytarilgan_miqdor = item.qolgan
-                        item.qolgan = 0
-                        item.save(update_fields=['ishlatilgan', 'qolgan'])
-                        
-                        qaytarilgan_items.append({
-                            'nomi': item.xomashyo.nomi,
-                            'miqdor': qaytarilgan_miqdor,
-                            'olchov': item.xomashyo.get_olchov_birligi_display()
-                        })
-                
-                # Taminlash statusini o'zgartirish
-                taminlash.status = 'qaytarilgan'
-                taminlash.qaytarilgan_sana = datetime.now()
-                taminlash.save(update_fields=['status', 'qaytarilgan_sana'])
-                
-                # Success message
-                if qaytarilgan_items:
-                    msg = f"✅ {taminlash.ishchi.ism}ning taminlashi qaytarildi!\n\n"
-                    msg += "🔄 Qaytarilgan xomashyolar:\n"
-                    for item in qaytarilgan_items:
-                        msg += f"   • {item['nomi']}: +{item['miqdor']} {item['olchov']}\n"
-                    messages.success(request, msg)
-                else:
-                    messages.info(request, "ℹ️ Qaytariladigan xomashyo topilmadi (barchasi ishlatilgan)")
-                
-        except Taminlash.DoesNotExist:
-            messages.error(request, "❌ Taminlash topilmadi!")
-        except Exception as e:
-            messages.error(request, f"❌ Xatolik: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-        
-        return redirect('xomashyo:taminlash')
-
-
-
-@method_decorator(login_required, name='dispatch')
-class TaminlashDetailView(AdminRequiredMixin,View):
-    """Taminlash tafsilotlari"""
-    template_name = 'taminlash/taminlash_detail.html'
-    
-    def get(self, request, taminlash_id, *args, **kwargs):
-        """GET so'rov - taminlash tafsilotlari"""
-        
-        taminlash = get_object_or_404(
-            Taminlash.objects.select_related(
-                'ishchi', 'ishchi__turi', 'yaratuvchi'
-            ).prefetch_related(
-                'items__xomashyo__category',
-                'items__variant'
-            ),
-            id=taminlash_id
+class YetkazibBeruvchilarView(AdminRequiredMixin, ListView):
+    model = YetkazibBeruvchi
+    template_name = 'yetkazib_beruvchi/list.html'
+    context_object_name = 'yetkazib_beruvchilar'
+ 
+    def get_queryset(self):
+        qs = YetkazibBeruvchi.objects.all().order_by('nomi')
+        for yb in qs:
+            harakatlar = XomashyoHarakat.objects.filter(
+                yetkazib_beruvchi=yb,
+                harakat_turi='kirim',
+                tolov_holati__in=['tolanmagan', 'qisman']
+            )
+            yb.jami_qarz_uzs = sum(h.qoldiq_uzs for h in harakatlar)
+        return qs
+ 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        qs  = ctx['yetkazib_beruvchilar']
+        ctx['qarzli_count']  = sum(1 for yb in qs if yb.jami_qarz_uzs > 0)
+        ctx['umumiy_qarz']   = sum(yb.jami_qarz_uzs for yb in qs)
+        return ctx
+ 
+ 
+# ─────────────────────────────────────────────────────────────────
+# YETKAZIB BERUVCHI DETAIL
+# ─────────────────────────────────────────────────────────────────
+@login_required(login_url='login')
+@user_passes_test(lambda u: u.is_staff, login_url='login')
+def yetkazib_beruvchi_detail(request, yb_id):
+    yb = get_object_or_404(YetkazibBeruvchi, id=yb_id)
+ 
+    # Qarzli harakatlar — eng eski birinchi (FIFO uchun)
+    qarzdor_harakatlar = XomashyoHarakat.objects.filter(
+        yetkazib_beruvchi=yb,
+        harakat_turi='kirim',
+        tolov_holati__in=['tolanmagan', 'qisman']
+    ).select_related('xomashyo').order_by('sana', 'id')
+ 
+    # To'liq to'langan tarix
+    toliq_harakatlar = XomashyoHarakat.objects.filter(
+        yetkazib_beruvchi=yb,
+        harakat_turi='kirim',
+        tolov_holati='toliq'
+    ).select_related('xomashyo').order_by('-sana')[:20]
+ 
+    jami_qarz_uzs = sum(h.qoldiq_uzs for h in qarzdor_harakatlar)
+    jami_qarz_usd = sum(h.qoldiq_usd or 0 for h in qarzdor_harakatlar)
+ 
+    # Oxirgi to'lovlar
+    oxirgi_tolovlar = ChiqimItem.objects.filter(
+        xomashyo_harakat__yetkazib_beruvchi=yb,
+        item_turi='xomashyo'
+    ).select_related(
+        'chiqim',
+        'xomashyo_harakat__xomashyo'
+    ).order_by('-chiqim__created')[:15]
+ 
+    # ── qarzdor_json — JS FIFO preview uchun ──────────────────────
+    # MUHIM: field nomlari JS bilan mos bo'lishi kerak
+    # JS da ishlatiladi: h.nomi, h.sana, h.qoldiq_uzs, h.qoldiq_usd
+    qarzdor_json_list = []
+    for h in qarzdor_harakatlar:
+        qarzdor_json_list.append({
+            'id':           str(h.id),
+            'nomi':         h.xomashyo.nomi if h.xomashyo else '—',       # JS: h.nomi
+            'sana':         h.sana.strftime('%d.%m.%Y') if h.sana else '', # JS: h.sana
+            'miqdori':      float(h.miqdori),
+            'olchov':       h.xomashyo.get_olchov_birligi_display() if h.xomashyo else '',
+            'jami_uzs':     float(h.jami_narx_uzs),
+            'jami_usd':     float(h.jami_narx_usd or 0),
+            'tolangan_uzs': float(h.tolangan_uzs),
+            'qoldiq_uzs':   float(h.qoldiq_uzs),                          # JS: h.qoldiq_uzs
+            'qoldiq_usd':   float(h.qoldiq_usd or 0),
+            'usd_kurs':     float(h.usd_kurs or 0),
+            'foiz':         h.tolov_foizi,
+        })
+ 
+    context = {
+        'yb':                   yb,
+        'qarzdor_harakatlar':   qarzdor_harakatlar,
+        'toliq_harakatlar':     toliq_harakatlar,
+        'jami_qarz_uzs':        jami_qarz_uzs,
+        'jami_qarz_usd':        jami_qarz_usd,
+        'oxirgi_tolovlar':      oxirgi_tolovlar,
+        'today_str':            date.today().strftime('%Y-%m-%d'),
+        'qarzdor_json':         json.dumps(qarzdor_json_list, cls=DjangoJSONEncoder),
+    }
+    return render(request, 'yetkazib_beruvchi/detail.html', context)
+ 
+ 
+# ─────────────────────────────────────────────────────────────────
+# AVTOMATIK TAQSIMLASH (FIFO)
+# ─────────────────────────────────────────────────────────────────
+@login_required(login_url='login')
+@user_passes_test(lambda u: u.is_staff, login_url='login')
+def yb_avto_tolov(request, yb_id):
+    if request.method != 'POST':
+        return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+    yb      = get_object_or_404(YetkazibBeruvchi, id=yb_id)
+    sana    = _parse_sana(request.POST.get('sana'))
+    valyuta = request.POST.get('valyuta', 'uzs')
+    izoh    = request.POST.get('izoh', '').strip()
+ 
+    try:
+        summa_str = request.POST.get('summa', '').replace(' ', '').replace(',', '')
+        summa     = Decimal(summa_str)
+        if summa <= 0:
+            raise ValueError("Summa 0 dan katta bo'lishi kerak!")
+    except (decimal.InvalidOperation, ValueError) as e:
+        messages.error(request, f"⚠️ Summa noto'g'ri: {e}")
+        return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+    kurs_str = request.POST.get('usd_kurs', '').strip()
+    try:
+        usd_kurs = Decimal(kurs_str) if kurs_str else None
+    except decimal.InvalidOperation:
+        usd_kurs = None
+ 
+    if valyuta == 'usd' and not usd_kurs:
+        messages.error(request, "⚠️ USD to'lov uchun kurs kiritilishi shart!")
+        return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+    # UZS ekvivalenti
+    if valyuta == 'usd':
+        summa_uzs = (summa * usd_kurs).quantize(Decimal('1'), rounding=ROUND_DOWN)
+        summa_usd = summa
+    else:
+        summa_uzs = summa
+        summa_usd = (summa / usd_kurs).quantize(Decimal('0.0001'), rounding=ROUND_DOWN) if usd_kurs else None
+ 
+    # FIFO harakatlar
+    qarzdor_harakatlar = XomashyoHarakat.objects.filter(
+        yetkazib_beruvchi=yb,
+        harakat_turi='kirim',
+        tolov_holati__in=['tolanmagan', 'qisman']
+    ).select_related('xomashyo').order_by('sana', 'id')
+ 
+    jami_qarz = sum(h.qoldiq_uzs for h in qarzdor_harakatlar)
+    if summa_uzs > jami_qarz:
+        messages.error(
+            request,
+            f"⚠️ Kiritilgan summa ({summa_uzs:,.0f} so'm) "
+            f"jami qarzdan ({jami_qarz:,.0f} so'm) ko'p!"
         )
-        
-        # Statistika
-        items = taminlash.items.all()
-        stats = {
-            'jami_xomashyolar': items.count(),
-            'jami_berilgan': sum(item.miqdor for item in items),
-            'jami_ishlatilgan': sum(item.ishlatilgan for item in items),
-            'jami_qolgan': sum(item.qolgan for item in items),
-            'jami_summa': taminlash.jami_summa() if hasattr(taminlash, 'jami_summa') else 0,
-        }
-        
-        context = {
-            'taminlash': taminlash,
-            'items': items,
-            'stats': stats,
-        }
-        
-        return render(request, self.template_name, context)
-
-
-@method_decorator(login_required, name='dispatch')
-class TaminlashQushishView(AdminRequiredMixin,View):
-    """Yangi taminlash yaratish"""
-    template_name = 'taminlash/taminlash_qoshish.html'
-    
-    def get(self, request, *args, **kwargs):
-        """GET so'rov - forma ko'rsatish"""
-        
-        ishchilar = Ishchi.objects.filter(
-            is_oylik_open=True
-        ).select_related('turi').order_by('ism')
-        
-        # Faqat real xomashyolar (teri, astar, padoj)
-        xomashyolar = Xomashyo.objects.filter(
-            category__turi='real',
-            holati='active',
-            miqdori__gt=0
-        ).select_related('category').prefetch_related('variantlar').order_by('category__name', 'nomi')
-        
-        context = {
-            'ishchilar': ishchilar,
-            'xomashyolar': xomashyolar,
-            'today': datetime.now().date().isoformat(),
-        }
-        
-        return render(request, self.template_name, context)
-    
-    def post(self, request, *args, **kwargs):
-        """POST so'rov - taminlash yaratish"""
-        
-        ishchi_id = request.POST.get('ishchi')
-        sana = request.POST.get('sana')
-        izoh = request.POST.get('izoh', '')
-        
-        # Xomashyolar (multiple POST fields)
-        xomashyo_ids = request.POST.getlist('xomashyo_id[]')
-        variant_ids = request.POST.getlist('variant_id[]')
-        miqdorlar = request.POST.getlist('miqdor[]')
-        narxlar = request.POST.getlist('narx[]')
-        
-        try:
-            with transaction.atomic():
-                # Validatsiya
-                if not ishchi_id:
-                    raise ValueError("❌ Ishchi tanlanmagan!")
-                
-                if not xomashyo_ids or not any(xomashyo_ids):
-                    raise ValueError("❌ Kamida bitta xomashyo tanlang!")
-                
-                ishchi = Ishchi.objects.get(id=ishchi_id)
-                
-                # Sana
-                if sana:
-                    try:
-                        sana_obj = datetime.strptime(sana, '%Y-%m-%d').date()
-                    except ValueError:
-                        raise ValueError("❌ Sana formati noto'g'ri!")
+        return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+    try:
+        with transaction.atomic():
+            xomashyo_cat, _ = ChiqimTuri.objects.get_or_create(name="Xomashyo to'lovi")
+ 
+            qolgan_uzs   = summa_uzs
+            item_objects = []
+            izoh_parts   = []
+ 
+            for harakat in qarzdor_harakatlar:
+                if qolgan_uzs <= 0:
+                    break
+ 
+                qoldiq = harakat.qoldiq_uzs
+                if qoldiq <= 0:
+                    continue
+ 
+                tolov_uzs = min(qolgan_uzs, qoldiq)
+                is_toliq  = (tolov_uzs >= qoldiq)
+ 
+                # USD — kurs farqi tiyinlarini yo'q qilish:
+                # To'liq to'lovda harakatning aniq qoldiq_usd ishlatiladi
+                if harakat.jami_narx_usd and harakat.qoldiq_usd:
+                    if is_toliq:
+                        tolov_usd = harakat.qoldiq_usd  # Aniq, hisoblashsiz
+                    else:
+                        nisbat    = tolov_uzs / qoldiq
+                        tolov_usd = (harakat.qoldiq_usd * nisbat).quantize(
+                            Decimal('0.0001'), rounding=ROUND_DOWN
+                        )
                 else:
-                    sana_obj = datetime.now().date()
-                
-                # Taminlash yaratish
-                taminlash = Taminlash.objects.create(
-                    ishchi=ishchi,
-                    sana=sana_obj,
-                    status='aktiv',
-                    izoh=izoh,
-                    yaratuvchi=request.user
+                    tolov_usd = None
+ 
+                qolgan_uzs -= tolov_uzs
+ 
+                nomi   = harakat.xomashyo.nomi if harakat.xomashyo else '—'
+                olchov = harakat.xomashyo.get_olchov_birligi_display() if harakat.xomashyo else ''
+                sana_str = harakat.sana.strftime('%d.%m.%Y') if harakat.sana else ''
+ 
+                izoh_parts.append(f"{nomi} ({sana_str}) — {tolov_uzs:,.0f} so'm")
+                item_objects.append({
+                    'harakat':   harakat,
+                    'tolov_uzs': tolov_uzs,
+                    'tolov_usd': tolov_usd,
+                    'name':      f"{nomi} to'lovi — {sana_str}",
+                })
+ 
+            if not item_objects:
+                messages.error(request, "Taqsimlanadigan qarz topilmadi!")
+                return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+            auto_izoh = "; ".join(izoh_parts)
+            if izoh:
+                auto_izoh += f"\nIzoh: {izoh}"
+ 
+            chiqim = Chiqim.objects.create(
+                name=f"Xomashyo to'lovi — {yb.nomi} — {sana.strftime('%d.%m.%Y')}",
+                category=xomashyo_cat,
+                price=summa_uzs,
+                price_usd=summa_usd,
+                usd_kurs=usd_kurs,
+                izoh=auto_izoh,
+                created=sana,
+                created_by=request.user,
+            )
+ 
+            for obj in item_objects:
+                ChiqimItem.objects.create(
+                    chiqim=chiqim,
+                    item_turi='xomashyo',
+                    name=obj['name'],
+                    price_uzs=obj['tolov_uzs'],
+                    price_usd=obj['tolov_usd'],
+                    tolov_kursi=usd_kurs,
+                    xomashyo_harakat=obj['harakat'],
                 )
-                
-                for i in taminlash.items.all():
-                    XomashyoHarakat.objects.create(
-                        xomashyo=i.xomashyo,
-                        harakat_turi = "taminlash",
-                        miqdori=i.miqdor,
-                        sana=sana,
-                        foydalanuvchi=request.user,
-                        izoh=f"{ishchi} ga {taminlash.jami_summa()} xomashyo taminlandi"
+ 
+            messages.success(
+                request,
+                f"✅ {summa_uzs:,.0f} so'm — {len(item_objects)} ta harakatga taqsimlandi."
+            )
+ 
+    except Exception as e:
+        messages.error(request, f"❌ Xatolik: {e}")
+ 
+    return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+ 
+# ─────────────────────────────────────────────────────────────────
+# ALOHIDA HARAKAT UCHUN TO'LOV
+# ─────────────────────────────────────────────────────────────────
+@login_required(login_url='login')
+@user_passes_test(lambda u: u.is_staff, login_url='login')
+def yb_harakat_tolov(request, yb_id, harakat_id):
+    if request.method != 'POST':
+        return redirect('xomashyo:yb_detail', yb_id=yb_id)
+ 
+    harakat = get_object_or_404(
+        XomashyoHarakat,
+        id=harakat_id,
+        yetkazib_beruvchi_id=yb_id,
+        harakat_turi='kirim',
+    )
+ 
+    sana    = _parse_sana(request.POST.get('sana'))
+    valyuta = request.POST.get('valyuta', 'uzs')
+    toliq   = request.POST.get('toliq') == '1'
+    izoh    = request.POST.get('izoh', '').strip()
+ 
+    kurs_str = request.POST.get('usd_kurs', '').strip()
+    try:
+        usd_kurs = Decimal(kurs_str) if kurs_str else None
+    except decimal.InvalidOperation:
+        usd_kurs = None
+ 
+    try:
+        if toliq:
+            # To'liq to'lov — aniq raqamlar, hisoblashsiz
+            tolov_uzs = harakat.qoldiq_uzs
+            tolov_usd = harakat.qoldiq_usd  # None bo'lishi mumkin
+        else:
+            summa_str = request.POST.get('summa', '').replace(' ', '').replace(',', '')
+            summa     = Decimal(summa_str)
+ 
+            if valyuta == 'usd':
+                if not usd_kurs:
+                    raise ValueError("USD to'lov uchun kurs kiritilishi shart!")
+                tolov_uzs = (summa * usd_kurs).quantize(Decimal('1'), rounding=ROUND_DOWN)
+                tolov_usd = summa
+            else:
+                tolov_uzs = summa
+                # USD ekvivalent — faqat harakat USD li bo'lsa
+                if usd_kurs and harakat.jami_narx_usd:
+                    tolov_usd = (summa / usd_kurs).quantize(
+                        Decimal('0.0001'), rounding=ROUND_DOWN
                     )
-                    
-                # Items yaratish
-                created_items = []
-                for i, xomashyo_id in enumerate(xomashyo_ids):
-                    if not xomashyo_id:
-                        continue
-                    
-                    variant_id = variant_ids[i] if i < len(variant_ids) and variant_ids[i] else None
-                    
-                    try:
-                        miqdor = Decimal(miqdorlar[i]) if i < len(miqdorlar) and miqdorlar[i] else Decimal('0')
-                    except (ValueError, IndexError):
-                        continue
-                    
-                    if miqdor <= 0:
-                        continue
-                    
-                    try:
-                        narx = Decimal(narxlar[i]) if i < len(narxlar) and narxlar[i] else None
-                    except (ValueError, IndexError):
-                        narx = None
-                    
-                    xomashyo = Xomashyo.objects.get(id=xomashyo_id)
-                    variant = XomashyoVariant.objects.get(id=variant_id) if variant_id else None
-                    
-                    # TaminlashItem yaratish (save metodida xomashyo miqdori kamayadi)
-                    item = TaminlashItem.objects.create(
-                        taminlash=taminlash,
-                        xomashyo=xomashyo,
-                        variant=variant,
-                        miqdor=miqdor,
-                        narx=narx
-                    )
-                    
-                for i in taminlash.items.all():
-                    XomashyoHarakat.objects.create(
-                        xomashyo=i.xomashyo,
-                        harakat_turi = "taminlash",
-                        miqdori=i.miqdor,
-                        sana=sana,
-                        foydalanuvchi=request.user,
-                        izoh=f"{ishchi} ga {taminlash.jami_summa()} xomashyo taminlandi"
-                    )
-                    
-                    created_items.append({
-                        'nomi': xomashyo.nomi,
-                        'miqdor': miqdor,
-                        'olchov': xomashyo.get_olchov_birligi_display(),
-                        'variant': variant.rang if variant else None
-                    })
-                
-                if not created_items:
-                    raise ValueError("❌ Hech qanday xomashyo qo'shilmadi!")
-                
-                # Success message
-                msg = f"✅ {ishchi.ism}ga ta'minlash berildi!\n\n"
-                msg += "📦 Berilgan xomashyolar:\n"
-                for item in created_items:
-                    variant_info = f" ({item['variant']})" if item['variant'] else ""
-                    msg += f"   • {item['nomi']}{variant_info}: {item['miqdor']} {item['olchov']}\n"
-                msg += f"\n📅 Sana: {sana_obj.strftime('%d.%m.%Y')}"
-                
-                messages.success(request, msg)
-                return redirect('xomashyo:taminlash_detail', taminlash_id=taminlash.id)
-                
-        except Ishchi.DoesNotExist:
-            messages.error(request, "❌ Ishchi topilmadi!")
-        except Xomashyo.DoesNotExist:
-            messages.error(request, "❌ Xomashyo topilmadi!")
-        except ValueError as e:
-            messages.error(request, str(e))
-        except Exception as e:
-            messages.error(request, f"❌ Xatolik: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-        
-        return redirect('xomashyo:taminlash_qoshish')
-
-
-@method_decorator(login_required, name='dispatch')
-class TaminlashQaytarishView(AdminRequiredMixin,View):
-    """Taminlashni qaytarish"""
-    
-    def post(self, request, taminlash_id, *args, **kwargs):
-        """POST so'rov - taminlashni qaytarish"""
-        
-        try:
-            with transaction.atomic():
-                taminlash = get_object_or_404(
-                    Taminlash.objects.select_related('ishchi').prefetch_related(
-                        'items__xomashyo', 'items__variant'
-                    ),
-                    id=taminlash_id
-                )
-                
-                # Status tekshirish
-                if taminlash.status == 'qaytarilgan':
-                    messages.warning(request, "⚠️ Bu ta'minlash allaqachon qaytarilgan!")
-                    return redirect('xomashyo:taminlash_detail', taminlash_id=taminlash_id)
-                
-                # Har bir item uchun qolgan miqdorni qaytarish
-                qaytarilgan_items = []
-                jami_qaytarilgan = Decimal('0')
-                
-                for item in taminlash.items.all():
-                    if item.qolgan > 0:
-                        # Omborga qaytarish
-                        if item.variant:
-                            item.variant.miqdori += item.qolgan
-                            item.variant.save(update_fields=['miqdori'])
-                        else:
-                            item.xomashyo.miqdori += item.qolgan
-                            item.xomashyo.save(update_fields=['miqdori', 'updated_at'])
-                        
-                        # Ishlatilgan va qolgan yangilash
-                        qaytarilgan_miqdor = item.qolgan
-                        item.ishlatilgan += item.qolgan
-                        item.qolgan = Decimal('0')
-                        item.save(update_fields=['ishlatilgan', 'qolgan'])
-                        
-                        jami_qaytarilgan += qaytarilgan_miqdor
-                        
-                        variant_info = f" ({item.variant.rang})" if item.variant else ""
-                        qaytarilgan_items.append({
-                            'nomi': item.xomashyo.nomi + variant_info,
-                            'miqdor': qaytarilgan_miqdor,
-                            'olchov': item.xomashyo.get_olchov_birligi_display()
-                        })
-                
-                # Taminlash statusini o'zgartirish
-                taminlash.status = 'qaytarilgan'
-                taminlash.qaytarilgan_sana = datetime.now()
-                taminlash.save(update_fields=['status', 'qaytarilgan_sana'])
-                
-                # Success message
-                if qaytarilgan_items:
-                    msg = f"✅ {taminlash.ishchi.ism}ning ta'minlashi qaytarildi!\n\n"
-                    msg += "🔄 Qaytarilgan xomashyolar:\n"
-                    for item in qaytarilgan_items:
-                        msg += f"   • {item['nomi']}: +{item['miqdor']} {item['olchov']}\n"
-                    msg += f"\n📅 Qaytarilgan sana: {taminlash.qaytarilgan_sana.strftime('%d.%m.%Y %H:%M')}"
-                    messages.success(request, msg)
                 else:
-                    messages.info(request, "ℹ️ Qaytariladigan xomashyo topilmadi (barchasi ishlatilgan)")
-                
-        except Taminlash.DoesNotExist:
-            messages.error(request, "❌ Ta'minlash topilmadi!")
-        except Exception as e:
-            messages.error(request, f"❌ Xatolik: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-        
-        return redirect('xomashyo:taminlash_detail', taminlash_id=taminlash_id)
+                    tolov_usd = None
+ 
+        if tolov_uzs <= 0:
+            raise ValueError("To'lov summasi 0 dan katta bo'lishi kerak!")
+        if tolov_uzs > harakat.qoldiq_uzs:
+            raise ValueError(
+                f"To'lov ({tolov_uzs:,.0f}) qoldiqdan ({harakat.qoldiq_uzs:,.0f} so'm) ko'p!"
+            )
+ 
+        with transaction.atomic():
+            xomashyo_cat, _ = ChiqimTuri.objects.get_or_create(name="Xomashyo to'lovi")
+            nomi   = harakat.xomashyo.nomi if harakat.xomashyo else '—'
+            olchov = harakat.xomashyo.get_olchov_birligi_display() if harakat.xomashyo else ''
+            sana_str = harakat.sana.strftime('%d.%m.%Y') if harakat.sana else ''
+ 
+            chiqim = Chiqim.objects.create(
+                name=f"{nomi} to'lovi — {sana.strftime('%d.%m.%Y')}",
+                category=xomashyo_cat,
+                price=tolov_uzs,
+                price_usd=tolov_usd,
+                usd_kurs=usd_kurs,
+                izoh=izoh or f"{nomi} ({harakat.miqdori:g} {olchov}) — {sana_str}",
+                created=sana,
+                created_by=request.user,
+            )
+            ChiqimItem.objects.create(
+                chiqim=chiqim,
+                item_turi='xomashyo',
+                name=f"{nomi} to'lovi — {sana_str}",
+                price_uzs=tolov_uzs,
+                price_usd=tolov_usd,
+                tolov_kursi=usd_kurs,
+                xomashyo_harakat=harakat,
+            )
+ 
+            messages.success(
+                request,
+                f"✅ {nomi} uchun {tolov_uzs:,.0f} so'm to'lov saqlandi."
+                + (" ✔ To'liq to'landi!" if harakat.tolov_holati == 'toliq' else "")
+            )
+ 
+    except ValueError as e:
+        messages.error(request, f"⚠️ {e}")
+    except (decimal.InvalidOperation, TypeError) as e:
+        messages.error(request, f"Son formati xato: {e}")
+    except Exception as e:
+        messages.error(request, f"❌ Xatolik: {e}")
+ 
+    return redirect('xomashyo:yb_detail', yb_id=yb_id)
 
 
-@method_decorator(login_required, name='dispatch')
-class TaminlashItemQaytarishView(AdminRequiredMixin,View):
-    """Bitta item qaytarish (qisman qaytarish)"""
-    
-    def post(self, request, item_id, *args, **kwargs):
-        """POST so'rov - itemni qaytarish"""
-        
-        qaytariladigan_miqdor_str = request.POST.get('qaytariladigan_miqdor')
-        
-        try:
-            with transaction.atomic():
-                item = get_object_or_404(
-                    TaminlashItem.objects.select_related(
-                        'taminlash__ishchi', 'xomashyo', 'variant'
-                    ),
-                    id=item_id
-                )
-                
-                # Status tekshirish
-                if item.taminlash.status == 'qaytarilgan':
-                    messages.warning(request, "⚠️ Bu ta'minlash allaqachon qaytarilgan!")
-                    return redirect('xomashyo:taminlash_detail', taminlash_id=item.taminlash.id)
-                
-                # Miqdorni tekshirish
-                try:
-                    qaytariladigan_miqdor = Decimal(qaytariladigan_miqdor_str)
-                except (ValueError, TypeError):
-                    raise ValueError("❌ Qaytariladigan miqdor noto'g'ri!")
-                
-                if qaytariladigan_miqdor <= 0:
-                    raise ValueError("❌ Qaytariladigan miqdor 0 dan katta bo'lishi kerak!")
-                
-                if qaytariladigan_miqdor > item.qolgan:
-                    raise ValueError(
-                        f"❌ Qaytariladigan miqdor qolgan miqdordan katta! "
-                        f"Qolgan: {item.qolgan}, Qaytariladigan: {qaytariladigan_miqdor}"
-                    )
-                
-                # Omborga qaytarish
-                if item.variant:
-                    item.variant.miqdori += qaytariladigan_miqdor
-                    item.variant.save(update_fields=['miqdori'])
-                else:
-                    item.xomashyo.miqdori += qaytariladigan_miqdor
-                    item.xomashyo.save(update_fields=['miqdori', 'updated_at'])
-                
-                # Item yangilash
-                item.ishlatilgan += (item.qolgan - qaytariladigan_miqdor)
-                item.qolgan -= qaytariladigan_miqdor
-                item.save(update_fields=['ishlatilgan', 'qolgan'])
-                
-                # Agar barcha itemlar qaytarilgan bo'lsa, taminlashni qaytarilgan qilish
-                taminlash = item.taminlash
-                if all(i.qolgan == 0 for i in taminlash.items.all()):
-                    taminlash.status = 'qaytarilgan'
-                    taminlash.qaytarilgan_sana = datetime.now()
-                    taminlash.save(update_fields=['status', 'qaytarilgan_sana'])
-                
-                variant_info = f" ({item.variant.rang})" if item.variant else ""
-                messages.success(
-                    request,
-                    f"✅ {item.xomashyo.nomi}{variant_info} qaytarildi: "
-                    f"+{qaytariladigan_miqdor} {item.xomashyo.get_olchov_birligi_display()}"
-                )
-                
-        except TaminlashItem.DoesNotExist:
-            messages.error(request, "❌ Item topilmadi!")
-        except ValueError as e:
-            messages.error(request, str(e))
-        except Exception as e:
-            messages.error(request, f"❌ Xatolik: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-        
-        return redirect('xomashyo:taminlash_detail', taminlash_id=item.taminlash.id)
+ 

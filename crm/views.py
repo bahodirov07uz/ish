@@ -129,21 +129,33 @@ def oylik_yopish(request, pk):
             berilgan = 0
 
         with transaction.atomic():
-            ishlari = m.Ish.objects.filter(ishchi=ishchi, status='active')
-            hisoblangan = sum(ish.narxi for ish in ishlari)
+            # Aktiv ishlarni oldindan id-lar bilan lock qilamiz
+            ishlari = m.Ish.objects.filter(
+                ishchi=ishchi,
+                status='yangi'          # ← shu qiymat modelingizda to'g'ri ekanligini tekshiring
+            ).select_for_update()
 
-            # Avanslarni yopish (oylikdan alohida, lekin shu vaqtda yopiladi)
+            # ✅ FIX #1: values_list bilan hisoblash — queryset baholanadi va list'ga aylanadi
+            narxlar = list(ishlari.values_list('narxi', flat=True))
+            hisoblangan = sum(narxlar)
+
+            # Avanslarni yopish
             aktiv_avanslar = m.Avans.objects.filter(ishchi=ishchi, is_active=True)
             aktiv_avanslar.update(is_active=False, ended=timezone.now().date())
 
+            # ✅ FIX #2: hisoblangan = view'da hisoblangan summa, oylik = admin bergan summa
             m.Oyliklar.objects.create(
                 ishchi=ishchi,
-                hisoblangan=hisoblangan,
-                oylik=berilgan,        # admin kiritgan summa
+                hisoblangan=hisoblangan,   # ← joriy hisoblangan (formula bo'yicha)
+                oylik=berilgan,            # ← admin qo'lda kiritgan
                 yopilgan=True,
             )
 
-            ishlari.update(status='yopilgan')
+            # ✅ FIX #1: update — to'g'ridan-to'g'ri DB'da yangilaydi, Python loop emas
+            m.Ish.objects.filter(
+                ishchi=ishchi,
+                status='yangi'
+            ).update(status='yopilgan')
 
             if berilgan > 0:
                 oylik_turi = m.ChiqimTuri.objects.filter(name__iexact='oylik').first()
@@ -157,7 +169,7 @@ def oylik_yopish(request, pk):
                     chiqim=chiqim,
                     item_turi='oylik',
                     name=f"{ishchi.ism} {ishchi.familiya} oyligi",
-                    price_uzs=berilgan,
+                    price_uzs=berilgan,     # berilgan
                 )
 
             ishchi.is_oylik_open = False
@@ -938,16 +950,7 @@ class IshQoshishView(AdminRequiredMixin,View):
                         f"📅 Sana: {ish_sana_obj.strftime('%d.%m.%Y')}"
                     )
                     
-                from django.db import connection
 
-                logger.info("FK CHECK: about to run")  # <-- shuni ko‘rishingiz shart
-
-                with connection.cursor() as cursor:
-                    cursor.execute("PRAGMA foreign_key_check;")
-                    rows = cursor.fetchall()
-
-                print("FK CHECK rows:", rows)          # <-- konsolda ko‘rinadi
-                logger.error("FK CHECK rows: %s", rows)
 
         except m.Ishchi.DoesNotExist:
             messages.error(request, "❌ Ishchi topilmadi!")

@@ -426,7 +426,7 @@ class Ish(models.Model):
                 self.narxi = self.mahsulot.narx_zakatovka * int(self.soni)
             elif self.ishchi.turi.nomi == "kroy":
                 self.narxi = self.mahsulot.narx_kroy * int(self.soni)
-            elif self.ishchi.turi.nomi == "pardozchi" or 'pardoz':
+            elif self.ishchi.turi.nomi == "pardoz":
                 self.narxi = self.mahsulot.narx_pardoz * int(self.soni)
             elif self.ishchi.turi.nomi == "rezak":
                 self.narxi = self.mahsulot.narx_rezak * int(self.soni)
@@ -729,38 +729,47 @@ class SotuvItem(models.Model):
     def __str__(self):
         return f"{self.variant} - {self.miqdor} ta - {self.narx} so'm"
 
+
     def save(self, *args, **kwargs):
-        # Sotuv kursidan foydalanish
-        usd_kurs = self.sotuv.usd_kurs if self.sotuv.usd_kurs else Decimal('0')
-        
-        narx =  Decimal(str(self.narx or 0))
-        miqdor = int(self.miqdor or 0)
+        from django.db import transaction
 
+        usd_kurs = Decimal(str(self.sotuv.usd_kurs)) if self.sotuv.usd_kurs else Decimal('0')
 
-        # Narxni hisoblash (valyutaga qarab)
-        if self.narx_turi == 'usd' and usd_kurs > 0:
-            self.narx_usd = self.narx 
-            self.narx = round(Decimal(str(self.narx)) * usd_kurs, 2) 
-        elif usd_kurs > 0:
-            self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
-        
-        narx = Decimal(str(self.narx or 0))
-        
-        
-        # Jami summalar
-        self.jami = Decimal(str(self.narx)) * Decimal(str(self.miqdor))
-        if usd_kurs > 0:
-            self.jami_usd = round(self.jami / usd_kurs, 4)
-        
-        # Yangi item ekanligini tekshirish
+        # --- 1. YANGI yoki MAVJUD ekanligini birinchi aniqlaymiz ---
         is_new = self.pk is None
         old_miqdor = 0
-        
+
         if not is_new:
             old_item = SotuvItem.objects.get(pk=self.pk)
             old_miqdor = old_item.miqdor
-        
-        # Stock tekshirish
+
+            # Faqat narx_turi ni DB dan olamiz (konversiya qayta ishlamasligi uchun)
+            # narx va narx_usd ni foydalanuvchi kiritganini saqlaymiz
+            self.narx_turi = old_item.narx_turi
+
+            # Narx o'zgargan bo'lsa narx_usd ni qayta hisoblaymiz
+            if self.narx != old_item.narx and usd_kurs > 0:
+                self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
+            else:
+                self.narx_usd = old_item.narx_usd
+
+        # --- 2. Narx konversiyasi FAQAT yangi item uchun ---
+        if is_new:
+            if self.narx_turi == 'usd' and usd_kurs > 0:
+                self.narx_usd = Decimal(str(self.narx))
+                self.narx = round(self.narx_usd * usd_kurs, 2)
+                self.narx_turi = 'uzs'
+            elif usd_kurs > 0:
+                self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
+
+        # --- 3. Jami summalarni hisoblash (har doim) ---
+        self.jami = Decimal(str(self.narx)) * Decimal(str(self.miqdor))
+        if usd_kurs > 0:
+            self.jami_usd = round(self.jami / usd_kurs, 4)
+        else:
+            self.jami_usd = Decimal('0')
+
+        # --- 4. Stock tekshirish ---
         if is_new:
             if self.variant.stock < self.miqdor:
                 raise ValueError(
@@ -775,11 +784,11 @@ class SotuvItem(models.Model):
                         f"Omborda yetarli {self.variant} yo'q! "
                         f"Mavjud: {self.variant.stock} ta"
                     )
-        
+
+        # --- 5. Asosiy saqlash ---
         super().save(*args, **kwargs)
-        
-        # Stockni yangilash
-        from django.db import transaction
+
+        # --- 6. Stockni yangilash ---
         with transaction.atomic():
             self.variant.refresh_from_db()
             if is_new:
@@ -792,20 +801,21 @@ class SotuvItem(models.Model):
                     self.variant.stock = F('stock') + abs(miqdor_farqi)
             self.variant.save()
             self.variant.refresh_from_db()
-        
+
+        # --- 7. Mahsulot umumiy miqdori va sotuv summasi ---
         self.mahsulot.update_total_quantity()
         self.sotuv.update_summa()
-
-    def delete(self, *args, **kwargs):
-        from django.db import transaction
-        with transaction.atomic():
-            self.variant.stock = F('stock') + self.miqdor
-            self.variant.save()
-            self.variant.refresh_from_db()
-            self.mahsulot.update_total_quantity()
-            sotuv = self.sotuv
-            super().delete(*args, **kwargs)
-            sotuv.update_summa()
+    
+        def delete(self, *args, **kwargs):
+            from django.db import transaction
+            with transaction.atomic():
+                self.variant.stock = F('stock') + self.miqdor
+                self.variant.save()
+                self.variant.refresh_from_db()
+                self.mahsulot.update_total_quantity()
+                sotuv = self.sotuv
+                super().delete(*args, **kwargs)
+                sotuv.update_summa()
 
 class Kirim(models.Model):
     """Sotuv to'lovlari (bir sotuv uchun bir nechta to'lov bo'lishi mumkin)"""
@@ -970,3 +980,37 @@ class TeriSarfi(models.Model):
         
         super().delete(*args, **kwargs)
 
+# class IshchiXarid(models.Model):
+#     ishchi  = models.ForeignKey(Ishchi,on_delete=models.PROTECT)
+#     created_at = models.DateField(default=timezone.now())
+#     sana = models.DateField(default=timezone.now())
+#     updated_at = models.DateField(default=timezone.now())
+#     uzs_narx = models.DecimalField(default=0,decimal_places=2,max_digits=13)
+#     usd_narx  = models.DecimalField(default=0,decimal_places=2,max_digits=13)
+    
+#     yakuniy_summa  = models.DecimalField(max_digits=13)
+        
+#     tolov_holati = models.CharField(
+#         max_length=20,
+#         choices=[
+#             ('tolandi', 'To\'landi'),
+#             ('qisman', 'Qisman to\'landi'),
+#             ('tolanmadi', 'To\'lanmadi'),
+#         ],
+#         default='tolanmadi',
+#         verbose_name="To'lov holati"
+#     )
+    
+#     class Meta:
+#         verbose_name = "Xodimlarga sotuv"
+#         verbose_name_plural = "Xodimlarga sotuvlar"
+#         ordering = ['-sana']
+
+#     def __str__(self):
+#         return f"#{self.id} - {self.ishchi.ism} - {self.yakuniy_summa} so'm"
+
+
+# class IshchiXaridItem(models.Model):
+#     product = models.ForeignKey(Product,on_delete=models.PROTECT)
+#     variant = models.ForeignKey(ProductVariant,on_delete=models.PROTECT)
+    
