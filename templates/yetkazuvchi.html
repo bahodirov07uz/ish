@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<title>{% block title %} Xaridlar royxati{% endblock title %}</title>
+
+    <link rel="stylesheet" href="{% static 'css/xaridor_list.css' %}">
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-title">Xaridorlar</div>
+            <button class="btn btn-primary" onclick="openModal()">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3v10M3 8h10"/>
+                </svg>
+                Yangi yetkazuvchi
+            </button>
+        </header>
+
+        <main class="content">
+            <div class="page">
+                <div class="breadcrumb">
+                    <a href="/">Bosh sahifa</a>
+                    <span>/</span>
+                    <span>Xaridorlar</span>
+                </div>
+
+                <div class="page-header">
+                    <div>
+                        <h2>Xaridorlar bazasi</h2>
+                        <p>Jami {{ jami_xaridorlar }} ta xaridor</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Barcha xaridorlar</h3>
+                        <div class="search-box">
+                            <span class="search-icon">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="7" cy="7" r="5"/>
+                                    <path d="M11 11l3 3"/>
+                                </svg>
+                            </span>
+                            <input type="text" id="searchInput" placeholder="Qidirish...">
+                        </div>
+                    </div>
+
+                    {% if xaridorlar %}
+                        <div class="customers-grid">
+                            {% for xaridor in xaridorlar %}
+                                <a href="{% url 'main:xaridor_detail' xaridor.id %}" style="text-decoration: none; color: inherit;">
+                                    <div class="customer-card">
+                                        <div class="customer-header">
+                                            <div class="customer-avatar">{{ xaridor.ism|slice:":1"|upper }}</div>
+                                            <div class="customer-info">
+                                                <h4>{{ xaridor.ism }}</h4>
+                                                <div class="customer-phone">{{ xaridor.telefon|default:"—" }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="customer-stats">
+                                            <div class="stat">
+                                                <div class="stat-label">Xaridlar</div>
+                                                <div class="stat-value">{{ xaridor.xaridlar_soni }} ta</div>
+                                            </div>
+                                            <div class="stat">
+                                                <div class="stat-label">Jami summa</div>
+                                                <div class="stat-value" style="color: var(--color-primary)">{{ xaridor.jami_xarid|floatformat:0|intcomma }} so'm</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">Hali xaridorlar yo'q</p>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="xaridorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Yangi xaridor</h3>
+                <button class="close-btn" onclick="closeModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="post" action="{% url 'main:xaridor_qoshish' %}">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label class="form-label">Ism *</label>
+                    <input type="text" name="ism" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Telefon</label>
+                    <input type="tel" name="telefon" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Manzil</label>
+                    <input type="text" name="manzil" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Izoh</label>
+                    <textarea name="izoh" class="form-textarea"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3v10M3 8h10"/>
+                    </svg>
+                    Saqlash
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal() {
+            document.getElementById('xaridorModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('xaridorModal').classList.remove('active');
+        }
+
+        // Close modal on outside click
+        document.getElementById('xaridorModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const customerCards = document.querySelectorAll('.customer-card');
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            customerCards.forEach(card => {
+                const name = card.querySelector('h4').textContent.toLowerCase();
+                const phone = card.querySelector('.customer-phone').textContent.toLowerCase();
+                
+                if (name.includes(searchTerm) || phone.includes(searchTerm)) {
+                    card.parentElement.style.display = '';
+                } else {
+                    card.parentElement.style.display = 'none';
+                }
+            });
+        });
+    </script>
+{% endblock content %}

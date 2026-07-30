@@ -19,7 +19,20 @@
     display: flex; align-items: center; justify-content: center;
     color: white; flex-shrink: 0;
 }
-
+/* Kirim xaridor chart — total label */
+.donut-center-label {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none;
+}
+.donut-center-label .dcl-val {
+    font-size: 13px; font-weight: 800; color: var(--text-primary);
+    white-space: nowrap;
+}
+.donut-center-label .dcl-sub {
+    font-size: 9px; text-transform: uppercase;
+    color: var(--text-secondary); font-weight: 700; letter-spacing: .4px;
+}
 /* ── Date Range Filter ── */
 .dr-bar {
     background: var(--bg-card);
@@ -221,6 +234,60 @@
 .sum-strip-label { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
 .sum-strip-value { font-size: 13px; font-weight: 800; margin-top: 3px; }
 
+/* ── [O'ZGARISH 2 & 3] Interactive chart filter ── */
+.chart-filter-wrap {
+    display: flex; align-items: flex-start; gap: 1.25rem;
+}
+.chart-filter-wrap canvas { flex-shrink: 0; }
+.chart-legend-filters {
+    flex: 1; display: flex; flex-direction: column; gap: 4px;
+    max-height: 180px; overflow-y: auto;
+}
+.chart-legend-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 4px 6px; border-radius: 5px; cursor: pointer;
+    transition: background .12s; user-select: none;
+    font-size: 12px;
+}
+.chart-legend-item:hover { background: var(--bg-secondary); }
+.chart-legend-item.disabled { opacity: 0.38; }
+.chart-legend-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    transition: opacity .15s;
+}
+.chart-legend-checkbox {
+    width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0;
+    border: 1.5px solid currentColor; display: flex; align-items: center;
+    justify-content: center; font-size: 9px;
+}
+.chart-legend-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-legend-val { font-weight: 700; color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+.chart-select-all {
+    font-size: 10px; font-weight: 700; color: #7c3aed;
+    cursor: pointer; padding: 2px 6px; border-radius: 4px;
+    text-decoration: underline; text-underline-offset: 2px;
+    white-space: nowrap; border: none; background: none;
+}
+.chart-select-all:hover { background: var(--bg-secondary); }
+
+/* ── [O'ZGARISH 1] Top mahsulotlar - soni badge ── */
+.mahsulot-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+}
+.mahsulot-row-name {
+    flex: 1; font-size: 12px; font-weight: 600; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+}
+.mahsulot-row-soni {
+    font-size: 10px; font-weight: 700; color: var(--text-secondary);
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0;
+}
+.mahsulot-row-summa {
+    font-size: 11px; color: var(--text-secondary); white-space: nowrap;
+    flex-shrink: 0;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 900px)  { .an-grid-2, .an-grid-3 { grid-template-columns: 1fr; } }
@@ -394,10 +461,10 @@
                 </div>
             </div>
 
-            <!-- ── GRID: Sotuv holat ── -->
+            <!-- ── GRID: Top mahsulotlar + Sotuv holat ── -->
             <div class="an-grid-2">
 
-                <!-- Top mahsulotlar -->
+                <!-- [O'ZGARISH 1] Top mahsulotlar - summa + soni -->
                 <div class="an-card">
                     <div class="an-card-header">
                         <h3>
@@ -411,9 +478,12 @@
                     <div class="an-card-body" style="padding:0.75rem 1.25rem;">
                         {% for item in top_mahsulotlar %}
                         <div class="prog-bar-wrap">
-                            <div class="prog-bar-label">
-                                <span>{{ forloop.counter }}. {{ item.mahsulot__nomi|truncatechars:26 }}</span>
-                                <span style="font-size:11px; color:var(--text-secondary);">{{ item.jami_summa|floatformat:0|intcomma }}</span>
+                            <div class="mahsulot-row">
+                                <span style="font-size:11px; font-weight:800; color:var(--text-secondary); min-width:16px;">{{ forloop.counter }}.</span>
+                                <span class="mahsulot-row-name">{{ item.mahsulot__nomi|truncatechars:24 }}</span>
+                                <!-- [YANGI] Soni badge -->
+                                <span class="mahsulot-row-soni">{{ item.jami_miqdor }} dona</span>
+                                <span class="mahsulot-row-summa">{{ item.jami_summa|floatformat:0|intcomma }}</span>
                             </div>
                             <div class="prog-bar-track">
                                 <div class="prog-bar-fill"
@@ -464,7 +534,45 @@
                     </div>
                 </div>
             </div>
-
+            <!-- ── KIRIMLAR XARIDOR BO'YICHA ── -->
+            <div class="an-card" style="margin-bottom:1.25rem;">
+                <div class="an-card-header">
+                    <h3>
+                        <span class="h-icon" style="background:#f0fdf4; color:#059669;">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 13 13">
+                                <path d="M7 2v10M2 7h10"/>
+                            </svg>
+                        </span>
+                        Kirimlar — xaridor bo'yicha
+                    </h3>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:12px; font-weight:700; color:#059669;">
+                            {{ kirim_summa|floatformat:0|intcomma }} so'm
+                        </span>
+                        <button class="chart-select-all" onclick="kirimXaridorSelectAll(this)" data-all="true">
+                            Barchasini o'chir
+                        </button>
+                    </div>
+                </div>
+                <div class="an-card-body" style="padding:1rem 1.25rem;">
+                    <div class="chart-filter-wrap" style="align-items:flex-start; gap:1.5rem;">
+                        <!-- Donut -->
+                        <div style="position:relative; width:160px; height:160px; flex-shrink:0;">
+                            <canvas id="kirimXaridorChart"></canvas>
+                            <div class="donut-center-label">
+                                <div class="dcl-val" id="kirimDonutTotal">
+                                    {{ kirim_summa|floatformat:2|intcomma }} 
+                                </div>
+                                <div class="dcl-sub">so'm</div>
+                            </div>
+                        </div>
+                        <!-- Legend + table -->
+                        <div style="flex:1; min-width:0;">
+                            <div id="kirimXaridorLegend" class="chart-legend-filters" style="max-height:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- ── YANGI XARIDORLAR ── -->
             <div class="an-card" style="margin-bottom:1.25rem;">
                 <div class="an-card-header">
@@ -544,7 +652,7 @@
                     </div>
                 </div>
 
-                <!-- Xomashyo kategoriya -->
+                <!-- [O'ZGARISH 2] Xomashyo kategoriya - interaktiv filter -->
                 <div class="an-card">
                     <div class="an-card-header">
                         <h3>
@@ -553,25 +661,19 @@
                             </span>
                             Xomashyo kategoriya
                         </h3>
+                        <button class="chart-select-all" onclick="xomCatSelectAll(this)" data-all="true">Barchasini o'chir</button>
                     </div>
-                    <div class="an-card-body" style="display:flex; align-items:center; gap:1rem;">
-                        <div style="width:140px; height:140px; flex-shrink:0;">
-                            <canvas id="xomCatChart"></canvas>
-                        </div>
-                        <div style="flex:1; font-size:12px;">
-                            {% for item in xom_cat_qs %}
-                            <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-color);">
-                                <span>{{ item.category__name|truncatechars:18 }}</span>
-                                <strong>{{ item.jami_miqdor|floatformat:1 }}</strong>
+                    <div class="an-card-body" style="padding:0.85rem 1.25rem;">
+                        <div class="chart-filter-wrap">
+                            <div style="width:140px; height:140px; flex-shrink:0;">
+                                <canvas id="xomCatChart"></canvas>
                             </div>
-                            {% empty %}
-                            <span style="color:var(--text-secondary);">Ma'lumot yo'q</span>
-                            {% endfor %}
+                            <div class="chart-legend-filters" id="xomCatLegend"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Chiqim turlari -->
+                <!-- [O'ZGARISH 3] Chiqim turlari - interaktiv filter -->
                 <div class="an-card">
                     <div class="an-card-header">
                         <h3>
@@ -580,19 +682,14 @@
                             </span>
                             Chiqim turlari
                         </h3>
+                        <button class="chart-select-all" onclick="chiqimTurSelectAll(this)" data-all="true">Barchasini o'chir</button>
                     </div>
-                    <div class="an-card-body" style="display:flex; align-items:center; gap:1rem;">
-                        <div style="width:140px; height:140px; flex-shrink:0;">
-                            <canvas id="chiqimTurChart"></canvas>
-                        </div>
-                        <div style="flex:1; font-size:12px;">
-                            {% for label in chiqim_tur_labels_list %}
-                            <div style="display:flex; align-items:center; gap:5px; padding:3px 0; border-bottom:1px solid var(--border-color);">
-                                <span style="width:8px; height:8px; border-radius:50%; background:{{ label.color }}; flex-shrink:0;"></span>
-                                <span style="flex:1;">{{ label.name|truncatechars:16 }}</span>
-                                <strong>{{ label.val|floatformat:0|intcomma }}</strong>
+                    <div class="an-card-body" style="padding:0.85rem 1.25rem;">
+                        <div class="chart-filter-wrap">
+                            <div style="width:140px; height:140px; flex-shrink:0;">
+                                <canvas id="chiqimTurChart"></canvas>
                             </div>
-                            {% endfor %}
+                            <div class="chart-legend-filters" id="chiqimTurLegend"></div>
                         </div>
                     </div>
                 </div>
@@ -643,6 +740,7 @@
                     </div>
                 </div>
 
+                <!-- [CHECK: logika to'g'ri, hech narsa o'zgartirilmadi] -->
                 <div class="an-card">
                     <div class="an-card-header">
                         <h3>
@@ -655,7 +753,7 @@
                     </div>
                     <div style="overflow-x:auto;">
                         <table class="an-table">
-                            <thead><tr><th>Xaridor</th><th>Sotuv</th><th>Qarz</th></tr></thead>
+                            <thead><tr><th>Xaridor</th><th>Sotuv</th><th>Umumiy qarz</th></tr></thead>
                             <tbody>
                             {% for x in qarzli_xaridorlar %}
                             <tr>
@@ -753,6 +851,7 @@
 
 <!-- ── Chart.js ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
 <script>
 // ── Date range filter logic ──────────────────────────────────────────────
 (function () {
@@ -773,29 +872,22 @@
         btn.addEventListener('click', () => {
             const key = btn.dataset.preset;
             setActive(key);
-            if (key !== 'custom') {
-                form.submit();
-            }
+            if (key !== 'custom') form.submit();
         });
     });
 
-    // Keep date inputs in sync
     dateFrom.addEventListener('change', () => {
-        if (dateTo.value && dateTo.value < dateFrom.value) {
-            dateTo.value = dateFrom.value;
-        }
+        if (dateTo.value && dateTo.value < dateFrom.value) dateTo.value = dateFrom.value;
         dateTo.min = dateFrom.value;
     });
 
     dateTo.addEventListener('change', () => {
-        if (dateFrom.value && dateFrom.value > dateTo.value) {
-            dateFrom.value = dateTo.value;
-        }
+        if (dateFrom.value && dateFrom.value > dateTo.value) dateFrom.value = dateTo.value;
         dateFrom.max = dateTo.value;
     });
 })();
 
-// ── Chart.js setup ───────────────────────────────────────────────────────
+// ── Chart.js global setup ────────────────────────────────────────────────
 const isDark    = document.documentElement.getAttribute('data-theme') === 'dark' ||
                   window.matchMedia('(prefers-color-scheme: dark)').matches;
 const gridColor = isDark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
@@ -805,12 +897,11 @@ Chart.defaults.font.family = "'Inter','Segoe UI',sans-serif";
 Chart.defaults.font.size   = 11;
 Chart.defaults.color       = textColor;
 
+// ── Data from Django ─────────────────────────────────────────────────────
 const trendLabels    = {{ trend_labels|safe }};
 const trendKirim     = {{ trend_kirim|safe }};
 const trendChiqim    = {{ trend_chiqim|safe }};
 const trendFoyda     = {{ trend_foyda|safe }};
-const mahsulotLabels = {{ mahsulot_labels|safe }};
-const mahsulotVals   = {{ mahsulot_vals|safe }};
 const xomCatLabels   = {{ xom_cat_labels|safe }};
 const xomCatVals     = {{ xom_cat_vals|safe }};
 const chiqimLabels   = {{ chiqim_tur_labels|safe }};
@@ -819,11 +910,20 @@ const xaridorLabels  = {{ xaridor_labels|safe }};
 const xaridorVals    = {{ xaridor_vals|safe }};
 const sotuvHolat     = {{ sotuv_holat_json|safe }};
 
+// ── Formatters ───────────────────────────────────────────────────────────
+// Y o'qi uchun qisqa format (1M, 500K ...)
 const yFmt = v => v >= 1e9 ? (v/1e9).toFixed(1)+'B' :
                   v >= 1e6 ? (v/1e6).toFixed(1)+'M' :
                   v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v;
 
-// 1. Trend
+// Hamma joyda to'liq raqam, bo'sh joy bilan ajratilgan
+const fullFmt = v => Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+// ── Palette ──────────────────────────────────────────────────────────────
+const PIE_COLORS    = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#14b8a6'];
+const CHIQIM_COLORS = ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#10b981','#f97316','#3b82f6','#84cc16','#ec4899','#14b8a6'];
+
+// ── 1. Trend chart ───────────────────────────────────────────────────────
 new Chart(document.getElementById('trendChart'), {
     type: 'bar',
     data: {
@@ -848,7 +948,7 @@ new Chart(document.getElementById('trendChart'), {
     },
 });
 
-// 2. Sotuv holat donut
+// ── 2. Sotuv holat donut ─────────────────────────────────────────────────
 new Chart(document.getElementById('sotuvHolatChart'), {
     type: 'doughnut',
     data: {
@@ -862,32 +962,7 @@ new Chart(document.getElementById('sotuvHolatChart'), {
     options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'65%' },
 });
 
-// 3. Xomashyo kategoriya
-const PIE = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4'];
-new Chart(document.getElementById('xomCatChart'), {
-    type:'doughnut',
-    data:{
-        labels:xomCatLabels,
-        datasets:[{ data:xomCatVals, backgroundColor:PIE, borderWidth:2, borderColor:isDark?'#1f2937':'#fff' }],
-    },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'55%' },
-});
-
-// 4. Chiqim turlari
-new Chart(document.getElementById('chiqimTurChart'), {
-    type:'doughnut',
-    data:{
-        labels:chiqimLabels,
-        datasets:[{
-            data:chiqimVals,
-            backgroundColor:['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#10b981','#f97316'],
-            borderWidth:2, borderColor:isDark?'#1f2937':'#fff',
-        }],
-    },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'55%' },
-});
-
-// 5. Yangi xaridorlar
+// ── 5. Yangi xaridorlar ──────────────────────────────────────────────────
 new Chart(document.getElementById('xaridorChart'), {
     type:'line',
     data:{
@@ -907,5 +982,333 @@ new Chart(document.getElementById('xaridorChart'), {
         },
     },
 });
+
+// ── Interaktiv pie chart factory ─────────────────────────────────────────
+function buildFilterablePie(canvasId, legendId, labels, values, colors, onChartReady) {
+    const state = labels.map(() => true);
+    const borderColor = isDark ? '#1f2937' : '#ffffff';
+
+    function getActiveData() {
+        const activeLabels = [], activeValues = [], activeColors = [];
+        state.forEach((on, i) => {
+            if (on) {
+                activeLabels.push(labels[i]);
+                activeValues.push(values[i]);
+                activeColors.push(colors[i % colors.length]);
+            }
+        });
+        return { activeLabels, activeValues, activeColors };
+    }
+
+    const { activeLabels, activeValues, activeColors } = getActiveData();
+
+    const chart = new Chart(document.getElementById(canvasId), {
+        type: 'doughnut',
+        data: {
+            labels: activeLabels,
+            datasets:[{
+                data: activeValues,
+                backgroundColor: activeColors,
+                borderWidth: 2,
+                borderColor: borderColor,
+            }],
+        },
+        options:{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins:{ legend:{ display:false } },
+            cutout: '55%',
+        },
+    });
+
+    const legendEl = document.getElementById(legendId);
+
+    function renderLegend() {
+        legendEl.innerHTML = '';
+        labels.forEach((label, i) => {
+            const color = colors[i % colors.length];
+            const isOn  = state[i];
+
+            const item = document.createElement('div');
+            item.className = 'chart-legend-item' + (isOn ? '' : ' disabled');
+            item.innerHTML = `
+                <span class="chart-legend-dot" style="background:${isOn ? color : '#9ca3af'};"></span>
+                <span class="chart-legend-name" title="${label}">${label || 'Boshqa'}</span>
+                <span class="chart-legend-val">${fullFmt(values[i])}</span>
+            `;
+            item.addEventListener('click', () => {
+                const onCount = state.filter(Boolean).length;
+                if (isOn && onCount === 1) return;
+                state[i] = !state[i];
+                updateChart();
+                renderLegend();
+            });
+            legendEl.appendChild(item);
+        });
+    }
+
+    function updateChart() {
+        const { activeLabels, activeValues, activeColors } = getActiveData();
+        chart.data.labels                       = activeLabels;
+        chart.data.datasets[0].data             = activeValues;
+        chart.data.datasets[0].backgroundColor  = activeColors;
+        chart.update('active');
+    }
+
+    renderLegend();
+
+    if (onChartReady) {
+        onChartReady({
+            selectAll: () => { state.fill(true);  updateChart(); renderLegend(); },
+            deselectAll: () => { state.fill(false); state[0] = true; updateChart(); renderLegend(); },
+            allOn: () => state.every(Boolean),
+        });
+    }
+
+    return chart;
+}
+
+// ── Xomashyo kategoriya chart ────────────────────────────────────────────
+let xomCatCtrl = null;
+buildFilterablePie('xomCatChart', 'xomCatLegend', xomCatLabels, xomCatVals, PIE_COLORS,
+    (ctrl) => { xomCatCtrl = ctrl; });
+
+function xomCatSelectAll(btn) {
+    if (!xomCatCtrl) return;
+    const allOn = btn.dataset.all === 'true';
+    if (allOn) { xomCatCtrl.deselectAll(); btn.textContent = 'Barchasini yoq';    btn.dataset.all = 'false'; }
+    else        { xomCatCtrl.selectAll();  btn.textContent = "Barchasini o'chir"; btn.dataset.all = 'true';  }
+}
+
+// ── Chiqim turlari chart ─────────────────────────────────────────────────
+let chiqimTurCtrl = null;
+buildFilterablePie('chiqimTurChart', 'chiqimTurLegend', chiqimLabels, chiqimVals, CHIQIM_COLORS,
+    (ctrl) => { chiqimTurCtrl = ctrl; });
+
+function chiqimTurSelectAll(btn) {
+    if (!chiqimTurCtrl) return;
+    const allOn = btn.dataset.all === 'true';
+    if (allOn) { chiqimTurCtrl.deselectAll(); btn.textContent = 'Barchasini yoq';    btn.dataset.all = 'false'; }
+    else        { chiqimTurCtrl.selectAll();  btn.textContent = "Barchasini o'chir"; btn.dataset.all = 'true';  }
+}
+</script>
+
+<script>
+// ── Kirim xaridor bo'yicha pie ────────────────────────────────────────────
+const kirimXLabels = {{ kirim_xaridor_labels|safe }};
+const kirimXVals   = {{ kirim_xaridor_vals|safe }};
+const KIRIM_COLORS = ['#059669','#10b981','#34d399','#6ee7b7','#3b82f6','#8b5cf6','#f59e0b','#06b6d4'];
+
+function kirimDonutUpdateTotal(state, vals) {
+    let total = 0;
+    state.forEach((on, i) => { if (on) total += vals[i]; });
+    const el = document.getElementById('kirimDonutTotal');
+    if (el) el.textContent = fullFmt(total);
+}
+
+let kirimXCtrl = null;
+buildFilterablePie(
+    'kirimXaridorChart', 'kirimXaridorLegend',
+    kirimXLabels, kirimXVals, KIRIM_COLORS,
+    (ctrl) => {
+        kirimXCtrl = ctrl;
+
+        const legendEl = document.getElementById('kirimXaridorLegend');
+
+        function renderKirimLegend(state) {
+            legendEl.innerHTML = '';
+            const totalAll = kirimXVals.reduce((a, b) => a + b, 0);
+
+            kirimXLabels.forEach((label, i) => {
+                const color = KIRIM_COLORS[i % KIRIM_COLORS.length];
+                const isOn  = state[i];
+                const pct   = totalAll > 0 ? ((kirimXVals[i] / totalAll) * 100).toFixed(1) : 0;
+
+                const row = document.createElement('div');
+                row.style.cssText = `
+                    display:flex; align-items:center; gap:8px;
+                    padding:5px 6px; border-radius:6px; cursor:pointer;
+                    transition:background .12s; user-select:none;
+                    border-bottom:1px solid var(--border-color);
+                    opacity:${isOn ? 1 : 0.38};
+                `;
+                row.innerHTML = `
+                    <span style="width:10px; height:10px; border-radius:50%; flex-shrink:0;
+                        background:${isOn ? color : '#9ca3af'};"></span>
+                    <span style="flex:1; font-size:12px; font-weight:600;
+                        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        title="${label}">${label || "Noma'lum"}</span>
+                    <span style="font-size:11px; color:var(--text-secondary);
+                        margin-left:auto; white-space:nowrap;">${pct}%</span>
+                    <span style="font-size:11px; font-weight:700;
+                        color:${isOn ? '#059669' : 'var(--text-secondary)'};
+                        white-space:nowrap; min-width:70px; text-align:right;">
+                        ${fullFmt(kirimXVals[i])}
+                    </span>
+                `;
+                row.addEventListener('click', () => {
+                    const onCount = state.filter(Boolean).length;
+                    if (isOn && onCount === 1) return;
+                    state[i] = !state[i];
+                    window._kirimChart.data.labels                      = kirimXLabels.filter((_, j) => state[j]);
+                    window._kirimChart.data.datasets[0].data            = kirimXVals.filter((_, j) => state[j]);
+                    window._kirimChart.data.datasets[0].backgroundColor = KIRIM_COLORS.filter((_, j) => state[j]);
+                    window._kirimChart.update('active');
+                    kirimDonutUpdateTotal(state, kirimXVals);
+                    renderKirimLegend(state);
+                });
+                legendEl.appendChild(row);
+            });
+        }
+
+        window._kirimState = kirimXLabels.map(() => true);
+        window._kirimChart = Chart.getChart('kirimXaridorChart');
+
+        renderKirimLegend(window._kirimState);
+        kirimDonutUpdateTotal(window._kirimState, kirimXVals);
+
+        ctrl._renderKirimLegend = renderKirimLegend;
+    }
+);
+
+function kirimXaridorSelectAll(btn) {
+    if (!window._kirimChart || !window._kirimState) return;
+    const allOn = btn.dataset.all === 'true';
+
+    if (allOn) {
+        window._kirimState.fill(false);
+        window._kirimState[0] = true;
+        btn.textContent = 'Barchasini yoq';
+        btn.dataset.all = 'false';
+    } else {
+        window._kirimState.fill(true);
+        btn.textContent = "Barchasini o'chir";
+        btn.dataset.all = 'true';
+    }
+
+    window._kirimChart.data.labels                      = kirimXLabels.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.data.datasets[0].data            = kirimXVals.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.data.datasets[0].backgroundColor = KIRIM_COLORS.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.update('active');
+    kirimDonutUpdateTotal(window._kirimState, kirimXVals);
+
+    if (kirimXCtrl && kirimXCtrl._renderKirimLegend) {
+        kirimXCtrl._renderKirimLegend(window._kirimState);
+    }
+}
+</script>
+
+
+<script>
+    // ── Kirim xaridor bo'yicha pie ─────────────────────────────────────────
+const kirimXLabels = {{ kirim_xaridor_labels|safe }};
+const kirimXVals   = {{ kirim_xaridor_vals|safe }};
+const KIRIM_COLORS = ['#059669','#10b981','#34d399','#6ee7b7','#3b82f6','#8b5cf6','#f59e0b','#06b6d4'];
+
+// fullFmt — GLOBAL scope'da, barcha funksiyalar ko'radi
+const fullFmt = v => Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+function kirimDonutUpdateTotal(state, vals) {
+    let total = 0;
+    state.forEach((on, i) => { if (on) total += vals[i]; });
+    const el = document.getElementById('kirimDonutTotal');
+    if (el) el.textContent = fullFmt(total);
+}
+
+let kirimXCtrl = null;
+buildFilterablePie(
+    'kirimXaridorChart', 'kirimXaridorLegend',
+    kirimXLabels, kirimXVals, KIRIM_COLORS,
+    (ctrl) => {
+        kirimXCtrl = ctrl;
+
+        const legendEl = document.getElementById('kirimXaridorLegend');
+
+        function renderKirimLegend(state) {
+            legendEl.innerHTML = '';
+            const totalAll = kirimXVals.reduce((a, b) => a + b, 0);
+
+            kirimXLabels.forEach((label, i) => {
+                const color = KIRIM_COLORS[i % KIRIM_COLORS.length];
+                const isOn  = state[i];
+                const pct   = totalAll > 0 ? ((kirimXVals[i] / totalAll) * 100).toFixed(1) : 0;
+
+                const row = document.createElement('div');
+                row.style.cssText = `
+                    display:flex; align-items:center; gap:8px;
+                    padding:5px 6px; border-radius:6px; cursor:pointer;
+                    transition:background .12s; user-select:none;
+                    border-bottom:1px solid var(--border-color);
+                    opacity:${isOn ? 1 : 0.38};
+                `;
+                row.innerHTML = `
+                    <span style="
+                        width:10px; height:10px; border-radius:50%; flex-shrink:0;
+                        background:${isOn ? color : '#9ca3af'};
+                    "></span>
+                    <span style="flex:1; font-size:12px; font-weight:600;
+                        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        title="${label}">
+                        ${label || "Noma'lum"}
+                    </span>
+                    <span style="font-size:11px; color:var(--text-secondary); margin-left:auto; white-space:nowrap;">
+                        ${pct}%
+                    </span>
+                    <span style="font-size:11px; font-weight:700;
+                        color:${isOn ? '#059669' : 'var(--text-secondary)'};
+                        white-space:nowrap; min-width:70px; text-align:right;">
+                        ${fullFmt(kirimXVals[i])}
+                    </span>
+                `;
+                row.addEventListener('click', () => {
+                    const onCount = state.filter(Boolean).length;
+                    if (isOn && onCount === 1) return;
+                    state[i] = !state[i];
+                    window._kirimChart.data.labels                      = kirimXLabels.filter((_, j) => state[j]);
+                    window._kirimChart.data.datasets[0].data            = kirimXVals.filter((_, j) => state[j]);
+                    window._kirimChart.data.datasets[0].backgroundColor = KIRIM_COLORS.filter((_, j) => state[j]);
+                    window._kirimChart.update('active');
+                    kirimDonutUpdateTotal(state, kirimXVals);
+                    renderKirimLegend(state);
+                });
+                legendEl.appendChild(row);
+            });
+        }
+
+        window._kirimState = kirimXLabels.map(() => true);
+        window._kirimChart = Chart.getChart('kirimXaridorChart');
+
+        renderKirimLegend(window._kirimState);
+        kirimDonutUpdateTotal(window._kirimState, kirimXVals);
+
+        ctrl._renderKirimLegend = renderKirimLegend;
+    }
+);
+
+function kirimXaridorSelectAll(btn) {
+    if (!window._kirimChart || !window._kirimState) return;
+    const allOn = btn.dataset.all === 'true';
+
+    if (allOn) {
+        window._kirimState.fill(false);
+        window._kirimState[0] = true;
+        btn.textContent = 'Barchasini yoq';
+        btn.dataset.all = 'false';
+    } else {
+        window._kirimState.fill(true);
+        btn.textContent = "Barchasini o'chir";
+        btn.dataset.all = 'true';
+    }
+
+    window._kirimChart.data.labels                      = kirimXLabels.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.data.datasets[0].data            = kirimXVals.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.data.datasets[0].backgroundColor = KIRIM_COLORS.filter((_, i) => window._kirimState[i]);
+    window._kirimChart.update('active');
+    kirimDonutUpdateTotal(window._kirimState, kirimXVals);
+
+    if (kirimXCtrl && kirimXCtrl._renderKirimLegend) {
+        kirimXCtrl._renderKirimLegend(window._kirimState);
+    }
+}
 </script>
 {% endblock content %}

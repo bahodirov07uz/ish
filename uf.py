@@ -1,20 +1,15 @@
-import os
-import json
-import django
-from django.utils.timezone import now
 from django.db.models import Sum
-# Django sozlamalarini yuklash
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings') # Loyiha nomini o'zgartiring
-django.setup()
+from datetime import date
+from crm.models import Ish  # to'g'ri app nomini qo'ying
 
-from django.db import transaction
-import re
+natija = Ish.objects.filter(
+    ishchi__turi__nomi='kosib',
+    sana__gte=date(2026, 6, 1),
+    sana__lte=date(2026, 6, 26)
+).aggregate(
+    umumiy_soni=Sum('soni'),
+    umumiy_narxi=Sum('narxi')
+)
 
-from crm.models import Chiqim,ChiqimItem
-
-from xomashyo.models import XomashyoHarakat
-from crm.models import Ish,Product
-
-ishlar = Ish.objects.filter(status='yangi')
-
-ishlar.update(status='yopilgan')
+print(f"Umumiy soni: {natija['umumiy_soni'] or 0}")
+print(f"Umumiy narxi: {natija['umumiy_narxi'] or 0}")

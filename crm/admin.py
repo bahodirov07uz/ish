@@ -73,6 +73,7 @@ class IshchiAdmin(ImportExportModelAdmin):
     list_filter = ('turi', 'is_active', 'is_oylik_open')
     search_fields = ('ism', 'familiya', 'telefon')
     readonly_fields = ('oylik_yopilgan_sana',)
+    list_editable = ('is_active',)
     list_per_page = 20
 
 @admin.register(Oyliklar)
@@ -82,6 +83,7 @@ class OyliklarAdmin(admin.ModelAdmin):
     list_filter = ('sana', 'yopilgan','ishchi__ism')
     search_fields = ('ishchi__ism', 'ishchi__familiya')
     list_per_page = 20
+    list_editable = ('sana',)
     def formfield_for_dbfield(self, db_field, **kwargs):
         if db_field.name == "oylik":
             kwargs["widget"] = forms.TextInput(attrs={
@@ -108,6 +110,7 @@ class IshAdmin(ImportExportModelAdmin):
     list_display = ('mahsulot', 'ishchi', 'sana', 'soni', 'narxi','status')
     list_filter = (Last15DaysFilter, 'ishchi__turi','ishchi__ism','status')
     search_fields = ('mahsulot__nomi', 'ishchi__ism')
+    list_editable = ('status',)
     list_per_page = 20
 
 
@@ -152,6 +155,7 @@ class ChiqimAdmin(ExportMixin,admin.ModelAdmin):
     inlines = [ChiqimItemInline]
     resource_class = ChiqimResource
     list_display = ('name', 'category', 'price','price_usd', 'created')
+    list_editable = ('created',)
     list_filter = ('category', Last15DaysFilter,'created')
     search_fields = ('name',)
     list_per_page = 20
@@ -175,9 +179,10 @@ class SotuvItemInline(admin.TabularInline):
 class SotuvAdmin(ImportExportModelAdmin):
     """Sotuv admin paneli"""
     resource_class = SotuvResource
-    list_display = ('id', 'xaridor', 'jami_summa', 'jami_summa_usd','tolangan_summa', 'tolov_holati', 'sana')
+    list_display = ('id', 'xaridor', 'formatted_summa', 'jami_summa_usd','tolangan_summa', 'tolov_holati', 'sana')
     list_filter = ('tolov_holati', 'sana','xaridor__ism')
     search_fields = ('xaridor__ism', 'xaridor__telefon', 'id')
+    
     readonly_fields = ('jami_summa', 'yakuniy_summa', 'created_at', 'updated_at')
     date_hierarchy = 'sana'
     inlines = [SotuvItemInline]
@@ -197,7 +202,10 @@ class SotuvAdmin(ImportExportModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('xaridor').prefetch_related('items')
-
+    
+    @admin.display(description='Summa') # Ustun sarlavhasi
+    def formatted_summa(self, obj):
+        return f"{intcomma(obj.jami_summa)}"
 
 @admin.register(SotuvItem)
 class SotuvItemAdmin(ImportExportModelAdmin):

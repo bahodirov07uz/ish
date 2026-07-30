@@ -402,6 +402,19 @@ class AnalyticsView(LoginRequiredMixin, TemplateView):
             xaridor_labels.append(f"{OY[r['oy'].month]} {str(r['oy'].year)[2:]}")
             xaridor_vals.append(r['soni'])
 
+        kirim_xaridorlar = (
+            kirim_period
+            .values('xaridor__id', 'xaridor__ism')
+            .annotate(jami=Sum('summa'))
+            .filter(jami__gt=0)          # storno tufayli manfiy chiqmasini filtrlaymiz
+            .order_by('-jami')[:8]
+        )
+        kirim_xaridor_labels = [
+            x['xaridor__ism'] if x['xaridor__ism'] else 'Noma\'lum'
+            for x in kirim_xaridorlar
+        ]
+        kirim_xaridor_vals = [j(x['jami']) for x in kirim_xaridorlar]
+        
         # ── Context ─────────────────────────────────────────────────
         ctx.update({
             # Filter state
@@ -465,6 +478,8 @@ class AnalyticsView(LoginRequiredMixin, TemplateView):
             'xaridor_labels'    : json.dumps(xaridor_labels),
             'xaridor_vals'      : json.dumps(xaridor_vals),
             'sotuv_holat_json'  : json.dumps(sotuv_holat),
+            'kirim_xaridor_labels': json.dumps(kirim_xaridor_labels),
+            'kirim_xaridor_vals':   json.dumps(kirim_xaridor_vals),
 
             'today'       : today,
         })

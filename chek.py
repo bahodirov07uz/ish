@@ -456,260 +456,307 @@ class XaridorUmumiyChekView(LoginRequiredMixin, View):
         doc.build(story)
         return buffer
     
+"""
+Rasmiy formatdagi Ishchi Chek (oylik hisob-kitob varaqasi) generatori.
+
+O'ZGARISHLAR (avvalgi versiyaga nisbatan):
+1. Rangli "card" dizayn o'rniga oddiy, rasmiy hujjatlarga xos qora-oq jadval.
+2. Ishlar jadvaliga "Birlik narx" ustuni qo'shildi.
+   -> birlik_narx = ish.narxi / ish.soni  (chunki ish.narxi shu yozuvning UMUMIY summasi)
+   Masalan: Tufli, soni=5, umumiy narxi=35000  =>  birlik narx = 7000
+   ESLATMA: agar sizda Mahsulot modelida alohida "ishchi narxi" maydoni bo'lsa
+   (masalan m.Mahsulot.ishchi_narxi), pastdagi `birlik_narx` hisoblashni
+   shunga almashtiring - izohli joyni qarang.
+3. Pastda "Mahsulotlar bo'yicha xulosa" jadvali qo'shildi - har bir mahsulotdan
+   jami nechta va qancha summaga ish qilingani.
+"""
+
+import io
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse
+from django.views import View
+from django.shortcuts import get_object_or_404
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+)
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from datetime import date
+
+from crm import models as m
+
+
 class IshchiChekView(LoginRequiredMixin, View):
     login_url = 'account_login'
- 
+
     def get(self, request, pk):
         ishchi = get_object_or_404(m.Ishchi, pk=pk)
- 
-        ishlar   = list(ishchi.ishlar.filter(status='yangi')
-                        .select_related('mahsulot').order_by('sana'))
-        avanslar = list(m.Avans.objects.filter(ishchi=ishchi, is_active=True)
-                        .order_by('created'))
- 
+
+        ishlar = list(
+            ishchi.ishlar.filter(status='yangi')
+            .select_related('mahsulot').order_by('sana')
+        )
+        avanslar = list(
+            m.Avans.objects.filter(ishchi=ishchi, is_active=True).order_by('created')
+        )
+
         total_summa = sum(to_int(ish.narxi) for ish in ishlar)
-        total_avans = sum(to_int(av.amount)  for av in avanslar)
-        total_soni  = sum(to_int(ish.soni)   for ish in ishlar)
- 
+        total_avans = sum(to_int(av.amount) for av in avanslar)
+        total_soni = sum(to_int(ish.soni) for ish in ishlar)
+
         buf = io.BytesIO()
         self._build(buf, ishchi, ishlar, avanslar, total_summa, total_avans, total_soni)
         buf.seek(0)
- 
+
         resp = HttpResponse(buf, content_type='application/pdf')
         resp['Content-Disposition'] = f'attachment; filename="chek_{ishchi.id}.pdf"'
         return resp
- 
+
     def _build(self, buf, ishchi, ishlar, avanslar,
-               total_summa, total_avans, total_soni):
- 
+            total_summa, total_avans, total_soni):
         doc = SimpleDocTemplate(
             buf, pagesize=A4,
-            rightMargin=12*mm, leftMargin=12*mm,
-            topMargin=10*mm,   bottomMargin=10*mm,
+            rightMargin=10*mm, leftMargin=10*mm,   # 14 → 10
+            topMargin=8*mm, bottomMargin=8*mm,      # 14 → 8
         )
- 
-        BD  = colors.HexColor("#ffffff")
-        BL  = colors.HexColor('#eff6ff')
-        GR  = colors.HexColor('#059669')
-        GRL = colors.HexColor('#f0fdf4')
-        RD  = colors.HexColor('#dc2626')
-        RDL = colors.HexColor('#fef2f2')
-        GB  = colors.HexColor('#f8fafc')
-        GT  = colors.HexColor('#64748b')
-        BR  = colors.HexColor('#e2e8f0')
-        BK  = colors.HexColor('#0f172a')
-        PU  = colors.HexColor('#7c3aed')
-        PUL = colors.HexColor('#f5f3ff')
- 
-        # Sahifa umumiy kengligi: 210 - 12 - 12 = 186mm
-        W = 186
- 
+        BK = colors.black
+        HB = colors.HexColor('#f2f2f2')
+        BR = colors.HexColor('#000000')
+        GT = colors.HexColor('#404040')
+        W = 190  # 210 - 10 - 10
         _sid = [0]
-        def p(text, fs=9, fn='Helvetica', tc=None, al=TA_LEFT):
+        def p(text, fs=8, fn='Helvetica', tc=None, al=TA_LEFT):   # default fs 9→8
             _sid[0] += 1
-            st = mkstyle(f'_s{_sid[0]}',
-                         fontSize=fs, fontName=fn,
-                         textColor=tc or BK,
-                         alignment=al)
+            st = mkstyle(f'_s{_sid[0]}', fontSize=fs, fontName=fn,
+                        textColor=tc or BK, alignment=al)
             return Paragraph(str(text), st)
- 
         story = []
- 
-        # ── 1. HEADER ──────────────────────────────────────────────
-        hdr = Table([[
-            p(f"{ishchi.ism} {ishchi.familiya}",
-              fs=13, fn='Helvetica-Bold', tc=colors.black),
-            p("OYLIK CHEK",
-              fs=13, fn='Helvetica-Bold', tc=colors.black, al=TA_CENTER),
-            p(f"{ishchi.turi.nomi if ishchi.turi else ''}  "
-              f"<font size=8 color='#bfdbfe'>{date.today().strftime('%d.%m.%Y')}</font>",
-              fs=9, fn='Helvetica-Bold', tc=colors.black, al=TA_RIGHT),
-        ]], colWidths=[70*mm, 76*mm, 40*mm])
-        hdr.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0),(-1,-1), BD),
-            ('TOPPADDING',    (0,0),(-1,-1), 8),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 8),
-            ('LEFTPADDING',   (0,0),(-1,-1), 10),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 10),
-            ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
+        # ── 1. SARLAVHA ──────────────────────────────────────────────────
+        story.append(p("OYLIK ISH HAQI HISOB-KITOB VARAQASI",
+                        fs=11, fn='Helvetica-Bold', al=TA_CENTER))
+        story.append(Spacer(1, 1*mm))                           # 1.5 → 1
+        story.append(p(f"Sana: {date.today().strftime('%d.%m.%Y')}",
+                        fs=8, tc=GT, al=TA_CENTER))
+        story.append(Spacer(1, 2*mm))                           # 4 → 2
+        turi_str = f" ({ishchi.turi.nomi})" if ishchi.turi else ""
+        info = Table([
+            [p("Xodim F.I.Sh:", fs=8, tc=GT),
+            p(f"{ishchi.ism} {ishchi.familiya}{turi_str}", fs=9, fn='Helvetica-Bold')],
+        ], colWidths=[38*mm, W*mm - 38*mm])
+        info.setStyle(TableStyle([
+            ('TOPPADDING', (0,0), (-1,-1), 1),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
         ]))
-        story.append(hdr)
-        story.append(Spacer(1, 3*mm))
- 
-        # ── 2. ISHLAR JADVALI ──────────────────────────────────────
-        # Ustun kengliklari jami: 8+22+104+18+34 = 186mm
-        COL_ISH = [8*mm, 22*mm, 104*mm, 18*mm, 34*mm]
- 
+        story.append(info)
+        story.append(Spacer(1, 3*mm))                           # 5 → 3
+        # ── 2. ISHLAR JADVALI ─────────────────────────────────────────────
+        # 8+18+72+16+30+36 = 180mm  (W=190 dan kichik, ok)
+        COL_ISH = [8*mm, 18*mm, 72*mm, 16*mm, 30*mm, 36*mm]
         rows = [[
-            p('#',            fs=7, tc=GT),
-            p('Sana',         fs=7, tc=GT),
-            p('Mahsulot',     fs=7, tc=GT),
-            p('Soni',         fs=7, tc=GT),
-            p("Summa (so'm)", fs=7, tc=GT, al=TA_RIGHT),
+            p('№', fs=7, fn='Helvetica-Bold', al=TA_CENTER),
+            p('Sana', fs=7, fn='Helvetica-Bold'),
+            p('Mahsulot', fs=7, fn='Helvetica-Bold'),
+            p('Soni', fs=7, fn='Helvetica-Bold', al=TA_CENTER),
+            p("Birlik narx", fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
+            p("Umumiy (so'm)", fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
         ]]
- 
         for i, ish in enumerate(ishlar, 1):
-            narxi = to_int(ish.narxi)
-            soni  = to_int(ish.soni)
+            umumiy = to_int(ish.narxi)
+            soni = to_int(ish.soni)
+            birlik_narx = umumiy // soni if soni else 0
             rows.append([
-                p(str(i),                                              fs=8, al=TA_CENTER),
-                p(ish.sana.strftime('%d.%m.%y') if ish.sana else '—', fs=8),
-                p(ish.mahsulot.nomi,                                   fs=8),
-                p(str(soni),                                           fs=8, al=TA_CENTER),
-                p(fmt(narxi), fs=8, fn='Helvetica-Bold',               al=TA_RIGHT),
+                p(str(i), fs=7, al=TA_CENTER),
+                p(ish.sana.strftime('%d.%m.%y') if ish.sana else '—', fs=7),
+                p(ish.mahsulot.nomi, fs=7),
+                p(str(soni), fs=7, al=TA_CENTER),
+                p(fmt(birlik_narx), fs=7, al=TA_RIGHT),
+                p(fmt(umumiy), fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
             ])
- 
         last_i = len(rows)
         rows.append([
-            p('', fs=7), p('', fs=7),
-            p('JAMI:', fs=8, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT),
-            p(f"{total_soni} ta", fs=8, fn='Helvetica-Bold', tc=BK, al=TA_CENTER),
-            p(f"{fmt(total_summa)} so'm", fs=9, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT),
+            p('', fs=7), p('', fs=7), p('', fs=7),
+            p(f"{total_soni} ta", fs=7, fn='Helvetica-Bold', al=TA_CENTER),
+            p('JAMI:', fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
+            p(f"{fmt(total_summa)} so'm", fs=8, fn='Helvetica-Bold', al=TA_RIGHT),
         ])
- 
         ish_t = Table(rows, colWidths=COL_ISH)
         ish_t.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0),      (-1,0),        colors.HexColor('#f1f5f9')),
-            ('BOX',           (0,0),      (-1,-1),       0.5, BR),
-            ('LINEBELOW',     (0,0),      (-1,0),        0.5, BR),
-            ('LINEBELOW',     (0,1),      (-1,last_i-1), 0.3, BR),
-            ('ROWBACKGROUNDS',(0,1),      (-1,last_i-1), [colors.white, GB]),
-            ('BACKGROUND',    (0,last_i), (-1,last_i),   BL),
-            ('LINEABOVE',     (0,last_i), (-1,last_i),   1, BD),
+            ('BACKGROUND', (0,0), (-1,0), HB),
+            ('GRID', (0,0), (-1,last_i-1), 0.5, BR),
+            ('BOX', (0,0), (-1,-1), 1, BR),
+            ('LINEABOVE', (0,last_i), (-1,last_i), 1, BR),
+            ('BACKGROUND', (0,last_i), (-1,last_i), HB),
+            ('TOPPADDING', (0,0), (-1,-1), 2),       # 3 → 2
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),     # 3 → 2
+            ('LEFTPADDING', (0,0), (-1,-1), 3),       # 4 → 3
+            ('RIGHTPADDING', (0,0), (-1,-1), 3),      # 4 → 3
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        story.append(ish_t)
+        story.append(Spacer(1, 3*mm))                           # 5 → 3
+
+
+        # ── 3. MAHSULOTLAR BO'YICHA XULOSA ─────────────────────────
+        mahsulot_summary = {}   # {nomi: [soni, summa]}
+        for ish in ishlar:
+            key  = ish.mahsulot.nomi
+            soni = to_int(ish.soni)
+            summa = to_int(ish.narxi)
+            if key not in mahsulot_summary:
+                mahsulot_summary[key] = [0, 0]
+            mahsulot_summary[key][0] += soni
+            mahsulot_summary[key][1] += summa
+        story.append(p("Mahsulotlar bo'yicha xulosa",
+                        fs=8, fn='Helvetica-Bold', tc=GT))
+        story.append(Spacer(1, 1*mm))
+        # №(8) + nomi(112) + soni(32) + summa(34) = 186mm
+        COL_MS = [8*mm, 112*mm, 32*mm, 34*mm]
+        ms_rows = [[
+            p('#',                  fs=7, tc=GT),
+            p('Mahsulot nomi',      fs=7, tc=GT),
+            p('Jami soni',          fs=7, tc=GT, al=TA_CENTER),
+            p("Jami summa (so'm)",  fs=7, tc=GT, al=TA_RIGHT),
+        ]]
+        for i, (nomi, (soni, summa)) in enumerate(mahsulot_summary.items(), 1):
+            ms_rows.append([
+                p(str(i),    fs=8, al=TA_CENTER),
+                p(nomi,      fs=8),
+                p(str(soni), fs=8, al=TA_CENTER),
+                p(fmt(summa), fs=8, fn='Helvetica-Bold', al=TA_RIGHT),
+            ])
+        # ── Jami qator ──────────────────────────────────────────────
+        ms_last = len(ms_rows)
+        ms_rows.append([
+            p('', fs=7),
+            p('JAMI:', fs=8, fn='Helvetica-Bold', al=TA_RIGHT),
+            p(f"{total_soni} ta", fs=8, fn='Helvetica-Bold', al=TA_CENTER),
+            p(f"{fmt(total_summa)} so'm", fs=8, fn='Helvetica-Bold', al=TA_RIGHT),
+        ])
+        
+        ms_t = Table(ms_rows, colWidths=COL_MS)
+        ms_t.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),       (-1,0),       colors.HexColor('#f1f5f9')),
+            ('BOX',           (0,0),       (-1,-1),      0.5, BR),
+            ('LINEBELOW',     (0,0),       (-1,0),       0.5, BR),
+            ('LINEBELOW',     (0,1),       (-1,ms_last-1), 0.3, BR),
+            ('ROWBACKGROUNDS',(0,1),       (-1,ms_last-1), [colors.white, colors.HexColor('#f8fafc')]),
+            # ── Jami qator uslubi ──────────────────────────
+            ('LINEABOVE',     (0,ms_last), (-1,ms_last), 1, BR),
+            ('BACKGROUND',    (0,ms_last), (-1,ms_last), colors.HexColor('#eff6ff')),
+            # ───────────────────────────────────────────────
             ('TOPPADDING',    (0,0),(-1,-1), 3),
             ('BOTTOMPADDING', (0,0),(-1,-1), 3),
             ('LEFTPADDING',   (0,0),(-1,-1), 4),
             ('RIGHTPADDING',  (0,0),(-1,-1), 4),
             ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
         ]))
-        story.append(ish_t)
+        story.append(ms_t)
         story.append(Spacer(1, 3*mm))
- 
-        # ── 3. AVANSLAR (chap, 110mm) + XULOSA (o'ng, 72mm) ───────
-        # Jami: 110 + 4 (gap) + 72 = 186mm
- 
-        AV_W  = 110   # avans jadval kengligi (mm)
-        GAP_W = 4     # oradagi bo'shliq
-        XU_W  = 72    # xulosa kengligi
-        # AV_W ichidagi ustunlar: 8 + 32 + 70 = 110
-        COL_AV = [8*mm, 32*mm, 70*mm]
- 
+        
+        
+        # ── 4. AVANSLAR + HISOB-KITOB ─────────────────────────────────────
+        AV_W, GAP_W, XU_W = 112, 4, 74
+        COL_AV = [8*mm, 32*mm, 72*mm]
         av_rows = [[
-            p('#',             fs=7, tc=GT),
-            p('Berilgan sana', fs=7, tc=GT),
-            p("Summa (so'm)",  fs=7, tc=GT, al=TA_RIGHT),
+            p('№', fs=7, fn='Helvetica-Bold', al=TA_CENTER),
+            p('Berilgan sana', fs=7, fn='Helvetica-Bold'),
+            p("Summa (so'm)", fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
         ]]
         for i, av in enumerate(avanslar, 1):
             av_rows.append([
-                p(str(i), fs=8, al=TA_CENTER),
-                p(av.created.strftime('%d.%m.%y') if av.created else '—', fs=8),
-                p(fmt(av.amount), fs=8, fn='Helvetica-Bold', tc=PU, al=TA_RIGHT),
+                p(str(i), fs=7, al=TA_CENTER),
+                p(av.created.strftime('%d.%m.%y') if av.created else '—', fs=7),
+                p(fmt(av.amount), fs=7, al=TA_RIGHT),
             ])
- 
         av_last = len(av_rows)
         av_rows.append([
             p('', fs=7),
-            p('JAMI:', fs=8, fn='Helvetica-Bold', tc=PU, al=TA_RIGHT),
-            p(f"{fmt(total_avans)} so'm", fs=9, fn='Helvetica-Bold', tc=PU, al=TA_RIGHT),
+            p('JAMI:', fs=7, fn='Helvetica-Bold', al=TA_RIGHT),
+            p(f"{fmt(total_avans)} so'm", fs=8, fn='Helvetica-Bold', al=TA_RIGHT),
         ])
- 
         av_t = Table(av_rows, colWidths=COL_AV)
         av_t.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0),       (-1,0),        PUL),
-            ('BOX',           (0,0),       (-1,-1),       0.5, BR),
-            ('LINEBELOW',     (0,0),       (-1,0),        0.5, BR),
-            ('LINEBELOW',     (0,1),       (-1,av_last-1),0.3, BR),
-            ('ROWBACKGROUNDS',(0,1),       (-1,av_last-1),[colors.white, GB]),
-            ('BACKGROUND',    (0,av_last), (-1,av_last),  PUL),
-            ('LINEABOVE',     (0,av_last), (-1,av_last),  1, PU),
-            ('TOPPADDING',    (0,0),(-1,-1), 3),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 3),
-            ('LEFTPADDING',   (0,0),(-1,-1), 4),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 4),
-            ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
+            ('BACKGROUND', (0,0), (-1,0), HB),
+            ('GRID', (0,0), (-1,av_last-1), 0.5, BR),
+            ('BOX', (0,0), (-1,-1), 1, BR),
+            ('LINEABOVE', (0,av_last), (-1,av_last), 1, BR),
+            ('BACKGROUND', (0,av_last), (-1,av_last), HB),
+            ('TOPPADDING', (0,0), (-1,-1), 2),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ('LEFTPADDING', (0,0), (-1,-1), 3),
+            ('RIGHTPADDING', (0,0), (-1,-1), 3),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
- 
-        # Xulosa — XU_W mm ichiga sig'adi: 36 + 36 = 72mm
-        qoldi   = total_summa - total_avans
-        q_color = GR  if qoldi >= 0 else RD
-        q_bg    = GRL if qoldi >= 0 else RDL
+        qoldi = total_summa - total_avans
         q_label = "Berilishi kerak:" if qoldi >= 0 else "Ortiqcha olgan:"
- 
         xulosa = Table([
-            [p("HISOB-KITOB", fs=8, fn='Helvetica-Bold', tc=BK), ''],
-            [p("Ishlagan:",   fs=7, tc=GT),
-             p(f"{fmt(total_summa)} so'm", fs=9, fn='Helvetica-Bold', tc=BK, al=TA_RIGHT)],
-            [p("Avans:",      fs=7, tc=GT),
-             p(f"{fmt(total_avans)} so'm", fs=9, fn='Helvetica-Bold', tc=PU, al=TA_RIGHT)],
-            [p(q_label,       fs=8, fn='Helvetica-Bold', tc=q_color),
-             p(f"{fmt(abs(qoldi))} so'm", fs=12, fn='Helvetica-Bold', tc=q_color, al=TA_RIGHT)],
-        ], colWidths=[36*mm, 36*mm])   # 36+36 = 72mm = XU_W
+            [p("HISOB-KITOB", fs=8, fn='Helvetica-Bold'), ''],
+            [p("Ishlagan:", fs=7, tc=GT), p(f"{fmt(total_summa)} so'm", fs=8, fn='Helvetica-Bold', al=TA_RIGHT)],
+            [p("Avans:", fs=7, tc=GT),    p(f"{fmt(total_avans)} so'm", fs=8, fn='Helvetica-Bold', al=TA_RIGHT)],
+            [p(q_label, fs=7, fn='Helvetica-Bold'), p(f"{fmt(abs(qoldi))} so'm", fs=10, fn='Helvetica-Bold', al=TA_RIGHT)],
+        ], colWidths=[37*mm, 37*mm])
         xulosa.setStyle(TableStyle([
-            ('SPAN',          (0,0),(-1,0)),
-            ('BACKGROUND',    (0,0),(-1,0),  BL),
-            ('BACKGROUND',    (0,1),(-1,2),  GB),
-            ('BACKGROUND',    (0,3),(-1,3),  q_bg),
-            ('BOX',           (0,0),(-1,-1), 1.2, BD),
-            ('LINEBELOW',     (0,0),(-1,0),  0.5, BR),
-            ('LINEBELOW',     (0,1),(-1,1),  0.3, BR),
-            ('LINEBELOW',     (0,2),(-1,2),  0.3, BR),
-            ('TOPPADDING',    (0,0),(-1,-1), 5),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 5),
-            ('LEFTPADDING',   (0,0),(-1,-1), 6),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 6),
-            ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
+            ('SPAN', (0,0), (-1,0)),
+            ('BACKGROUND', (0,0), (-1,0), HB),
+            ('GRID', (0,0), (-1,-1), 0.5, BR),
+            ('BOX', (0,0), (-1,-1), 1, BR),
+            ('TOPPADDING', (0,0), (-1,-1), 3),       # 4 → 3
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3),     # 4 → 3
+            ('LEFTPADDING', (0,0), (-1,-1), 4),       # 5 → 4
+            ('RIGHTPADDING', (0,0), (-1,-1), 4),      # 5 → 4
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
- 
-        # Combo: avans | bo'shliq | xulosa
-        combo = Table(
-            [[av_t, '', xulosa]],
-            colWidths=[AV_W*mm, GAP_W*mm, XU_W*mm]
-        )
+        combo = Table([[av_t, '', xulosa]], colWidths=[AV_W*mm, GAP_W*mm, XU_W*mm])
         combo.setStyle(TableStyle([
-            ('VALIGN',        (0,0),(-1,-1), 'TOP'),
-            ('TOPPADDING',    (0,0),(-1,-1), 0),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 0),
-            ('LEFTPADDING',   (0,0),(-1,-1), 0),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
         ]))
         story.append(combo)
-        story.append(Spacer(1, 4*mm))
- 
-        # ── 4. IMZO ────────────────────────────────────────────────
-        # Jami: 93 + 93 = 186mm
+        story.append(Spacer(1, 4*mm))                           # 6 → 4
+        # ── 5. IZOH ──────────────────────────────────────────────────────
+        izoh_box = Table([
+            [p("Izoh:", fs=7, fn='Helvetica-Bold')],
+            [Spacer(1, 8*mm)],                                  # 14 → 8
+        ], colWidths=[W*mm])
+        izoh_box.setStyle(TableStyle([
+            ('BOX', (0,0), (-1,-1), 0.5, BR),
+            ('TOPPADDING', (0,0), (-1,-1), 3),       # 5 → 3
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3),     # 5 → 3
+            ('LEFTPADDING', (0,0), (-1,-1), 5),       # 6 → 5
+            ('RIGHTPADDING', (0,0), (-1,-1), 5),      # 6 → 5
+        ]))
+        story.append(izoh_box)
+        story.append(Spacer(1, 3*mm))                           # 5 → 3
+        # ── 6. IMZO ───────────────────────────────────────────────────────
         imzo = Table([[
             Table([
-                [p("Xodim:", fs=8, fn='Helvetica-Bold')],
-                [p(f"{ishchi.ism} {ishchi.familiya}", fs=9, fn='Helvetica-Bold')],
-                [Spacer(1, 6*mm)],
-                [p("Imzo: _______________________", fs=8, tc=GT)],
-            ], colWidths=[89*mm]),
+                [p("Xodim:", fs=7, fn='Helvetica-Bold')],
+                [p(f"{ishchi.ism} {ishchi.familiya}", fs=8)],
+                [Spacer(1, 4*mm)],                              # 6 → 4
+                [p("Imzo: _______________________", fs=7, tc=GT)],
+            ], colWidths=[93*mm]),
             Table([
-                [p("Mas'ul:", fs=8, fn='Helvetica-Bold')],
-                [p("_______________________", fs=9, fn='Helvetica-Bold')],
-                [Spacer(1, 6*mm)],
-                [p("Imzo: _______________________", fs=8, tc=GT)],
-            ], colWidths=[89*mm]),
-        ]], colWidths=[93*mm, 93*mm])
+                [p("Mas'ul:", fs=7, fn='Helvetica-Bold')],
+                [p("_______________________", fs=8)],
+                [Spacer(1, 4*mm)],                              # 6 → 4
+                [p("Imzo: _______________________", fs=7, tc=GT)],
+            ], colWidths=[93*mm]),
+        ]], colWidths=[95*mm, 95*mm])
         imzo.setStyle(TableStyle([
-            ('BOX',           (0,0),(-1,-1), 0.5, BR),
-            ('LINEAFTER',     (0,0),(0,-1),  0.5, BR),
-            ('BACKGROUND',    (0,0),(-1,-1), GB),
-            ('TOPPADDING',    (0,0),(-1,-1), 8),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 10),
-            ('LEFTPADDING',   (0,0),(-1,-1), 10),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 10),
-            ('VALIGN',        (0,0),(-1,-1), 'TOP'),
+            ('BOX', (0,0), (-1,-1), 0.5, BR),
+            ('LINEAFTER', (0,0), (0,-1), 0.5, BR),
+            ('TOPPADDING', (0,0), (-1,-1), 5),       # 8 → 5
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),    # 10 → 6
+            ('LEFTPADDING', (0,0), (-1,-1), 8),      # 10 → 8
+            ('RIGHTPADDING', (0,0), (-1,-1), 8),     # 10 → 8
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ]))
         story.append(imzo)
- 
-        # ── 5. SANA ────────────────────────────────────────────────
-        story.append(Spacer(1, 3*mm))
-        story.append(Paragraph(
-            "Sana: _______________________",
-            mkstyle('_sana', fontSize=9, fontName='Helvetica',
-                    textColor=GT, alignment=TA_LEFT)
-        ))
- 
         doc.build(story)
- 

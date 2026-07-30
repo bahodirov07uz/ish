@@ -576,12 +576,9 @@ class Xaridor(models.Model):
         return self.ism
 
 class Sotuv(models.Model):
-    """Asosiy sotuv - bir xaridor uchun bir to'liq buyurtma"""
     xaridor = models.ForeignKey(
-        'Xaridor', 
-        on_delete=models.CASCADE, 
-        related_name="sotuvlar", 
-        verbose_name="Xaridor"
+        'Xaridor', on_delete=models.CASCADE,
+        related_name="sotuvlar", verbose_name="Xaridor"
     )
     jami_summa = models.DecimalField(
         max_digits=12, decimal_places=2, default=0,
@@ -595,12 +592,10 @@ class Sotuv(models.Model):
         max_digits=12, decimal_places=2, default=0,
         verbose_name="Yakuniy summa (so'm)"
     )
-    
-    # === YANGI USD FIELDLAR ===
     usd_kurs = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
         verbose_name="USD kursi (sotuv paytida)",
-        help_text="CBU dan olingan USD kursi"
+        help_text="Qo'lda kiritiladigan USD kursi"
     )
     jami_summa_usd = models.DecimalField(
         max_digits=12, decimal_places=4, default=0,
@@ -610,19 +605,16 @@ class Sotuv(models.Model):
         max_digits=12, decimal_places=4, default=0,
         verbose_name="Yakuniy summa (USD)"
     )
-    # === YANGI: To'langan summa (qarz tizimi uchun) ===
     tolangan_summa = models.DecimalField(
         max_digits=12, decimal_places=2, default=0,
         verbose_name="To'langan summa (so'm)"
     )
-    # =========================
-    
     tolov_holati = models.CharField(
         max_length=20,
         choices=[
-            ('tolandi', 'To\'landi'),
-            ('qisman', 'Qisman to\'landi'),
-            ('tolanmadi', 'To\'lanmadi'),
+            ('tolandi',   "To'landi"),
+            ('qisman',    "Qisman to'landi"),
+            ('tolanmadi', "To'lanmadi"),
         ],
         default='tolanmadi',
         verbose_name="To'lov holati"
@@ -631,63 +623,64 @@ class Sotuv(models.Model):
     sana = models.DateTimeField(default=timezone.now, verbose_name="Sana")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratildi")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Yangilandi")
-
+ 
     class Meta:
         verbose_name = "Sotuv"
         verbose_name_plural = "Sotuvlar"
         ordering = ['-sana']
-
+ 
     def __str__(self):
         return f"#{self.id} - {self.xaridor.ism} - {self.yakuniy_summa} so'm"
-
+ 
     @property
     def qarz_summa(self):
-        """Hozirgi qarz miqdori"""
-        return max(self.yakuniy_summa - self.tolangan_summa, 0)
-
+        return max(self.yakuniy_summa - self.tolangan_summa, Decimal('0'))
+ 
     @property
     def qarz_summa_usd(self):
-        """Qarz USD da"""
         if self.usd_kurs and self.usd_kurs > 0:
-            return round(self.qarz_summa / self.usd_kurs, 4)
-        return 0
-
+            return round(self.qarz_summa / Decimal(str(self.usd_kurs)), 4)
+        return Decimal('0')
+ 
     def update_summa(self):
-        """Sotuv ichidagi barcha itemlarni hisoblash"""
+        """Barcha itemlar asosida summalarni qayta hisoblaydi."""
         self.jami_summa = self.items.aggregate(
             total=Sum(F('narx') * F('miqdor'))
-        )['total'] or 0
-        self.yakuniy_summa = self.jami_summa - self.chegirma
-        
-        # USD summalarini hisoblash
+        )['total'] or Decimal('0')
+ 
+        self.yakuniy_summa = max(self.jami_summa - self.chegirma, Decimal('0'))
+ 
         if self.usd_kurs and self.usd_kurs > 0:
-            self.jami_summa_usd = round(Decimal(str(self.jami_summa)) / Decimal(str(self.usd_kurs)), 4)
-            self.yakuniy_summa_usd = round(Decimal(str(self.yakuniy_summa)) / Decimal(str(self.usd_kurs)), 4)
-        
-        # To'lov holatini yangilash
+            kurs = Decimal(str(self.usd_kurs))
+            self.jami_summa_usd    = round(self.jami_summa    / kurs, 4)
+            self.yakuniy_summa_usd = round(self.yakuniy_summa / kurs, 4)
+ 
         self._update_tolov_holati()
-        
-        self.save(update_fields=['jami_summa', 'yakuniy_summa', 'jami_summa_usd', 
-                                  'yakuniy_summa_usd', 'tolov_holati', 'updated_at'])
-
+        self.save(update_fields=[
+            'jami_summa', 'yakuniy_summa',
+            'jami_summa_usd', 'yakuniy_summa_usd',
+            'tolov_holati', 'updated_at',
+        ])
+ 
     def _update_tolov_holati(self):
-        """To'langan summaga qarab holatni avtomatik yangilash"""
-        if self.tolangan_summa >= self.yakuniy_summa:
+        """tolangan_summa asosida tolov_holati ni belgilaydi."""
+        if self.yakuniy_summa <= 0:
+            # To'liq qaytarilgan yoki summasi 0
+            self.tolov_holati = 'tolandi'
+        elif self.tolangan_summa >= self.yakuniy_summa:
             self.tolov_holati = 'tolandi'
         elif self.tolangan_summa > 0:
             self.tolov_holati = 'qisman'
         else:
             self.tolov_holati = 'tolanmadi'
-
   
 class SotuvItem(models.Model):
-    """Sotuv tarkibidagi alohida mahsulot"""
     sotuv = models.ForeignKey(
-        Sotuv, on_delete=models.CASCADE, 
+        Sotuv, on_delete=models.CASCADE,
         related_name="items", verbose_name="Sotuv"
     )
     mahsulot = models.ForeignKey(
-        'Product', on_delete=models.PROTECT, 
+        'Product', on_delete=models.PROTECT,
         related_name="sotuv_items", verbose_name="Mahsulot"
     )
     variant = models.ForeignKey(
@@ -696,24 +689,21 @@ class SotuvItem(models.Model):
     )
     miqdor = models.PositiveIntegerField(verbose_name="Miqdor")
     narx = models.DecimalField(
-        max_digits=10, decimal_places=2, 
+        max_digits=10, decimal_places=2,
         verbose_name="Birlik narxi (so'm)"
     )
-    # === YANGI USD NARX ===
     narx_usd = models.DecimalField(
         max_digits=10, decimal_places=4, default=0,
-        verbose_name="Birlik narxi (USD)",
-        help_text="Agar USD da kiritilgan bo'lsa"
+        verbose_name="Birlik narxi (USD)"
     )
     narx_turi = models.CharField(
-        max_length=3, 
+        max_length=3,
         choices=[('uzs', "So'm"), ('usd', 'USD')],
         default='uzs',
         verbose_name="Narx valyutasi"
     )
-    # =====================
     jami = models.DecimalField(
-        max_digits=12, decimal_places=2, 
+        max_digits=12, decimal_places=2,
         editable=False, verbose_name="Jami summa (so'm)"
     )
     jami_usd = models.DecimalField(
@@ -721,55 +711,54 @@ class SotuvItem(models.Model):
         editable=False, verbose_name="Jami summa (USD)"
     )
     izoh = models.CharField(max_length=255, blank=True, null=True, verbose_name="Izoh")
-
+ 
     class Meta:
         verbose_name = "Sotuv elementi"
         verbose_name_plural = "Sotuv elementlari"
-
+ 
     def __str__(self):
         return f"{self.variant} - {self.miqdor} ta - {self.narx} so'm"
-
-
+ 
+    @property
+    def qaytarilgan_jami(self):
+        """Bu item uchun jami qaytarilgan miqdor."""
+        return self.qaytarishlar.aggregate(total=Sum('miqdor'))['total'] or 0
+ 
+    @property
+    def qaytarish_mumkin(self):
+        """Hali qaytarish mumkin bo'lgan miqdor."""
+        return self.miqdor - self.qaytarilgan_jami
+ 
     def save(self, *args, **kwargs):
         from django.db import transaction
-
+ 
         usd_kurs = Decimal(str(self.sotuv.usd_kurs)) if self.sotuv.usd_kurs else Decimal('0')
-
-        # --- 1. YANGI yoki MAVJUD ekanligini birinchi aniqlaymiz ---
-        is_new = self.pk is None
+ 
+        is_new     = self.pk is None
         old_miqdor = 0
-
+ 
         if not is_new:
-            old_item = SotuvItem.objects.get(pk=self.pk)
+            old_item   = SotuvItem.objects.get(pk=self.pk)
             old_miqdor = old_item.miqdor
-
-            # Faqat narx_turi ni DB dan olamiz (konversiya qayta ishlamasligi uchun)
-            # narx va narx_usd ni foydalanuvchi kiritganini saqlaymiz
             self.narx_turi = old_item.narx_turi
-
-            # Narx o'zgargan bo'lsa narx_usd ni qayta hisoblaymiz
+ 
             if self.narx != old_item.narx and usd_kurs > 0:
                 self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
             else:
                 self.narx_usd = old_item.narx_usd
-
-        # --- 2. Narx konversiyasi FAQAT yangi item uchun ---
+ 
         if is_new:
             if self.narx_turi == 'usd' and usd_kurs > 0:
-                self.narx_usd = Decimal(str(self.narx))
-                self.narx = round(self.narx_usd * usd_kurs, 2)
+                self.narx_usd  = Decimal(str(self.narx))
+                self.narx      = round(self.narx_usd * usd_kurs, 2)
                 self.narx_turi = 'uzs'
             elif usd_kurs > 0:
                 self.narx_usd = round(Decimal(str(self.narx)) / usd_kurs, 4)
-
-        # --- 3. Jami summalarni hisoblash (har doim) ---
+ 
         self.jami = Decimal(str(self.narx)) * Decimal(str(self.miqdor))
-        if usd_kurs > 0:
-            self.jami_usd = round(self.jami / usd_kurs, 4)
-        else:
-            self.jami_usd = Decimal('0')
-
-        # --- 4. Stock tekshirish ---
+        self.jami_usd = round(self.jami / usd_kurs, 4) if usd_kurs > 0 else Decimal('0')
+ 
+        # Stock tekshiruv — faqat miqdor OSHGANDA
         if is_new:
             if self.variant.stock < self.miqdor:
                 raise ValueError(
@@ -778,17 +767,14 @@ class SotuvItem(models.Model):
                 )
         else:
             miqdor_farqi = self.miqdor - old_miqdor
-            if miqdor_farqi > 0:
-                if self.variant.stock < miqdor_farqi:
-                    raise ValueError(
-                        f"Omborda yetarli {self.variant} yo'q! "
-                        f"Mavjud: {self.variant.stock} ta"
-                    )
-
-        # --- 5. Asosiy saqlash ---
+            if miqdor_farqi > 0 and self.variant.stock < miqdor_farqi:
+                raise ValueError(
+                    f"Omborda yetarli {self.variant} yo'q! "
+                    f"Mavjud: {self.variant.stock} ta"
+                )
+ 
         super().save(*args, **kwargs)
-
-        # --- 6. Stockni yangilash ---
+ 
         with transaction.atomic():
             self.variant.refresh_from_db()
             if is_new:
@@ -798,41 +784,47 @@ class SotuvItem(models.Model):
                 if miqdor_farqi > 0:
                     self.variant.stock = F('stock') - miqdor_farqi
                 elif miqdor_farqi < 0:
+                    # Miqdor kamaydi — stock qaytariladi (Qaytarish.save() bundan foydalanadi)
                     self.variant.stock = F('stock') + abs(miqdor_farqi)
             self.variant.save()
             self.variant.refresh_from_db()
-
-        # --- 7. Mahsulot umumiy miqdori va sotuv summasi ---
+ 
         self.mahsulot.update_total_quantity()
         self.sotuv.update_summa()
-    
-        def delete(self, *args, **kwargs):
-            from django.db import transaction
-            with transaction.atomic():
-                self.variant.stock = F('stock') + self.miqdor
-                self.variant.save()
-                self.variant.refresh_from_db()
-                self.mahsulot.update_total_quantity()
-                sotuv = self.sotuv
-                super().delete(*args, **kwargs)
-                sotuv.update_summa()
+ 
+    def delete(self, *args, **kwargs):
+        from django.db import transaction
+        with transaction.atomic():
+            self.variant.stock = F('stock') + self.miqdor
+            self.variant.save()
+            self.variant.refresh_from_db()
+            self.mahsulot.update_total_quantity()
+            sotuv = self.sotuv
+            super().delete(*args, **kwargs)
+            sotuv.update_summa()
+ 
+
 
 class Kirim(models.Model):
-    """Sotuv to'lovlari (bir sotuv uchun bir nechta to'lov bo'lishi mumkin)"""
+    """
+    Sotuv to'lovlari.
+    summa manfiy bo'lishi mumkin — storno (qaytarish) holatida.
+    """
     sotuv = models.ForeignKey(
-        Sotuv, on_delete=models.CASCADE, 
-        related_name="kirimlar",  # MUHIM: "kirim" dan "kirimlar" ga o'zgardi
+        Sotuv, on_delete=models.CASCADE,
+        related_name="kirimlar",
         verbose_name="Sotuv",
-        null=True,blank=True
+        null=True, blank=True
     )
     xaridor = models.ForeignKey(
         Xaridor, on_delete=models.CASCADE, verbose_name="Xaridor"
     )
+    # FIX 9: summa manfiy bo'lishi mumkin (storno), shuning uchun
+    # validators=[MinValueValidator(0)] bo'lmasligi kerak
     summa = models.DecimalField(
-        max_digits=12, decimal_places=2, 
+        max_digits=12, decimal_places=2,
         verbose_name="Summa (so'm)"
     )
-    # === YANGI USD FIELDLAR ===
     summa_usd = models.DecimalField(
         max_digits=12, decimal_places=4, default=0,
         verbose_name="Summa (USD)"
@@ -847,51 +839,57 @@ class Kirim(models.Model):
         default='uzs',
         verbose_name="To'lov valyutasi"
     )
-    # =========================
     sana = models.DateTimeField(default=timezone.now, verbose_name="Sana")
     izoh = models.TextField(null=True, blank=True, verbose_name="Izoh")
-
+ 
     class Meta:
         verbose_name = "Kirim"
         verbose_name_plural = "Kirimlar"
         ordering = ['-sana']
-
+ 
     def __str__(self):
-        return f"{self.sana} - {self.summa} so'm ({self.xaridor.ism})"
-
+        prefix = "↩ Storno — " if self.summa < 0 else ""
+        return f"{prefix}{self.sana:%d.%m.%Y} — {self.summa:,.0f} so'm ({self.xaridor.ism})"
+ 
     def save(self, *args, **kwargs):
-        # USD summani hisoblash
-        if self.valyuta == 'usd' and self.usd_kurs > 0:
-            # USD da to'langan bo'lsa, so'mga aylantirish
-            self.summa = round(Decimal(str(self.summa_usd)) * Decimal(str(self.usd_kurs)), 2)
-        elif self.usd_kurs > 0:
-            self.summa_usd = round(Decimal(str(self.summa)) / Decimal(str(self.usd_kurs)), 4)
-        
+        # Manfiy summa (storno) bo'lsa valyuta konversiyasini o'tkazib yuboramiz
+        # Chunki Qaytarish.save() allaqachon to'g'ri qiymat beradi
+        if self.summa >= 0:
+            if self.valyuta == 'usd' and self.usd_kurs > 0:
+                self.summa = round(
+                    Decimal(str(self.summa_usd)) * Decimal(str(self.usd_kurs)), 2
+                )
+            elif self.usd_kurs > 0:
+                self.summa_usd = round(
+                    Decimal(str(self.summa)) / Decimal(str(self.usd_kurs)), 4
+                )
+ 
         super().save(*args, **kwargs)
-        
-        # Sotuvning to'langan summasini yangilash
         self._update_sotuv_tolangan()
-
+ 
     def _update_sotuv_tolangan(self):
-        """Sotuvning tolangan_summa va holatini yangilash"""
+        if not self.sotuv:
+            return
         sotuv = self.sotuv
         jami_tolangan = sotuv.kirimlar.aggregate(
             total=Sum('summa')
         )['total'] or Decimal('0')
-        
-        sotuv.tolangan_summa = jami_tolangan
+ 
+        # tolangan_summa hech qachon manfiy bo'lmasin
+        sotuv.tolangan_summa = max(jami_tolangan, Decimal('0'))
         sotuv._update_tolov_holati()
         sotuv.save(update_fields=['tolangan_summa', 'tolov_holati', 'updated_at'])
-
+ 
     def delete(self, *args, **kwargs):
         sotuv = self.sotuv
         super().delete(*args, **kwargs)
-        self._update_sotuv_tolangan.__func__(self)  # sotuv ni qayta hisoblash
-        # To'g'ri usul:
-        jami_tolangan = sotuv.kirimlar.aggregate(total=Sum('summa'))['total'] or Decimal('0')
-        sotuv.tolangan_summa = jami_tolangan
-        sotuv._update_tolov_holati()
-        sotuv.save(update_fields=['tolangan_summa', 'tolov_holati', 'updated_at'])
+        if sotuv:
+            jami_tolangan = sotuv.kirimlar.aggregate(
+                total=Sum('summa')
+            )['total'] or Decimal('0')
+            sotuv.tolangan_summa = max(jami_tolangan, Decimal('0'))
+            sotuv._update_tolov_holati()
+            sotuv.save(update_fields=['tolangan_summa', 'tolov_holati', 'updated_at'])
 
 class Feature(models.Model):
     name = models.CharField(max_length=300)
@@ -1014,3 +1012,5 @@ class TeriSarfi(models.Model):
 #     product = models.ForeignKey(Product,on_delete=models.PROTECT)
 #     variant = models.ForeignKey(ProductVariant,on_delete=models.PROTECT)
     
+    
+

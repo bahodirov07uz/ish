@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<title>{% block title %}Yetkazuvchilar{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/yetkazuvchi_list.css' %}">
+
+<div class="main-content">
+  <header class="header">
+    <div class="header-title">Yetkazuvchi<span>lar</span></div>
+    <button class="btn btn-primary" onclick="openModal()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M8 3v10M3 8h10"/>
+      </svg>
+      Yangi yetkazuvchi
+    </button>
+  </header>
+
+  <main class="content">
+    <div class="page">
+      <div class="breadcrumb">
+        <a href="/">Bosh sahifa</a><span>/</span><span>Yetkazuvchilar</span>
+      </div>
+
+      <!-- STATS CARDS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Jami</div>
+          <div class="stat-value">{{ jami_yetkazuvchilar }} ta</div>
+          <div class="stat-sub">yetkazuvchi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Qarzdorlar</div>
+          <div class="stat-value warn">{{ qarzli_count }} ta</div>
+          <div class="stat-sub">to'lovda qolgan</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Umumiy qarz</div>
+          <div class="stat-value warn">{{ umumiy_qarz|floatformat:0|intcomma }}</div>
+          <div class="stat-sub">so'm</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Jami kirim</div>
+          <div class="stat-value blue">{{ umumiy_kirim|floatformat:0|intcomma }}</div>
+          <div class="stat-sub">so'm (barcha vaqt)</div>
+        </div>
+      </div>
+
+      <!-- TABLE CARD -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Barcha yetkazuvchilar</h3>
+          <div class="search-box">
+            <span class="search-icon">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+              </svg>
+            </span>
+            <input type="text" id="searchInput" placeholder="Qidirish...">
+          </div>
+        </div>
+
+        {% if yetkazib_beruvchilar %}
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nomi</th>
+                  <th>INN</th>
+                  <th>Manzil</th>
+                  <th>Kirimlar</th>
+                  <th>Jami kirim</th>
+                  <th>Qarz (UZS)</th>
+                  <th>To'lov holati</th>
+                  <th>Oxirgi yetkazma</th>
+                </tr>
+              </thead>
+              <tbody id="supplierTableBody">
+                {% for yb in yetkazib_beruvchilar %}
+                  <tr
+                    class="supplier-row"
+                    data-name="{{ yb.nomi|lower }}"
+                    data-phone="{{ yb.telefon }}"
+                    onclick="window.location='{% url 'xomashyo:yb_detail' yb.id %}'"
+                  >
+                    <!-- Nomi + telefon -->
+                    <td>
+                      <div class="name-cell">
+                        <div class="avatar">{{ yb.nomi|slice:":1"|upper }}</div>
+                        <div>
+                          <div class="supplier-name">{{ yb.nomi }}</div>
+                          <div class="supplier-phone">{{ yb.telefon|default:"—" }}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <!-- INN -->
+                    <td>
+                      {% if yb.inn %}
+                        <span class="inn-badge">{{ yb.inn }}</span>
+                      {% else %}
+                        <span class="no-data">—</span>
+                      {% endif %}
+                    </td>
+
+                    <!-- Manzil -->
+                    <td>
+                      <span class="address-text">{{ yb.manzil|default:"—"|truncatechars:30 }}</span>
+                    </td>
+
+                    <!-- Kirimlar soni -->
+                    <td>
+                      <span class="count-text">{{ yb.kirimlar_soni }} ta</span>
+                    </td>
+
+                    <!-- Jami kirim -->
+                    <td>
+                      <span class="money-text">
+                        {{ yb.jami_kirim_uzs|floatformat:0|intcomma }} so'm
+                      </span>
+                    </td>
+
+                    <!-- Qarz -->
+                    <td>
+                      {% if yb.jami_qarz_uzs > 0 %}
+                        <span class="qarz-text has-debt">
+                          {{ yb.jami_qarz_uzs|floatformat:0|intcomma }} so'm
+                        </span>
+                      {% else %}
+                        <span class="no-data">—</span>
+                      {% endif %}
+                    </td>
+
+                    <!-- To'lov holati -->
+                    <td>
+                      {% if yb.jami_qarz_uzs <= 0 and yb.kirimlar_soni > 0 %}
+                        <span class="badge badge-toliq">✓ To'liq</span>
+                      {% elif yb.jami_qarz_uzs > 0 and yb.jami_kirim_uzs > yb.jami_qarz_uzs %}
+                        <span class="badge badge-qisman">! Qisman</span>
+                      {% elif yb.jami_qarz_uzs > 0 %}
+                        <span class="badge badge-tolanmagan">✗ To'lanmagan</span>
+                      {% else %}
+                        <span class="no-data">—</span>
+                      {% endif %}
+                    </td>
+
+                    <!-- Oxirgi yetkazma -->
+                    <td>
+                      <span class="date-text">
+                        {{ yb.oxirgi_yetkazma|date:"d.m.Y"|default:"—" }}
+                      </span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="empty-state">Hali yetkazuvchilar yo'q</p>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal (avvalgi versiya bilan bir xil) -->
+...
+
+<script>
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('input', function () {
+    const term = this.value.toLowerCase();
+    document.querySelectorAll('.supplier-row').forEach(row => {
+      const name  = row.dataset.name  || '';
+      const phone = row.dataset.phone || '';
+      row.style.display = (name.includes(term) || phone.includes(term)) ? '' : 'none';
+    });
+  });
+</script>
+{% endblock %}

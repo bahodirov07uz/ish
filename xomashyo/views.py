@@ -2,7 +2,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views.generic import ListView,DetailView,View
-from django.db.models import Sum,F,DecimalField, Q
+from django.db.models import Sum,F,DecimalField, Q,Count,Max
 from datetime import date,datetime
 import decimal
 from decimal import Decimal,ROUND_DOWN
@@ -624,23 +624,60 @@ class YetkazibBeruvchilarView(AdminRequiredMixin, ListView):
     model = YetkazibBeruvchi
     template_name = 'yetkazib_beruvchi/list.html'
     context_object_name = 'yetkazib_beruvchilar'
- 
+
     def get_queryset(self):
-        qs = YetkazibBeruvchi.objects.all().order_by('nomi')
-        for yb in qs:
-            harakatlar = XomashyoHarakat.objects.filter(
-                yetkazib_beruvchi=yb,
-                harakat_turi='kirim',
-                tolov_holati__in=['tolanmagan', 'qisman']
+        qarz_filter = Q(
+            xomashyoharakat__harakat_turi='kirim',
+            xomashyoharakat__tolov_holati__in=['tolanmagan', 'qisman']
+        )
+        kirim_filter = Q(xomashyoharakat__harakat_turi='kirim')
+
+        return (
+            YetkazibBeruvchi.objects
+            .annotate(
+                # Jami qarz (to'lanmagan + qisman)
+                jami_qarz_uzs=Coalesce(
+                    Sum(
+                        'xomashyoharakat__jami_narx_uzs',
+                        filter=qarz_filter
+                    ) - Sum(
+                        'xomashyoharakat__tolangan_uzs',
+                        filter=qarz_filter
+                    ),
+                    0,
+                    output_field=DecimalField()
+                ),
+                # Jami kirim summasi (barcha vaqt)
+                jami_kirim_uzs=Coalesce(
+                    Sum(
+                        'xomashyoharakat__jami_narx_uzs',
+                        filter=kirim_filter
+                    ),
+                    0,
+                    output_field=DecimalField()
+                ),
+                # Nechta kirim harakati
+                kirimlar_soni=Count(
+                    'xomashyoharakat',
+                    filter=kirim_filter
+                ),
+                # Oxirgi yetkazma sanasi
+                oxirgi_yetkazma=Max(
+                    'xomashyoharakat__sana',
+                    filter=kirim_filter
+                ),
             )
-            yb.jami_qarz_uzs = sum(h.qoldiq_uzs for h in harakatlar)
-        return qs
- 
+            .order_by('nomi')
+        )
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        qs  = ctx['yetkazib_beruvchilar']
-        ctx['qarzli_count']  = sum(1 for yb in qs if yb.jami_qarz_uzs > 0)
-        ctx['umumiy_qarz']   = sum(yb.jami_qarz_uzs for yb in qs)
+        qs = ctx['yetkazib_beruvchilar']
+
+        ctx['jami_yetkazuvchilar'] = qs.count()
+        ctx['qarzli_count']        = sum(1 for yb in qs if yb.jami_qarz_uzs > 0)
+        ctx['umumiy_qarz']         = sum(yb.jami_qarz_uzs for yb in qs)
+        ctx['umumiy_kirim']        = sum(yb.jami_kirim_uzs for yb in qs)
         return ctx
  
  

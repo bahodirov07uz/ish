@@ -215,6 +215,7 @@ class EmployeeView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['ishchi_turlari'] = m.IshchiCategory.objects.all()
         context['is_admin'] = is_admin(self.request.user)
+        context['ishchilar'] = m.Ishchi.objects.filter(is_active=True).order_by('ism')
         return context
 
 
@@ -2283,3 +2284,4 @@ def chiqim_ochirish(request, pk):
             messages.error(request, f'❌ Xatolik: {str(e)}')
     
     return redirect('xomashyo:chiqimlar')
+

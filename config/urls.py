@@ -11,6 +11,7 @@ urlpatterns = [
     path('analytics/', include('analytics.urls', namespace='analytics')),
     path('budget/', include('budget.urls')),
     path('accounts/', include('allauth.urls')),
+    # path('qaytarish/',include('qaytarish.urls')),
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

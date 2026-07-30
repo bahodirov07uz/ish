@@ -458,25 +458,39 @@ function avtoCalcPreview() {
 
     if (!summaUzs) { taqsim.style.display='none'; return; }
 
-    // FIFO simulatsiya
+    // FIFO simulatsiya — field nomlarni console.log bilan tekshirib olish
     let qolgan = summaUzs;
     const lines = [];
+
+    console.log('QARZ data:', QARZ); // DEBUG — console'da ko'rish uchun
+
     for (const h of QARZ) {
         if (qolgan <= 0) break;
-        const tolov = Math.min(qolgan, h.qoldiq_uzs);
+
+        // Field nomlarni himoyalangan o'qish
+        const nomi     = h.nomi || h.xomashyo_nomi || h.fields?.nomi || '—';
+        const sana     = h.sana || h.fields?.sana   || '—';
+        const qoldiqUzs = parseFloat(h.qoldiq_uzs ?? h.fields?.qoldiq_uzs ?? 0);
+
+        if (isNaN(qoldiqUzs) || qoldiqUzs <= 0) continue;
+
+        const tolov = Math.min(qolgan, qoldiqUzs);
         lines.push(
-            `✔ <strong>${h.nomi}</strong> (${h.sana}) — `+
-            `${Math.floor(tolov).toLocaleString()} so'm`+
-            (tolov >= h.qoldiq_uzs ? ' <span style="color:var(--green)">[ To\'liq ]</span>' : '')
+            `✔ <strong>${nomi}</strong> (${sana}) — ` +
+            `${Math.floor(tolov).toLocaleString()} so'm` +
+            (tolov >= qoldiqUzs ? ' <span style="color:var(--green)">[To\'liq]</span>' : '')
         );
         qolgan -= tolov;
     }
+
     if (qolgan > 0) {
         lines.push(`<span style="color:var(--red)">⚠️ Taqsimlanmagan: ${Math.floor(qolgan).toLocaleString()} so'm</span>`);
     }
+
     taqsimList.innerHTML = lines.join('<br>');
     taqsim.style.display = 'block';
 }
+
 
 // ══════════════════════════════════════════════════
 // INLINE TO'LOV FORM (har bir harakat uchun)
