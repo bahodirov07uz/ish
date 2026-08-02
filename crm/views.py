@@ -1076,7 +1076,10 @@ class SotuvQoshish(AdminRequiredMixin, ListView):
         )['yakuniy_summa__sum'] or 0
         
         # Form uchun ma'lumotlar
-        context['xaridorlar'] = m.Xaridor.objects.all().order_by('-created_at')[:20]
+        context['xaridorlar'] = m.Xaridor.objects.all().only(
+            'id', 'ism', 'telefon'
+        ).order_by('ism')
+    
         context['mahsulotlar'] = m.ProductVariant.objects.filter(
             stock__gt=0
         ).select_related('product').order_by('product__nomi')
@@ -1236,22 +1239,22 @@ def get_usd_kurs(request):
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url="login")
 def sotuv_qoshish(request):
-    """Yangi sotuv yaratish (USD kurs bilan)"""
+    """Yangi sotuv yaratish (sana va USD kurs qo'lda kiritiladi)"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
                 # 1. Xaridorni aniqlash
                 xaridor_turi = request.POST.get('xaridor_turi')
-                
+ 
                 if xaridor_turi == 'yangi':
                     xaridor_ism = request.POST.get('xaridor_ism')
                     xaridor_telefon = request.POST.get('xaridor_telefon')
                     xaridor_manzil = request.POST.get('xaridor_manzil')
-                    
+ 
                     if not xaridor_ism:
                         messages.error(request, 'Xaridor ismini kiriting!')
                         return redirect('main:sotuvlar')
-                    
+ 
                     xaridor = m.Xaridor.objects.create(
                         ism=xaridor_ism,
                         telefon=xaridor_telefon,
@@ -1259,58 +1262,82 @@ def sotuv_qoshish(request):
                     )
                 else:
                     xaridor_id = request.POST.get('xaridor')
+                    # MAJBURIY tekshiruv — frontendda ham required qo'yilgan,
+                    # lekin backend'da ham albatta tekshiramiz (frontend
+                    # aylanib o'tilishi mumkin).
                     if not xaridor_id:
                         messages.error(request, 'Xaridorni tanlang!')
                         return redirect('main:sotuvlar')
                     xaridor = get_object_or_404(m.Xaridor, id=xaridor_id)
-                
-                # 2. USD kursini olish (frontenddan yoki API dan)
+ 
+                # 2. SANA — endi foydalanuvchi qo'lda tanlaydi
+                #    (frontend datetime-local input: "YYYY-MM-DDTHH:MM")
+                #
+                #    DIQQAT: agar Sotuv modelidagi `sana` maydoni
+                #    `auto_now_add=True` bo'lsa, quyidagi qiymat E'TIBORGA
+                #    OLINMAYDI. Bunday holda modelni:
+                #        sana = models.DateTimeField(default=timezone.now)
+                #    ko'rinishiga o'zgartirib, migratsiya qiling.
+                sana_str = request.POST.get('sana')
+                if sana_str:
+                    try:
+                        naive_sana = datetime.strptime(sana_str, '%Y-%m-%dT%H:%M')
+                        if timezone.is_naive(naive_sana):
+                            sotuv_sana = timezone.make_aware(naive_sana)
+                        else:
+                            sotuv_sana = naive_sana
+                    except (ValueError, TypeError):
+                        sotuv_sana = timezone.now()
+                else:
+                    sotuv_sana = timezone.now()
+ 
+                # 3. USD kurs — QO'LDA KIRITILGAN qiymat, CBU'dan
+                #    avtomatik olib qo'yilmaydi. Bo'sh/0 bo'lsa xatolik.
                 usd_kurs_str = request.POST.get('usd_kurs', '0')
                 try:
-                    usd_kurs = Decimal(str(usd_kurs_str)) if usd_kurs_str else get_usd_rate()
-                except:
-                    usd_kurs = get_usd_rate()
-                
-                if not usd_kurs or usd_kurs == 0:
-                    usd_kurs = get_usd_rate()
-                
-                # 3. Asosiy sotuvni yaratish
+                    usd_kurs = Decimal(str(usd_kurs_str))
+                except Exception:
+                    usd_kurs = Decimal('0')
+ 
+                if not usd_kurs or usd_kurs <= 0:
+                    messages.error(request, 'USD kursini kiriting!')
+                    return redirect('main:sotuvlar')
+ 
+                # 4. Asosiy sotuvni yaratish
                 chegirma = request.POST.get('chegirma', 0)
                 izoh = request.POST.get('izoh', '')
                 tolov_holati = request.POST.get('tolov_holati', 'tolandi')
                 tolangan_summa_str = request.POST.get('tolangan_summa', '0')
-                
+ 
                 try:
                     tolangan_summa = Decimal(str(tolangan_summa_str)) if tolangan_summa_str else Decimal('0')
-                except:
+                except Exception:
                     tolangan_summa = Decimal('0')
-                
+ 
                 sotuv = m.Sotuv(
                     xaridor=xaridor,
+                    sana=sotuv_sana,
                     chegirma=Decimal(str(chegirma)) if chegirma else 0,
                     izoh=izoh,
                     tolov_holati=tolov_holati,
                     usd_kurs=usd_kurs,
                     tolangan_summa=tolangan_summa,
                 )
-                
-                # Oldin save qilmasdan, keyingi logika uchun flagni o'rnatamiz
-                # (SotuvItem save da sotuv.id kerak, shuning uchun oldin save qilamiz)
-                # Kirim yaratishni manual boshqaramiz
-                sotuv._skip_kirim = True  # Kirimni keyinroq qo'shamiz
+ 
+                sotuv._skip_kirim = True
                 sotuv.save()
-                
-                # 4. Mahsulotlarni qo'shish
+ 
+                # 5. Mahsulotlarni qo'shish
                 items_json = request.POST.get('items')
                 if not items_json:
                     variant_id = request.POST.get('mahsulot')
                     miqdor = request.POST.get('miqdor')
                     narx = request.POST.get('narx')
                     narx_turi = request.POST.get('narx_turi', 'uzs')
-                    
+ 
                     if not all([variant_id, miqdor, narx]):
                         raise ValueError('Mahsulot, miqdor va narx majburiy!')
-                    
+ 
                     variant = get_object_or_404(m.ProductVariant, id=variant_id)
                     m.SotuvItem.objects.create(
                         sotuv=sotuv,
@@ -1326,7 +1353,7 @@ def sotuv_qoshish(request):
                         variant = get_object_or_404(m.ProductVariant, id=item['variant_id'])
                         narx_turi = item.get('narx_turi', 'uzs')
                         narx_val = Decimal(str(item['narx']))
-                        
+ 
                         m.SotuvItem.objects.create(
                             sotuv=sotuv,
                             mahsulot=variant.product,
@@ -1335,11 +1362,11 @@ def sotuv_qoshish(request):
                             narx=narx_val,
                             narx_turi=narx_turi,
                         )
-                
-                # 5. Summani yangilash
+ 
+                # 6. Summani yangilash
                 sotuv.refresh_from_db()
-                
-                # 6. Kirimlarni yaratish (manual)
+ 
+                # 7. Kirimlarni yaratish (manual)
                 if tolov_holati == 'tolandi':
                     m.Kirim.objects.create(
                         sotuv=sotuv,
@@ -1353,7 +1380,7 @@ def sotuv_qoshish(request):
                     )
                     sotuv.tolangan_summa = sotuv.yakuniy_summa
                     sotuv.save(update_fields=['tolangan_summa'])
-                    
+ 
                 elif tolov_holati == 'qisman' and tolangan_summa > 0:
                     m.Kirim.objects.create(
                         sotuv=sotuv,
@@ -1365,7 +1392,7 @@ def sotuv_qoshish(request):
                         sana=sotuv.sana,
                         izoh=f"Sotuv #{sotuv.id} - Qisman to'lov"
                     )
-                
+ 
                 messages.success(
                     request,
                     f"✅ Sotuv #{sotuv.id} muvaffaqiyatli yaratildi! "
@@ -1373,14 +1400,13 @@ def sotuv_qoshish(request):
                     f"(≈ {sotuv.yakuniy_summa_usd:.2f} USD)"
                 )
                 return redirect('main:sotuvlar')
-                
+ 
         except ValueError as e:
             messages.error(request, f'❌ Xatolik: {str(e)}')
         except Exception as e:
             messages.error(request, f'❌ Kutilmagan xatolik: {str(e)}')
-    
-    return redirect('main:sotuvlar')
-
+            
+            
 # ================================================================
 # YANGILANGAN: sotuv_pdf - USD va kirimlar ro'yxati bilan
 # ================================================================

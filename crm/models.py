@@ -35,7 +35,7 @@ class Product(models.Model):
     description = models.TextField(verbose_name="Tavsif")
     narxi = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Narxi")
     image = models.ImageField(upload_to="products/", verbose_name="Rasm",null=True,blank=True)
-    avg_profit = models.PositiveIntegerField(default=0, verbose_name="O'rtacha foyda")
+    avg_profit = models.PositiveIntegerField(default=0, verbose_name="O'rtacha foyda",help_text='1 ta mahsulot sotuvdan qanchadan foyda qilinadi')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan sana")
     narx_kosib = models.IntegerField(default=0, verbose_name="Kasb narxi")
     narx_zakatovka = models.IntegerField(default=0, verbose_name="Zakatovka narxi")
