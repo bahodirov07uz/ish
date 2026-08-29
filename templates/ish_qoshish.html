@@ -189,9 +189,88 @@
     align-items: center;
     margin-bottom: 1rem;
 }
+
+/* Eslatma: bu loyihada selectlarni qidiruvli qilish uchun allaqachon
+   search.js orqali ulangan kutubxona bor (window.ssRefreshSelect
+   funksiyasi orqali refresh qilinadi). U ko'p selectlarda ishlatiladi
+   va bu yerda ULARGA qo'shimcha custom overlay YOZILMAYDI.
+
+   Quyidagi .ez-select-* stillar FAQAT 3 ta joyda ishlatiladi:
+   kroy-select, zakatovka-select (ish xomashyosi) va padoj-select —
+   chunki bu uchtasida qidiruv yo'q edi. Boshqa hech qanday selectga
+   bu qo'llanilmaydi. */
+.ez-select-wrapper { position: relative; width: 100%; }
+.ez-select-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    min-height: 38px;
+    transition: all 0.15s;
+}
+.ez-select-trigger:hover { border-color: var(--color-primary); }
+.ez-select-trigger.active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.ez-select-trigger svg { flex-shrink: 0; color: var(--text-secondary); transition: transform 0.15s; }
+.ez-select-trigger.active svg { transform: rotate(180deg); }
+.ez-select-value { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ez-select-value.placeholder { color: var(--text-tertiary); }
+.ez-select-dropdown {
+    /* fixed pozitsiya — ota-elementning overflow:hidden cheklovidan qochadi */
+    position: fixed;
+    display: none;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    max-height: 300px;
+    z-index: 3000;
+}
+.ez-select-search {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+}
+.ez-select-search input {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 0.25rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8125rem;
+    outline: none;
+}
+.ez-select-search input:focus { border-color: var(--color-primary); }
+.ez-select-options { overflow-y: auto; }
+.ez-select-option {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+.ez-select-option:last-child { border-bottom: none; }
+.ez-select-option:hover { background: var(--bg-secondary); }
+.ez-select-option.selected { background: var(--color-primary); color: white; }
+.ez-select-option.no-results { color: var(--text-tertiary); cursor: default; text-align: center; }
+.ez-select-option.no-results:hover { background: transparent; }
+.ez-select-option.is-current { font-weight: 700; }
 </style>
 
 <div class="app">
+
     <div class="main-content">
         <main class="content">
             <div class="page">
@@ -278,7 +357,8 @@
                                             <div class="form-group">
                                                 <select name="mahsulot" class="form-select mahsulot-select" required
                                                     data-row="{{ forloop.counter }}"
-                                                    data-ishchi-turi="{{ ishchi.turi.nomi|lower }}">
+                                                    data-ishchi-turi="{{ ishchi.turi.nomi|lower }}"
+                                                    data-placeholder="Mahsulot tanlang...">
                                                     <option value="">Mahsulot...</option>
                                                     {% for mahsulot in mahsulotlar %}
                                                     <option value="{{ mahsulot.id }}"
@@ -320,11 +400,12 @@
                                                 <div class="extra-field">
                                                     <label class="field-label">🟦 Kroy xomashyosi:</label>
                                                     <select name="kroy_xomashyo" class="form-select kroy-select"
-                                                        data-row="{{ forloop.counter }}">
+                                                        data-row="{{ forloop.counter }}"
+                                                        data-placeholder="Kroy xomashyo tanlang...">
                                                         <option value="">Kroy xomashyo tanlang...</option>
                                                     </select>
                                                     <div class="info-badge" style="background: #dbeafe; color: #1e40af;">
-                                                        ℹ️ Kroy jarayonidan chiqqan yarim tayyor mahsulot
+                                                        ℹ️ ⭐ belgisi — tanlangan mahsulotning o'z kroy zaxirasi. Kerak bo'lsa boshqa mahsulot zaxirasini ham tanlashingiz mumkin.
                                                     </div>
                                                 </div>
                                             </div>
@@ -357,7 +438,8 @@
                                                         </div>
                                                         <div style="display: grid; gap: 0.5rem;">
                                                             <select name="teri_xomashyo[]" class="form-select xomashyo-select teri-select" required
-                                                                data-row="{{ forloop.counter }}" data-teri-index="1" data-type="teri">
+                                                                data-row="{{ forloop.counter }}" data-teri-index="1" data-type="teri"
+                                                                data-placeholder="Teri tanlang...">
                                                                 <option value="">Teri tanlang...</option>
                                                                 {% for teri in terilar %}
                                                                 <option value="{{ teri.id }}"
@@ -370,7 +452,8 @@
                                                             <div class="variant-select-container teri-variant-container"
                                                                  id="teri-variant-{{ forloop.counter }}-1" style="display:none;">
                                                                 <span class="variant-label">📦 Variant:</span>
-                                                                <select name="teri_variant[]" class="form-select variant-select teri-variant-select"></select>
+                                                                <select name="teri_variant[]" class="form-select variant-select teri-variant-select"
+                                                                    data-placeholder="Variant tanlang..."></select>
                                                             </div>
                                                         </div>
                                                         <button type="button" class="btn-remove-teri" onclick="removeTeriRow(this)"
@@ -393,7 +476,8 @@
                                                         </div>
                                                     </div>
                                                     <select name="astar_xomashyo" class="form-select xomashyo-select"
-                                                        data-row="{{ forloop.counter }}" data-type="astar">
+                                                        data-row="{{ forloop.counter }}" data-type="astar"
+                                                        data-placeholder="Astar kerak emas">
                                                         <option value="">Astar kerak emas</option>
                                                         {% for astar in astarlar %}
                                                         <option value="{{ astar.id }}"
@@ -405,7 +489,8 @@
                                                     </select>
                                                     <div class="variant-select-container" id="astar-variant-{{ forloop.counter }}" style="display:none;">
                                                         <span class="variant-label">📦 Variant:</span>
-                                                        <select name="astar_variant" class="form-select variant-select"></select>
+                                                        <select name="astar_variant" class="form-select variant-select"
+                                                            data-placeholder="Variant tanlang..."></select>
                                                     </div>
                                                 </div>
 
@@ -421,7 +506,8 @@
                                                 <div class="extra-field">
                                                     <label class="field-label">🎨 Mahsulot varianti:</label>
                                                     <select name="mahsulot_variant" class="form-select variant-product-select"
-                                                        data-row="{{ forloop.counter }}">
+                                                        data-row="{{ forloop.counter }}"
+                                                        data-placeholder="Avval mahsulot tanlang...">
                                                         <option value="">Avval mahsulot tanlang...</option>
                                                     </select>
                                                     <button type="button" class="btn-create-variant"
@@ -461,7 +547,8 @@
                                                 <div class="extra-field">
                                                     <label class="field-label">🟦 Zakatovka xomashyo:</label>
                                                     <select name="zakatovka_xomashyo" class="form-select zakatovka-select"
-                                                        data-row="{{ forloop.counter }}">
+                                                        data-row="{{ forloop.counter }}"
+                                                        data-placeholder="Avval mahsulot tanlang...">
                                                         <option value="">Avval mahsulot tanlang...</option>
                                                     </select>
                                                 </div>
@@ -469,7 +556,8 @@
                                                 <div class="extra-field">
                                                     <label class="field-label">🟨 Padoj xomashyo:</label>
                                                     <select name="padoj_xomashyo" class="form-select xomashyo-select" required
-                                                        data-row="{{ forloop.counter }}" data-type="padoj">
+                                                        data-row="{{ forloop.counter }}" data-type="padoj"
+                                                        data-placeholder="Padoj tanlang...">
                                                         <option value="">Padoj tanlang...</option>
                                                         {% for padoj in padojlar %}
                                                         <option value="{{ padoj.id }}"
@@ -481,7 +569,8 @@
                                                     </select>
                                                     <div class="variant-select-container" id="padoj-variant-{{ forloop.counter }}" style="display:none;">
                                                         <span class="variant-label">📦 Variant:</span>
-                                                        <select name="padoj_variant" class="form-select variant-select"></select>
+                                                        <select name="padoj_variant" class="form-select variant-select"
+                                                            data-placeholder="Variant tanlang..."></select>
                                                     </div>
                                                 </div>
 
@@ -531,17 +620,198 @@ function _signal(key) {
 // YORDAMCHI: selectda birinchi real optionni tanlash va change eventini yuborish
 // ============================================================================
 function _autoSelectFirst(select) {
-    // index 0 = bo'sh placeholder, index 1 = birinchi real option
     if (select.options.length > 1) {
         select.selectedIndex = 1;
-        // change eventini chiqarish — boshqa listenerlar (variant yuklash va h.k.) ishlashi uchun
         select.dispatchEvent(new Event('change', { bubbles: true }));
     }
 }
 
 // ============================================================================
-// AJAX FUNKSIYALAR — global scope, bitta joyda, AbortController bilan
+// MAVJUD QIDIRUVLI-SELECT KUTUBXONASI BILAN INTEGRATSIYA
+// Loyihada allaqachon search.js orqali ulangan kutubxona bor — u
+// selectlarni avtomatik qidiruvli qiladi. AJAX orqali select
+// optionlari almashtirilganda (innerHTML) o'sha kutubxonaning
+// ko'rinishini yangilash uchun window.ssRefreshSelect() chaqiriladi.
 // ============================================================================
+function _ssRefresh(selectEl) {
+    if (selectEl && window.ssRefreshSelect) window.ssRefreshSelect(selectEl);
+}
+
+// ============================================================================
+// QIDIRUVLI SELECT MOTORI — FAQAT quyidagi 3 joy uchun ishlatiladi:
+//   1) kroy-select      (Zakatovka ishchisi — "Kroy xomashyosi")
+//   2) zakatovka-select (Kosib ishchisi — "Zakatovka xomashyo")
+//   3) padoj-select     (Kosib ishchisi — "Padoj xomashyo")
+// Boshqa hech qanday selectga QO'LLANILMAYDI — ular allaqachon mavjud
+// search.js kutubxonasi orqali ishlaydi, shu bois bu yerda ularga
+// tegilmaydi (aks holda ikkita search ustma-ust chiqib qoladi).
+// ============================================================================
+function enhanceSelect(selectEl) {
+    if (!selectEl) return;
+
+    if (selectEl.dataset.ezEnhanced === '1') {
+        if (selectEl._ezTrigger) updateTriggerLabel(selectEl, selectEl._ezTrigger);
+        return;
+    }
+    selectEl.dataset.ezEnhanced = '1';
+    selectEl.style.display = 'none';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ez-select-wrapper';
+
+    const trigger = document.createElement('div');
+    trigger.className = 'ez-select-trigger';
+    trigger.innerHTML = `<span class="ez-select-value placeholder"></span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>`;
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'ez-select-dropdown';
+    dropdown.innerHTML = `
+        <div class="ez-select-search">
+            <input type="text" placeholder="Qidirish..." autocomplete="off">
+        </div>
+        <div class="ez-select-options"></div>
+    `;
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(dropdown);
+    selectEl.insertAdjacentElement('afterend', wrapper);
+
+    const searchInput = dropdown.querySelector('input');
+    const optionsBox = dropdown.querySelector('.ez-select-options');
+
+    function renderList(query) {
+        const opts = Array.from(selectEl.querySelectorAll('option')).filter(o => o.value);
+        const q = query.toLowerCase().trim();
+        const filtered = q === '' ? opts : opts.filter(o => o.textContent.toLowerCase().includes(q));
+
+        if (filtered.length === 0) {
+            optionsBox.innerHTML = '<div class="ez-select-option no-results">Hech narsa topilmadi</div>';
+            return;
+        }
+
+        optionsBox.innerHTML = filtered.map(o => {
+            const isCurrent = o.dataset.isCurrent === 'true';
+            const cls = ['ez-select-option'];
+            if (o.value === selectEl.value) cls.push('selected');
+            if (isCurrent) cls.push('is-current');
+            return `<div class="${cls.join(' ')}" data-value="${o.value}">${o.textContent}</div>`;
+        }).join('');
+
+        optionsBox.querySelectorAll('.ez-select-option').forEach(el => {
+            if (el.classList.contains('no-results')) return;
+            el.addEventListener('click', function() {
+                selectEl.value = this.dataset.value;
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                updateTriggerLabel(selectEl, trigger);
+                closeDropdown();
+            });
+        });
+    }
+
+    function positionDropdown() {
+        const rect = trigger.getBoundingClientRect();
+        dropdown.style.left = Math.max(8, rect.left) + 'px';
+        dropdown.style.width = rect.width + 'px';
+        const spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < 300 && rect.top > 300) {
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+        } else {
+            dropdown.style.bottom = 'auto';
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+        }
+    }
+
+    function openDropdown() {
+        closeAllEzDropdowns();
+        trigger.classList.add('active');
+        positionDropdown();
+        dropdown.style.display = 'flex';
+        searchInput.value = '';
+        renderList('');
+        searchInput.focus();
+    }
+
+    function closeDropdown() {
+        trigger.classList.remove('active');
+        dropdown.style.display = 'none';
+    }
+
+    trigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (trigger.classList.contains('active')) {
+            closeDropdown();
+        } else {
+            openDropdown();
+        }
+    });
+
+    searchInput.addEventListener('input', function() { renderList(this.value); });
+
+    document.addEventListener('click', function(e) {
+        if (!wrapper.contains(e.target)) closeDropdown();
+    });
+
+    window.addEventListener('scroll', function() {
+        if (trigger.classList.contains('active')) positionDropdown();
+    }, true);
+    window.addEventListener('resize', function() {
+        if (trigger.classList.contains('active')) positionDropdown();
+    });
+
+    selectEl._ezWrapper = wrapper;
+    selectEl._ezTrigger = trigger;
+    updateTriggerLabel(selectEl, trigger);
+}
+
+function updateTriggerLabel(selectEl, trigger) {
+    const valEl = trigger.querySelector('.ez-select-value');
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (opt && opt.value) {
+        valEl.textContent = opt.textContent.trim();
+        valEl.classList.remove('placeholder');
+    } else {
+        valEl.textContent = selectEl.dataset.placeholder || 'Tanlang...';
+        valEl.classList.add('placeholder');
+    }
+}
+
+function closeAllEzDropdowns() {
+    document.querySelectorAll('.ez-select-trigger.active').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ez-select-dropdown').forEach(d => d.style.display = 'none');
+}
+
+/**
+ * Xomashyo variantlarini select ichiga chizadi.
+ * MUHIM: get_xomashyo_variants_api javobida har bir variant ICHIDA
+ * olchov_birligi maydoni YO'Q — birlik faqat tashqi data.xomashyo
+ * obyektida bor (allaqachon inson o'qiy oladigan formatda,
+ * get_olchov_birligi_display() orqali). Shuning uchun variantlar
+ * uchun umumiy shu birlik ishlatiladi.
+ */
+function renderVariantOptions(selectEl, data) {
+    selectEl.innerHTML = '<option value="">Variant tanlang...</option>';
+    const unit = (data.xomashyo && data.xomashyo.olchov_birligi) || '';
+    (data.variants || []).forEach(v => {
+        const parts = [v.rang || 'Rangsiz'];
+        if (v.qalinlik) parts.push(`${v.qalinlik} qalinlik`);
+        if (v.partiya_kodi) parts.push(`#${v.partiya_kodi}`);
+        const label = `${parts.join(' | ')} — ${v.miqdori} ${unit}`.trim();
+        selectEl.innerHTML += `<option value="${v.id}">${label}</option>`;
+    });
+}
+
+// ============================================================================
+// AJAX FUNKSIYALAR
+// ============================================================================
+
+/**
+ * ZAKATOVKA: Kroy xomashyolarini yuklash.
+ * ENDI: barcha faol kroy jarayon xomashyolari ko'rsatiladi (faqat
+ * tanlangan mahsulotnikilar emas), lekin tanlangan mahsulotga tegishli
+ * bo'lgani (agar mavjud bo'lsa) ⭐ belgisi bilan default tanlanadi.
+ */
 function loadKroyXomashyolar(mahsulotId, rowNum) {
     const select = document.querySelector(`.kroy-select[data-row="${rowNum}"]`);
     if (!select) return;
@@ -551,22 +821,39 @@ function loadKroyXomashyolar(mahsulotId, rowNum) {
         .then(r => r.json())
         .then(data => {
             select.innerHTML = '<option value="">Kroy tanlang...</option>';
+            let defaultId = null;
+
             if (data.success && data.xomashyolar.length > 0) {
                 data.xomashyolar.forEach(x => {
-                    select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
+                    const isCurrent = !!x.is_current;
+                    const label = (isCurrent ? '⭐ ' : '') + `${x.nomi} (${x.miqdori} ${x.olchov_birligi})`;
+                    select.innerHTML += `<option value="${x.id}" data-is-current="${isCurrent}">${label}</option>`;
+                    if (isCurrent && defaultId === null) defaultId = x.id;
                 });
-                // ✅ AUTO-SELECT: birinchi real optionni tanlash
-                _autoSelectFirst(select);
+
+                if (defaultId !== null) {
+                    select.value = defaultId;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    _autoSelectFirst(select);
+                }
             } else {
                 select.innerHTML += '<option value="">❌ Kroy jarayoni yo\'q (mustaqil ish tanlang)</option>';
             }
+
             const pv = select.dataset.pendingValue;
             if (pv) { select.value = pv; delete select.dataset.pendingValue; }
-            if (window.ssRefreshSelect) window.ssRefreshSelect(select);
+
+            enhanceSelect(select);
         })
         .catch(e => { if (e.name !== 'AbortError') console.error(e); });
 }
 
+/**
+ * KOSIB: Zakatovka xomashyolarini yuklash.
+ * ENDI: barcha faol zakatovka jarayon xomashyolari ko'rsatiladi, lekin
+ * tanlangan mahsulotga tegishli bo'lgani ⭐ bilan default tanlanadi.
+ */
 function loadZakatovkaXomashyolar(mahsulotId, rowNum) {
     const select = document.querySelector(`.zakatovka-select[data-row="${rowNum}"]`);
     if (!select) return;
@@ -576,18 +863,30 @@ function loadZakatovkaXomashyolar(mahsulotId, rowNum) {
         .then(r => r.json())
         .then(data => {
             select.innerHTML = '<option value="">Zakatovka tanlang...</option>';
+            let defaultId = null;
+
             if (data.success && data.xomashyolar.length > 0) {
                 data.xomashyolar.forEach(x => {
-                    select.innerHTML += `<option value="${x.id}">${x.nomi} (${x.miqdori} ${x.olchov_birligi})</option>`;
+                    const isCurrent = !!x.is_current;
+                    const label = (isCurrent ? '⭐ ' : '') + `${x.nomi} (${x.miqdori} ${x.olchov_birligi})`;
+                    select.innerHTML += `<option value="${x.id}" data-is-current="${isCurrent}">${label}</option>`;
+                    if (isCurrent && defaultId === null) defaultId = x.id;
                 });
-                // ✅ AUTO-SELECT: birinchi real optionni tanlash
-                _autoSelectFirst(select);
+
+                if (defaultId !== null) {
+                    select.value = defaultId;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    _autoSelectFirst(select);
+                }
             } else {
                 select.innerHTML += '<option value="">❌ Zakatovka yo\'q (mustaqil ish tanlang)</option>';
             }
+
             const pv = select.dataset.pendingValue;
             if (pv) { select.value = pv; delete select.dataset.pendingValue; }
-            if (window.ssRefreshSelect) window.ssRefreshSelect(select);
+
+            enhanceSelect(select);
         })
         .catch(e => { if (e.name !== 'AbortError') console.error(e); });
 }
@@ -610,7 +909,7 @@ function loadProductVariants(mahsulotId, rowNum) {
             }
             const pv = vs.dataset.pendingValue;
             if (pv) { vs.value = pv; delete vs.dataset.pendingValue; }
-            if (window.ssRefreshSelect) window.ssRefreshSelect(vs);
+            _ssRefresh(vs);
         })
         .catch(e => { if (e.name !== 'AbortError') console.error(e); });
 }
@@ -643,7 +942,8 @@ function addTeriRow(rowNum) {
         </div>
         <div style="display: grid; gap: 0.5rem;">
             <select name="teri_xomashyo[]" class="form-select xomashyo-select teri-select" required
-                data-row="${rowNum}" data-teri-index="${newIndex}" data-type="teri">
+                data-row="${rowNum}" data-teri-index="${newIndex}" data-type="teri"
+                data-placeholder="Teri tanlang...">
                 <option value="">Teri tanlang...</option>
                 {% for teri in terilar %}
                 <option value="{{ teri.id }}"
@@ -656,13 +956,15 @@ function addTeriRow(rowNum) {
             <div class="variant-select-container teri-variant-container"
                  id="teri-variant-${rowNum}-${newIndex}" style="display:none;">
                 <span class="variant-label">📦 Variant:</span>
-                <select name="teri_variant[]" class="form-select variant-select teri-variant-select"></select>
+                <select name="teri_variant[]" class="form-select variant-select teri-variant-select"
+                    data-placeholder="Variant tanlang..."></select>
             </div>
         </div>
         <button type="button" class="btn-remove-teri" onclick="removeTeriRow(this)">🗑️ O'chirish</button>
     `;
     container.appendChild(newRow);
-    newRow.querySelector('.teri-select').addEventListener('change', function() {
+    const newTeriSelect = newRow.querySelector('.teri-select');
+    newTeriSelect.addEventListener('change', function() {
         handleTeriSelect(this, rowNum, newIndex);
     });
     const sarfInp = newRow.querySelector('.teri-sarf-input');
@@ -670,6 +972,10 @@ function addTeriRow(rowNum) {
     sarfInp.addEventListener('focus', function() { this.select(); });
     sarfInp.addEventListener('blur', function() { if (this.value) this.value = parseFloat(this.value).toFixed(2); });
     updateRemoveButtons(rowNum);
+
+    // Yangi qatordagi selectlarni mavjud qidiruvli-select kutubxonasiga tanishtirish
+    _ssRefresh(newTeriSelect);
+    _ssRefresh(newRow.querySelector('.teri-variant-select'));
 }
 
 function removeTeriRow(button) {
@@ -710,11 +1016,9 @@ function handleTeriSelect(selectElement, rowNum, teriIndex) {
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.variants.length > 0) {
-                    variantSelect.innerHTML = '<option value="">Variant tanlang...</option>';
-                    data.variants.forEach(v => {
-                        variantSelect.innerHTML += `<option value="${v.id}">${v.rang || 'Rangsiz'} - ${v.miqdori} ${v.olchov_birligi}</option>`;
-                    });
+                    renderVariantOptions(variantSelect, data);
                     variantContainer.style.display = 'flex';
+                    _ssRefresh(variantSelect);
                 } else {
                     variantContainer.style.display = 'none';
                 }
@@ -804,6 +1108,9 @@ function createNewVariant(rowNum) {
         opt.textContent = `🆕 Yangi: ${rang || 'Rangsiz'} - ${razmer || 'Razmersiz'}`;
         opt.selected = true;
         variantSelect.appendChild(opt);
+        variantSelect.value = 'new';
+        _ssRefresh(variantSelect);
+
         const form = variantSelect.closest('form');
         let ri = form.querySelector('input[name="variant_rang"]');
         if (!ri) { ri = document.createElement('input'); ri.type = 'hidden'; ri.name = 'variant_rang'; form.appendChild(ri); }
@@ -826,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
     document.querySelectorAll('.date-input').forEach(inp => inp.value = today);
 
-    // Qidiruv
+    // Qidiruv (ishchilar jadvali)
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', function(e) {
@@ -844,10 +1151,18 @@ document.addEventListener('DOMContentLoaded', function () {
             const ishchiTuri = form.dataset.ishchiTuri;
             if (ishchiTuri === 'zakatovka') {
                 const s = form.querySelector('.kroy-select');
-                if (s) { s.required = !this.checked; s.style.opacity = this.checked ? '0.5' : '1'; if (this.checked) s.value = ''; }
+                if (s) {
+                    s.required = !this.checked;
+                    s.style.opacity = this.checked ? '0.5' : '1';
+                    if (this.checked) { s.value = ''; enhanceSelect(s); }
+                }
             } else if (ishchiTuri === 'kosib') {
                 const s = form.querySelector('.zakatovka-select');
-                if (s) { s.required = !this.checked; s.style.opacity = this.checked ? '0.5' : '1'; if (this.checked) s.value = ''; }
+                if (s) {
+                    s.required = !this.checked;
+                    s.style.opacity = this.checked ? '0.5' : '1';
+                    if (this.checked) { s.value = ''; enhanceSelect(s); }
+                }
             }
         });
     });
@@ -890,11 +1205,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     .then(r => r.json())
                     .then(data => {
                         if (data.success && data.variants.length > 0) {
-                            variantSelect.innerHTML = '<option value="">Variant tanlang...</option>';
-                            data.variants.forEach(v => {
-                                variantSelect.innerHTML += `<option value="${v.id}">${v.rang || 'Rangsiz'} - ${v.miqdori} ${v.olchov_birligi}</option>`;
-                            });
+                            renderVariantOptions(variantSelect, data);
                             variantContainer.style.display = 'flex';
+                            _ssRefresh(variantSelect);
                         } else { variantContainer.style.display = 'none'; }
                     })
                     .catch(() => { variantContainer.style.display = 'none'; });
@@ -968,10 +1281,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Padoj select — statik ro'yxat, sahifa yuklanganda darhol qidiruvli qilinadi
+    document.querySelectorAll('select[name="padoj_xomashyo"]').forEach(sel => enhanceSelect(sel));
+
 });
 </script>
 
 <script src="{% static 'js/draft.js' %}"></script>
 <script src="{% static 'js/search.js' %}"></script>
 
-{% endblock content %}
+{% endblock content %} 

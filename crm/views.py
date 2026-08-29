@@ -823,7 +823,6 @@ class IshQoshishView(AdminRequiredMixin,View):
                         zakatovka = Xomashyo.objects.get(
                             id=zakatovka_xomashyo_id,
                             category__name__iexact='zakatovka',
-                            mahsulot=mahsulot,
                             holati='active'
                         )
 

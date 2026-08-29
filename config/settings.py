@@ -14,6 +14,22 @@ LOGOUT_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'  
 LOGIN_URL = 'account_login'
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    }
+}
 
 ACCOUNT_LOGIN_METHODS = {'username'}
 
@@ -59,6 +75,7 @@ INSTALLED_APPS = [
     'allauth',                      
     'allauth.account',
     'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'rest_framework',
     'django.contrib.humanize',
     'crm.apps.CrmConfig', 
