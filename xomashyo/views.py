@@ -15,6 +15,7 @@ from django.utils.decorators import method_decorator
 from django.db.models.functions import Coalesce
 from crm.models import Chiqim, ChiqimTuri,Ishchi,ChiqimItem
 from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
+from xomashyo.services import tolov_yozish
 from crm.views import AdminRequiredMixin,is_admin
 import json
 
@@ -258,78 +259,12 @@ def chiqim_qoshish(request):
 
             # ── XOMASHYO TO'LOV ──────────────────────────────────
             if chiqim_turi == 'xomashyo_tolov':
-                xomashyo_cat, _ = ChiqimTuri.objects.get_or_create(
-                    name="Xomashyo to'lovi"
+                chiqim, auto_izoh, jami_uzs = tolov_yozish(
+                    items=rows,
+                    user=request.user,
+                    sana=sana,
+                    izoh=izoh,
                 )
-                jami_uzs     = Decimal('0')
-                jami_usd     = Decimal('0')
-                item_objects = []
-                izoh_parts   = []
-
-                for row in rows:
-                    harakat    = get_object_or_404(XomashyoHarakat, id=row['harakat_id'])
-                    miqdor_uzs = Decimal(str(row['miqdor_uzs']))
-                    miqdor_usd_str = row.get('miqdor_usd')
-                    miqdor_usd = Decimal(str(miqdor_usd_str)) if miqdor_usd_str else None
-                    kurs_str   = row.get('kurs')
-                    kurs       = Decimal(str(kurs_str)) if kurs_str else None
-
-                    # Qoldiqdan oshmasligi kerak
-                    if miqdor_uzs > harakat.qoldiq_uzs:
-                        raise ValueError(
-                            f"{harakat.xomashyo.nomi} uchun qoldiq: "
-                            f"{harakat.qoldiq_uzs:,.0f} so'm, "
-                            f"kiritilgan: {miqdor_uzs:,.0f} so'm"
-                        )
-
-                    jami_uzs += miqdor_uzs
-                    if miqdor_usd:
-                        jami_usd += miqdor_usd
-
-                    olchov = harakat.xomashyo.get_olchov_birligi_display()
-                    izoh_parts.append(
-                        f"{harakat.xomashyo.nomi} ({harakat.miqdori:g} {olchov}) "
-                        f"uchun {miqdor_uzs:,.0f} so'm"
-                    )
-                    item_objects.append({
-                        'harakat':    harakat,
-                        'miqdor_uzs': miqdor_uzs,
-                        'miqdor_usd': miqdor_usd,
-                        'kurs':       kurs,
-                        'name': (
-                            f"{harakat.xomashyo.nomi} to'lovi — "
-                            f"{harakat.sana.strftime('%d.%m.%Y')}"
-                        ),
-                    })
-
-                auto_izoh = "; ".join(izoh_parts)
-                if izoh:
-                    auto_izoh += f"\nIzoh: {izoh}"
-
-                chiqim = Chiqim.objects.create(
-                    name=f"Xomashyo to'lovi — {sana.strftime('%d.%m.%Y')}",
-                    category=xomashyo_cat,
-                    price=jami_uzs,
-                    price_usd=jami_usd if jami_usd else None,
-                    usd_kurs=item_objects[0]['kurs'] if item_objects else None,
-                    izoh=auto_izoh,
-                    created=sana,
-                    created_by=request.user,
-                )
-
-                for obj in item_objects:
-                    ChiqimItem.objects.create(
-                        chiqim=chiqim,
-                        item_turi='xomashyo',
-                        name=obj['name'],
-                        price_uzs=obj['miqdor_uzs'],
-                        price_usd=obj['miqdor_usd'],
-                        tolov_kursi=obj['kurs'],
-                        xomashyo_harakat=obj['harakat'],
-                        # ↑ save() ichida harakat.tolov_yangilash() chaqiriladi
-                        # ↑ ombor O'ZGARMAYDI
-                    )
-
                 messages.success(
                     request,
                     f"✅ To'lov saqlandi: {auto_izoh} | Jami: {jami_uzs:,.0f} so'm"
