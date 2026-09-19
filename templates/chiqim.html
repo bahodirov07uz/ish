@@ -134,6 +134,17 @@
     .tolov-btn{background:#10b981;color:white;border:none;padding:.35rem .75rem;border-radius:4px;font-size:.8125rem;font-weight:500;cursor:pointer}
     .tolov-btn:hover{background:#059669}
 
+    /* To'lov rejimi segmenti */
+    .payment-segment{display:inline-flex;gap:.35rem;background:var(--bg-tertiary);padding:.25rem;border-radius:8px;border:1px solid var(--border-color)}
+    .segment-opt{margin:0;cursor:pointer}
+    .segment-opt input[type="radio"]{display:none}
+    .segment-btn{display:inline-block;padding:.45rem 1rem;border-radius:6px;font-size:.875rem;font-weight:500;color:var(--text-secondary);transition:all .2s;user-select:none}
+    .segment-opt input[type="radio"]:checked + .segment-btn{font-weight:600;color:#fff}
+    .segment-opt input[value="tolanmagan"]:checked + .segment-btn{background:#ef4444;box-shadow:0 2px 8px rgba(239,68,68,.35)}
+    .segment-opt input[value="qisman"]:checked + .segment-btn{background:#f59e0b;box-shadow:0 2px 8px rgba(245,158,11,.35)}
+    .segment-opt input[value="toliq"]:checked + .segment-btn{background:#10b981;box-shadow:0 2px 8px rgba(16,185,129,.35)}
+    .col-tolangan{transition:all .2s}
+
     @media(max-width:1024px){.form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}}
 </style>
 
@@ -201,7 +212,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Yetkazib beruvchi <span style="color: #dc2626;" class="required">*</span></label>
-                    <select name="yetkazib_beruvchi" class="form-select" required>
+                    <select name="yetkazib_beruvchi" class="form-select" id="kirimYetkazibBeruvchi" required>
                         <option value="">Tanlang…</option>
                         {% for yb in yetkazib_beruvchilar %}
                             <option value="{{ yb.id }}">{{ yb.nomi }}</option>
@@ -216,6 +227,23 @@
                 <div class="form-group">
                     <label class="form-label">Izoh</label>
                     <textarea name="izoh" class="form-control" rows="1" placeholder="Qo'shimcha…"></textarea>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:1rem;">
+                <label class="form-label" style="font-weight:600;margin-bottom:.5rem;">To'lov holati</label>
+                <div class="payment-segment">
+                    <label class="segment-opt">
+                        <input type="radio" name="tolov_rejim" value="tolanmagan" checked>
+                        <span class="segment-btn">❌ To'lanmagan</span>
+                    </label>
+                    <label class="segment-opt">
+                        <input type="radio" name="tolov_rejim" value="qisman">
+                        <span class="segment-btn">⏳ Qisman to'lov</span>
+                    </label>
+                    <label class="segment-opt">
+                        <input type="radio" name="tolov_rejim" value="toliq">
+                        <span class="segment-btn">✅ To'liq to'langan</span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -237,6 +265,7 @@
                         <th>Birlik narxi (UZS)</th>
                         <th>Birlik narxi (USD)</th>
                         <th>Jami (UZS)</th>
+                        <th class="col-tolangan" style="display:none;">To'langan (UZS)</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -245,13 +274,23 @@
         </div>
 
         <div class="summary-section" id="kirimSummary">
-            <div class="sum-row">
-                <span class="sum-lbl">Jami:</span>
-                <span class="sum-val" id="kirimTotal">0 so'm</span>
-                <span class="sum-val-usd" id="kirimTotalUsd"></span>
+            <div style="display:flex;justify-content:flex-end;gap:2rem;flex-wrap:wrap;align-items:center;">
+                <div class="sum-row">
+                    <span class="sum-lbl">Jami:</span>
+                    <span class="sum-val" id="kirimTotal">0 so'm</span>
+                    <span class="sum-val-usd" id="kirimTotalUsd"></span>
+                </div>
+                <div class="sum-row" id="rowKirimTolangan" style="display:none;">
+                    <span class="sum-lbl" style="color:#10b981;">To'langan:</span>
+                    <span class="sum-val" id="kirimTolangan" style="color:#10b981;">0 so'm</span>
+                </div>
+                <div class="sum-row" id="rowKirimQoldiq" style="display:none;">
+                    <span class="sum-lbl" style="color:#ef4444;">Qoldiq:</span>
+                    <span class="sum-val" id="kirimQoldiq" style="color:#ef4444;">0 so'm</span>
+                </div>
             </div>
-            <div style="font-size:.8rem;color:var(--text-secondary);text-align:right;margin-top:.4rem;">
-                ⚠️ Bu to'lov emas — xomashyo ombori yangilanadi. To'lov alohida amalga oshiriladi.
+            <div id="kirimNotice" style="font-size:.8rem;color:var(--text-secondary);text-align:right;margin-top:.5rem;">
+                ⚠️ To'lanmagan kirim (nasiya) — xomashyo omborga tushadi, to'lov keyinroq amalga oshiriladi.
             </div>
         </div>
 
@@ -634,11 +673,30 @@ function fmtUsd(n) { return n > 0 ? '≈ $' + Number(n).toFixed(2) : ''; }
 // ══════════════════════════════════════════════════════════════
 let kirimIdx = 0;
 
+function getTolovRejim() {
+    const checked = document.querySelector('input[name="tolov_rejim"]:checked');
+    return checked ? checked.value : 'tolanmagan';
+}
+
+function updateTolovRejimUI() {
+    const rejim = getTolovRejim();
+    const isQisman = rejim === 'qisman';
+    document.querySelectorAll('.col-tolangan').forEach(el => {
+        el.style.display = isQisman ? '' : 'none';
+    });
+    calcKirim();
+}
+
+document.querySelectorAll('input[name="tolov_rejim"]').forEach(radio => {
+    radio.addEventListener('change', updateTolovRejimUI);
+});
+
 function addKirimRow() {
     const idx = kirimIdx++;
     const tr  = document.createElement('tr');
     tr.className   = 'kirim-row';
     tr.dataset.idx = idx;
+    const isQisman = getTolovRejim() === 'qisman';
     tr.innerHTML   = `
         <td class="row-num">${document.querySelectorAll('.kirim-row').length + 1}</td>
         <td style="min-width:200px;"><div class="sel-wrap" data-idx="${idx}"></div></td>
@@ -655,6 +713,10 @@ function addKirimRow() {
             <span class="unit">$</span>
         </td>
         <td class="jami-td k-jami" data-idx="${idx}">—</td>
+        <td class="col-tolangan" style="${isQisman ? '' : 'display:none;'}white-space:nowrap;">
+            <input type="number" class="ii wide k-tolangan-uzs" data-idx="${idx}" step="1" min="0" placeholder="0">
+            <span class="unit">so'm</span>
+        </td>
         <td><button type="button" class="rm-btn" onclick="removeRow(this,'kirim-row',calcKirim)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/></svg>
         </button></td>`;
@@ -685,6 +747,7 @@ function addKirimRow() {
         calcKirimRow(idx); calcKirim();
     });
     tr.querySelector('.k-narx-usd').addEventListener('input', () => { calcKirimRow(idx); calcKirim(); });
+    tr.querySelector('.k-tolangan-uzs').addEventListener('input', () => { calcKirim(); });
     renumber('kirim-row');
 }
 
@@ -701,24 +764,71 @@ function calcKirimRow(idx) {
 }
 
 function calcKirim() {
-    let totalUzs = 0, totalUsd = 0;
+    let totalUzs = 0, totalUsd = 0, totalTolangan = 0;
+    const rejim = getTolovRejim();
+
     document.querySelectorAll('.kirim-row').forEach(tr => {
         const miqdor = parseFloat(tr.querySelector('.k-miqdor')?.value) || 0;
         const uzs    = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
         const usd    = parseFloat(tr.querySelector('.k-narx-usd')?.value) || 0;
+        const tolanganInp = tr.querySelector('.k-tolangan-uzs');
+        const rowJami = miqdor * uzs;
+
         if (tr.querySelector('.k-xom-id')?.value && miqdor) {
-            totalUzs += miqdor * uzs;
+            totalUzs += rowJami;
             totalUsd += miqdor * usd;
+
+            if (rejim === 'toliq') {
+                totalTolangan += rowJami;
+            } else if (rejim === 'qisman') {
+                const tolVal = parseFloat(tolanganInp?.value) || 0;
+                totalTolangan += tolVal;
+            }
         }
     });
+
     document.getElementById('kirimSummary').style.display = totalUzs > 0 ? 'block' : 'none';
     document.getElementById('kirimTotal').textContent    = fmt(totalUzs);
     document.getElementById('kirimTotalUsd').textContent = fmtUsd(totalUsd);
+
+    const rowTolangan = document.getElementById('rowKirimTolangan');
+    const rowQoldiq   = document.getElementById('rowKirimQoldiq');
+    const notice      = document.getElementById('kirimNotice');
+
+    if (rejim === 'tolanmagan') {
+        if (rowTolangan) rowTolangan.style.display = 'none';
+        if (rowQoldiq) rowQoldiq.style.display   = totalUzs > 0 ? 'flex' : 'none';
+        const elQoldiq = document.getElementById('kirimQoldiq');
+        if (elQoldiq) elQoldiq.textContent = fmt(totalUzs);
+        if (notice) notice.textContent = "⚠️ To'lanmagan kirim (nasiya) — xomashyo qarz sifatida saqlanadi.";
+    } else if (rejim === 'qisman') {
+        if (rowTolangan) rowTolangan.style.display = 'flex';
+        if (rowQoldiq) rowQoldiq.style.display   = 'flex';
+        const qoldiq = Math.max(0, totalUzs - totalTolangan);
+        const elTolangan = document.getElementById('kirimTolangan');
+        const elQoldiq = document.getElementById('kirimQoldiq');
+        if (elTolangan) elTolangan.textContent = fmt(totalTolangan);
+        if (elQoldiq) elQoldiq.textContent   = fmt(qoldiq);
+        if (notice) notice.textContent = "💳 Qisman to'lov — kiritilgan to'lov uchun Chiqim va Tranzaksiya yaratiladi, qoldiq qarzda qoladi.";
+    } else if (rejim === 'toliq') {
+        if (rowTolangan) rowTolangan.style.display = 'flex';
+        if (rowQoldiq) rowQoldiq.style.display   = 'flex';
+        const elTolangan = document.getElementById('kirimTolangan');
+        const elQoldiq = document.getElementById('kirimQoldiq');
+        if (elTolangan) elTolangan.textContent = fmt(totalUzs);
+        if (elQoldiq) elQoldiq.textContent   = '0 so\'m';
+        if (notice) notice.textContent = "✅ To'liq to'lov — to'liq summa uchun Chiqim va Tranzaksiya darhol yaratiladi.";
+    }
 }
 
 function resetKirim() {
     document.getElementById('kirimBody').innerHTML = '';
-    kirimIdx = 0; addKirimRow(); calcKirim();
+    const defRadio = document.querySelector('input[name="tolov_rejim"][value="tolanmagan"]');
+    if (defRadio) defRadio.checked = true;
+    kirimIdx = 0;
+    updateTolovRejimUI();
+    addKirimRow();
+    calcKirim();
 }
 
 document.getElementById('addKirimRow').addEventListener('click', addKirimRow);
@@ -740,22 +850,66 @@ document.getElementById('globalKurs').addEventListener('input', function () {
 });
 
 document.getElementById('kirimForm').addEventListener('submit', function (e) {
+    const rejim = getTolovRejim();
+    const yb = document.getElementById('kirimYetkazibBeruvchi')?.value;
+
+    if (rejim !== 'tolanmagan' && !yb) {
+        e.preventDefault();
+        alert("To'lov qilish uchun yetkazib beruvchini tanlash majburiy!");
+        return;
+    }
+
     const items = [];
+    let hasError = false;
+
     document.querySelectorAll('.kirim-row').forEach(tr => {
         const xomId  = tr.querySelector('.k-xom-id')?.value;
         const miqdor = parseFloat(tr.querySelector('.k-miqdor')?.value) || 0;
         const uzs    = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
         const usd    = parseFloat(tr.querySelector('.k-narx-usd')?.value) || 0;
         if (!xomId || !miqdor) return;
+
+        const rowJami = miqdor * uzs;
+        let tolanganUzs = 0;
+        if (rejim === 'toliq') {
+            tolanganUzs = rowJami;
+        } else if (rejim === 'qisman') {
+            tolanganUzs = parseFloat(tr.querySelector('.k-tolangan-uzs')?.value) || 0;
+            if (tolanganUzs < 0 || tolanganUzs > rowJami) {
+                alert(`To'langan summa (${fmt(tolanganUzs)}) jami summadan (${fmt(rowJami)}) oshmasligi va manfiy bo'lmasligi kerak!`);
+                hasError = true;
+                return;
+            }
+        }
+
         items.push({
             xomashyo_id:     xomId,
             miqdor:          miqdor,
             birlik_narx_uzs: uzs,
             birlik_narx_usd: usd || null,
+            tolangan_uzs:    tolanganUzs,
         });
     });
-    if (!items.length) { e.preventDefault(); alert("Kamida bitta xomashyo qatori to'ldiring!"); return; }
+
+    if (hasError) {
+        e.preventDefault();
+        return;
+    }
+
+    if (!items.length) {
+        e.preventDefault();
+        alert("Kamida bitta xomashyo qatori to'ldiring!");
+        return;
+    }
+
     document.getElementById('kirimItems').value = JSON.stringify(items);
+
+    // Ikki marta yuborishdan himoya
+    const submitBtn = this.querySelector('.btn-submit');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ Saqlanmoqda...';
+    }
 });
 
 // ══════════════════════════════════════════════════════════════
