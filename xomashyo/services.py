@@ -1,8 +1,8 @@
 import decimal
 from decimal import Decimal
 from django.utils import timezone
-from xomashyo.models import XomashyoHarakat, ChiqimTuri
-from crm.models import Chiqim, ChiqimItem
+from xomashyo.models import XomashyoHarakat
+from crm.models import Chiqim, ChiqimItem, ChiqimTuri
 
 
 def tolov_yozish(items, user=None, sana=None, izoh='', chiqim_nomi=None):
