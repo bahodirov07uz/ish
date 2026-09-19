@@ -132,9 +132,10 @@ def xomashyo_kirim_qoshish(request):
     """
     POST fields:
       sana              = 'YYYY-MM-DD'
-      yetkazib_beruvchi = <id>  (ixtiyoriy)
+      yetkazib_beruvchi = <id>  (to'lov bo'lsa majburiy)
       usd_kurs          = kurs  (ixtiyoriy)
       izoh              = '...' (ixtiyoriy)
+      tolov_rejim       = 'tolanmagan' | 'qisman' | 'toliq'
       items             = JSON
 
     items JSON:
@@ -143,16 +144,23 @@ def xomashyo_kirim_qoshish(request):
         "miqdor":         5,
         "birlik_narx_uzs": 12000,
         "birlik_narx_usd": 1.0,   (ixtiyoriy)
+        "tolangan_uzs":   60000,  (ixtiyoriy, faqat 'qisman' rejimda)
       }, ...]
     """
     if request.method != 'POST':
         return redirect('xomashyo:chiqimlar')
 
+    tolov_rejim = request.POST.get('tolov_rejim', 'tolanmagan').strip()
+    if tolov_rejim not in ('tolanmagan', 'qisman', 'toliq'):
+        tolov_rejim = 'tolanmagan'
+
     izoh    = request.POST.get('izoh', '').strip()
     yb_id   = request.POST.get('yetkazib_beruvchi') or None
     sana    = _parse_sana(request.POST.get('sana'))
-    usd_kurs_str = request.POST.get('usd_kurs', '').strip()
+    if not sana:
+        sana = timezone.now().date()
 
+    usd_kurs_str = request.POST.get('usd_kurs', '').strip()
     try:
         usd_kurs = Decimal(usd_kurs_str) if usd_kurs_str else None
     except decimal.InvalidOperation:
@@ -168,8 +176,13 @@ def xomashyo_kirim_qoshish(request):
         if yb_id:
             yetkazib_beruvchi = get_object_or_404(YetkazibBeruvchi, id=yb_id)
 
+        if tolov_rejim in ('qisman', 'toliq') and not yetkazib_beruvchi:
+            raise ValueError("To'lov qilish uchun yetkazib beruvchini tanlash majburiy!")
+
         with transaction.atomic():
             harakatlar_info = []
+            tolov_items = []
+            jami_kirim_uzs = Decimal('0')
 
             for row in rows:
                 xomashyo = get_object_or_404(Xomashyo, id=row['xomashyo_id'])
@@ -181,6 +194,7 @@ def xomashyo_kirim_qoshish(request):
 
                 jami_uzs = birlik_uzs * miqdor
                 jami_usd = (birlik_usd * miqdor) if birlik_usd else None
+                jami_kirim_uzs += jami_uzs
 
                 # XomashyoHarakat yaratiladi — ombor yangilanadi
                 harakat = XomashyoHarakat(
@@ -196,19 +210,64 @@ def xomashyo_kirim_qoshish(request):
                     yetkazib_beruvchi=yetkazib_beruvchi,
                     foydalanuvchi=request.user,
                     izoh=izoh,
-                    # tolov_holati → save() ichida 'tolanmagan' bo'ladi
                 )
-                harakat.save()  # ← bu yerda ombor yangilanadi, Chiqim EMAS
+                harakat.save()  # ← bu yerda ombor yangilanadi
+
+                # To'lov summasi
+                if tolov_rejim == 'toliq':
+                    tolangan = jami_uzs
+                elif tolov_rejim == 'qisman':
+                    val = row.get('tolangan_uzs')
+                    try:
+                        tolangan = Decimal(str(val)) if val not in (None, '') else Decimal('0')
+                    except (decimal.InvalidOperation, TypeError):
+                        raise ValueError(f"{xomashyo.nomi} uchun to'langan summa noto'g'ri kiritilgan!")
+                    if tolangan < 0 or tolangan > jami_uzs:
+                        raise ValueError(
+                            f"{xomashyo.nomi} uchun to'lov summasi noto'g'ri: "
+                            f"kiritilgan {tolangan:,.0f} so'm, jami summa {jami_uzs:,.0f} so'm"
+                        )
+                else:
+                    tolangan = Decimal('0')
+
+                if tolangan > 0:
+                    tolangan_usd = round(tolangan / usd_kurs, 2) if (usd_kurs and usd_kurs > 0) else None
+                    tolov_items.append({
+                        'harakat': harakat,
+                        'miqdor_uzs': tolangan,
+                        'miqdor_usd': tolangan_usd,
+                        'kurs': usd_kurs,
+                    })
 
                 harakatlar_info.append(
                     f"{xomashyo.nomi} {miqdor:g} {xomashyo.get_olchov_birligi_display()}"
                     f" ({jami_uzs:,.0f} so'm)"
                 )
 
+            jami_tolangan_barchasi = sum((item['miqdor_uzs'] for item in tolov_items), Decimal('0'))
+            jami_qoldiq_barchasi = jami_kirim_uzs - jami_tolangan_barchasi
+
+            # To'lov summasi > 0 bo'lgan qatorlar uchun tolov_yozish service chaqiriladi
+            if tolov_items:
+                yb_nomi = f" ({yetkazib_beruvchi.nomi})" if yetkazib_beruvchi else ""
+                sana_str = sana.strftime('%d.%m.%Y') if hasattr(sana, 'strftime') else str(sana)
+                tolov_yozish(
+                    items=tolov_items,
+                    user=request.user,
+                    sana=sana,
+                    izoh=izoh,
+                    chiqim_nomi=f"Xomashyo to'lovi{yb_nomi} — {sana_str}",
+                )
+
             msg = "✅ Xomashyo kirim saqlandi: " + ", ".join(harakatlar_info)
-            msg += " | To'lov keyinroq amalga oshirilishi mumkin."
+            if jami_tolangan_barchasi > 0:
+                msg += f" | To'landi: {jami_tolangan_barchasi:,.0f} so'm, Qoldiq: {jami_qoldiq_barchasi:,.0f} so'm"
+            else:
+                msg += f" | To'lanmagan (Qoldiq: {jami_kirim_uzs:,.0f} so'm)"
             messages.success(request, msg)
 
+    except ValueError as e:
+        messages.error(request, f"⚠️ {e}")
     except (decimal.InvalidOperation, TypeError, KeyError) as e:
         messages.error(request, f"Son formatida xatolik: {e}")
     except Exception as e:
