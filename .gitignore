@@ -13,3 +13,4 @@ readme
 .venv
 
 *csv
+backups/
