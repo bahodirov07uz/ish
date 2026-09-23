@@ -15,7 +15,7 @@ from django.utils.decorators import method_decorator
 from django.db.models.functions import Coalesce
 from crm.models import Chiqim, ChiqimTuri,Ishchi,ChiqimItem
 from xomashyo.models import Xomashyo, XomashyoHarakat, YetkazibBeruvchi,XomashyoCategory,XomashyoVariant
-from xomashyo.services import tolov_yozish
+from xomashyo.services import tolov_yozish, tolov_yozish_kop
 from crm.views import AdminRequiredMixin,is_admin
 import json
 
@@ -163,18 +163,33 @@ def xomashyo_kirim_qoshish(request):
     except decimal.InvalidOperation:
         usd_kurs = None
 
+    tolov_umumiy_uzs_str = request.POST.get('tolov_umumiy_uzs', '').strip()
+    try:
+        tolov_umumiy_uzs = Decimal(tolov_umumiy_uzs_str) if tolov_umumiy_uzs_str else None
+    except decimal.InvalidOperation:
+        tolov_umumiy_uzs = None
+
     try:
         rows = json.loads(request.POST.get('items', '[]'))
         if not rows:
             messages.error(request, "Kamida bitta xomashyo qatori kerak!")
             return redirect('xomashyo:chiqimlar')
 
+        if tolov_umumiy_uzs is not None and tolov_umumiy_uzs > 0:
+            has_row_payment = any(
+                (row.get('tolov_holati') in ('qisman', 'toliq')) or
+                (row.get('tolangan_uzs') is not None and str(row.get('tolangan_uzs')).strip() != '')
+                for row in rows
+            )
+            if has_row_payment:
+                raise ValueError("Ikkala to'lov rejimini bir vaqtda ishlatib bo'lmaydi: umumiy summa yoki qatorlar bo'yicha to'lovdan birini tanlang")
+
         yetkazib_beruvchi = None
         if yb_id:
             yetkazib_beruvchi = get_object_or_404(YetkazibBeruvchi, id=yb_id)
 
         with transaction.atomic():
-            harakatlar_info = []
+            harakatlar = []
 
             for row in rows:
                 xomashyo = get_object_or_404(Xomashyo, id=row['xomashyo_id'])
@@ -203,45 +218,60 @@ def xomashyo_kirim_qoshish(request):
                     izoh=izoh,
                 )
                 harakat.save()  # Ombor yangilandi
+                harakatlar.append((harakat, jami_uzs, row))
 
-                tolov_holati = row.get('tolov_holati', 'tolanmagan')
-                if tolov_holati == 'toliq':
-                    if jami_uzs > 0:
+            if tolov_umumiy_uzs is not None and tolov_umumiy_uzs > 0:
+                just_harakatlar = [h for h, _, _ in harakatlar]
+                tolov_yozish_kop(
+                    harakatlar=just_harakatlar,
+                    umumiy_uzs=tolov_umumiy_uzs,
+                    sana=sana,
+                    user=request.user,
+                    usd_kurs=usd_kurs,
+                    izoh=izoh,
+                )
+            else:
+                for harakat, jami_uzs, row in harakatlar:
+                    tolov_holati = row.get('tolov_holati', 'tolanmagan')
+                    if tolov_holati == 'toliq':
+                        if jami_uzs > 0:
+                            tolov_yozish(
+                                harakat=harakat,
+                                summa_uzs=jami_uzs,
+                                sana=sana,
+                                user=request.user,
+                                usd_kurs=usd_kurs,
+                                izoh=izoh,
+                            )
+                    elif tolov_holati == 'qisman':
+                        tolangan_val = row.get('tolangan_uzs')
+                        if tolangan_val is None or str(tolangan_val).strip() == '':
+                            raise ValueError(f"{harakat.xomashyo.nomi} uchun to'langan summa kiritilmadi")
+                        tolov_summa = Decimal(str(tolangan_val))
+                        if tolov_summa <= 0 or tolov_summa > jami_uzs:
+                            raise ValueError(
+                                f"{harakat.xomashyo.nomi} uchun to'langan summa ({tolov_summa:,.0f} so'm) "
+                                f"0 dan katta va jami narxdan ({jami_uzs:,.0f} so'm) oshmasligi kerak"
+                            )
                         tolov_yozish(
                             harakat=harakat,
-                            summa_uzs=jami_uzs,
+                            summa_uzs=tolov_summa,
                             sana=sana,
                             user=request.user,
                             usd_kurs=usd_kurs,
                             izoh=izoh,
                         )
-                elif tolov_holati == 'qisman':
-                    tolangan_val = row.get('tolangan_uzs')
-                    if tolangan_val is None or str(tolangan_val).strip() == '':
-                        raise ValueError(f"{xomashyo.nomi} uchun to'langan summa kiritilmadi")
-                    tolov_summa = Decimal(str(tolangan_val))
-                    if tolov_summa <= 0 or tolov_summa > jami_uzs:
-                        raise ValueError(
-                            f"{xomashyo.nomi} uchun to'langan summa ({tolov_summa:,.0f} so'm) "
-                            f"0 dan katta va jami narxdan ({jami_uzs:,.0f} so'm) oshmasligi kerak"
-                        )
-                    tolov_yozish(
-                        harakat=harakat,
-                        summa_uzs=tolov_summa,
-                        sana=sana,
-                        user=request.user,
-                        usd_kurs=usd_kurs,
-                        izoh=izoh,
-                    )
-                elif tolov_holati == 'tolanmagan':
-                    pass
-                else:
-                    raise ValueError(f"Noto'g'ri to'lov holati: {tolov_holati}")
+                    elif tolov_holati == 'tolanmagan':
+                        pass
+                    else:
+                        raise ValueError(f"Noto'g'ri to'lov holati: {tolov_holati}")
 
+            harakatlar_info = []
+            for harakat, jami_uzs, _ in harakatlar:
                 harakat.refresh_from_db()
                 holat_text = harakat.get_tolov_holati_display()
                 harakatlar_info.append(
-                    f"{xomashyo.nomi} {miqdor:g} {xomashyo.get_olchov_birligi_display()} "
+                    f"{harakat.xomashyo.nomi} {harakat.miqdori:g} {harakat.xomashyo.get_olchov_birligi_display()} "
                     f"({jami_uzs:,.0f} so'm, holat: {holat_text}, qarz: {harakat.qoldiq_uzs:,.0f} so'm)"
                 )
 
