@@ -143,6 +143,8 @@ def xomashyo_kirim_qoshish(request):
         "miqdor":         5,
         "birlik_narx_uzs": 12000,
         "birlik_narx_usd": 1.0,   (ixtiyoriy)
+        "tolov_holati":   "tolanmagan"|"qisman"|"toliq", (ixtiyoriy)
+        "tolangan_uzs":   50000,  (faqat qisman uchun)
       }, ...]
     """
     if request.method != 'POST':
@@ -150,7 +152,10 @@ def xomashyo_kirim_qoshish(request):
 
     izoh    = request.POST.get('izoh', '').strip()
     yb_id   = request.POST.get('yetkazib_beruvchi') or None
-    sana    = _parse_sana(request.POST.get('sana'))
+    sana_raw = request.POST.get('sana')
+    sana    = _parse_sana(sana_raw) if sana_raw else timezone.now().date()
+    if not sana:
+        sana = timezone.now().date()
     usd_kurs_str = request.POST.get('usd_kurs', '').strip()
 
     try:
@@ -196,19 +201,55 @@ def xomashyo_kirim_qoshish(request):
                     yetkazib_beruvchi=yetkazib_beruvchi,
                     foydalanuvchi=request.user,
                     izoh=izoh,
-                    # tolov_holati → save() ichida 'tolanmagan' bo'ladi
                 )
-                harakat.save()  # ← bu yerda ombor yangilanadi, Chiqim EMAS
+                harakat.save()  # Ombor yangilandi
 
+                tolov_holati = row.get('tolov_holati', 'tolanmagan')
+                if tolov_holati == 'toliq':
+                    if jami_uzs > 0:
+                        tolov_yozish(
+                            harakat=harakat,
+                            summa_uzs=jami_uzs,
+                            sana=sana,
+                            user=request.user,
+                            usd_kurs=usd_kurs,
+                            izoh=izoh,
+                        )
+                elif tolov_holati == 'qisman':
+                    tolangan_val = row.get('tolangan_uzs')
+                    if tolangan_val is None or str(tolangan_val).strip() == '':
+                        raise ValueError(f"{xomashyo.nomi} uchun to'langan summa kiritilmadi")
+                    tolov_summa = Decimal(str(tolangan_val))
+                    if tolov_summa <= 0 or tolov_summa > jami_uzs:
+                        raise ValueError(
+                            f"{xomashyo.nomi} uchun to'langan summa ({tolov_summa:,.0f} so'm) "
+                            f"0 dan katta va jami narxdan ({jami_uzs:,.0f} so'm) oshmasligi kerak"
+                        )
+                    tolov_yozish(
+                        harakat=harakat,
+                        summa_uzs=tolov_summa,
+                        sana=sana,
+                        user=request.user,
+                        usd_kurs=usd_kurs,
+                        izoh=izoh,
+                    )
+                elif tolov_holati == 'tolanmagan':
+                    pass
+                else:
+                    raise ValueError(f"Noto'g'ri to'lov holati: {tolov_holati}")
+
+                harakat.refresh_from_db()
+                holat_text = harakat.get_tolov_holati_display()
                 harakatlar_info.append(
-                    f"{xomashyo.nomi} {miqdor:g} {xomashyo.get_olchov_birligi_display()}"
-                    f" ({jami_uzs:,.0f} so'm)"
+                    f"{xomashyo.nomi} {miqdor:g} {xomashyo.get_olchov_birligi_display()} "
+                    f"({jami_uzs:,.0f} so'm, holat: {holat_text}, qarz: {harakat.qoldiq_uzs:,.0f} so'm)"
                 )
 
-            msg = "✅ Xomashyo kirim saqlandi: " + ", ".join(harakatlar_info)
-            msg += " | To'lov keyinroq amalga oshirilishi mumkin."
+            msg = "✅ Xomashyo kirim saqlandi: " + "; ".join(harakatlar_info)
             messages.success(request, msg)
 
+    except ValueError as e:
+        messages.error(request, f"⚠️ {e}")
     except (decimal.InvalidOperation, TypeError, KeyError) as e:
         messages.error(request, f"Son formatida xatolik: {e}")
     except Exception as e:
