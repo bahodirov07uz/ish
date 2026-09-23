@@ -220,6 +220,22 @@
             </div>
         </div>
 
+        <!-- To'lov rejimi switcheri -->
+        <div class="tolov-mode-bar" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:.75rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <span style="font-weight:600;font-size:.875rem;color:var(--text-primary);">To'lov rejimi:</span>
+                <div style="display:inline-flex;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;padding:3px;gap:3px;">
+                    <button type="button" id="btnModeQator" class="btn-mode active" style="padding:.35rem .75rem;font-size:.8125rem;border:none;border-radius:4px;cursor:pointer;font-weight:500;background:#ef4444;color:white;transition:all .2s;">Qatorlar bo'yicha</button>
+                    <button type="button" id="btnModeWaterfall" class="btn-mode" style="padding:.35rem .75rem;font-size:.8125rem;border:none;border-radius:4px;cursor:pointer;font-weight:500;background:transparent;color:var(--text-secondary);transition:all .2s;">Umumiy summa (Waterfall)</button>
+                </div>
+            </div>
+            <div id="waterfallControls" style="display:none;align-items:center;gap:.75rem;">
+                <label style="font-size:.875rem;font-weight:500;color:var(--text-primary);">Umumiy to'lov (UZS):</label>
+                <input type="number" name="tolov_umumiy_uzs" id="tolovUmumiyUzs" class="ii wide" style="text-align:left;width:140px;font-size:.875rem;padding:.45rem .6rem;" step="1" min="0" placeholder="0">
+                <button type="button" id="btnToliqTolash" class="btn-green" style="color:white;border:none;padding:.45rem .85rem;border-radius:4px;font-size:.8125rem;font-weight:600;cursor:pointer;">To'liq to'lash</button>
+            </div>
+        </div>
+
         <div class="products-section">
             <div class="table-toolbar">
                 <span class="toolbar-title">Xomashyo qatorlari</span>
@@ -237,7 +253,7 @@
                         <th>Birlik narxi (UZS)</th>
                         <th>Birlik narxi (USD)</th>
                         <th>Jami (UZS)</th>
-                        <th>To'lov holati</th>
+                        <th id="thTolovCol">To'lov holati</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -637,9 +653,53 @@ function fmt(n) { return Number(n).toLocaleString('uz-UZ') + ' so\'m'; }
 function fmtUsd(n) { return n > 0 ? '≈ $' + Number(n).toFixed(2) : ''; }
 
 // ══════════════════════════════════════════════════════════════
-// 1. XOMASHYO KIRIM ROWS
+// 1. XOMASHYO KIRIM ROWS & PAYMENT MODES
 // ══════════════════════════════════════════════════════════════
 let kirimIdx = 0;
+let currentKirimMode = 'qator'; // 'qator' | 'waterfall'
+
+function setKirimMode(mode) {
+    currentKirimMode = mode;
+    const btnQator = document.getElementById('btnModeQator');
+    const btnWaterfall = document.getElementById('btnModeWaterfall');
+    const wfControls = document.getElementById('waterfallControls');
+    const thTolov = document.getElementById('thTolovCol');
+
+    if (mode === 'waterfall') {
+        if (btnWaterfall) {
+            btnWaterfall.style.background = '#ef4444';
+            btnWaterfall.style.color = 'white';
+        }
+        if (btnQator) {
+            btnQator.style.background = 'transparent';
+            btnQator.style.color = 'var(--text-secondary)';
+        }
+        if (wfControls) wfControls.style.display = 'flex';
+        if (thTolov) thTolov.textContent = "To'lanadi (Waterfall)";
+
+        document.querySelectorAll('.k-row-pay-wrap').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.k-waterfall-preview').forEach(el => el.style.display = 'inline-flex');
+        calcWaterfallPreview();
+    } else {
+        if (btnQator) {
+            btnQator.style.background = '#ef4444';
+            btnQator.style.color = 'white';
+        }
+        if (btnWaterfall) {
+            btnWaterfall.style.background = 'transparent';
+            btnWaterfall.style.color = 'var(--text-secondary)';
+        }
+        if (wfControls) wfControls.style.display = 'none';
+        if (thTolov) thTolov.textContent = "To'lov holati";
+
+        const wfInput = document.getElementById('tolovUmumiyUzs');
+        if (wfInput) wfInput.value = '';
+
+        document.querySelectorAll('.k-row-pay-wrap').forEach(el => el.style.display = 'block');
+        document.querySelectorAll('.k-waterfall-preview').forEach(el => el.style.display = 'none');
+        calcKirim();
+    }
+}
 
 function addKirimRow() {
     const idx = kirimIdx++;
@@ -663,17 +723,23 @@ function addKirimRow() {
         </td>
         <td class="jami-td k-jami" data-idx="${idx}">—</td>
         <td style="white-space:nowrap;">
-            <select class="k-tolov-holati" data-idx="${idx}" style="padding:.35rem .6rem; font-size:.8125rem; background:var(--bg-primary); color:var(--text-primary); border:1px solid var(--border-color); border-radius:4px; outline:none; cursor:pointer;">
-                <option value="tolanmagan">To'lanmagan</option>
-                <option value="qisman">Qisman</option>
-                <option value="toliq">To'liq</option>
-            </select>
-            <div class="k-qisman-wrap" data-idx="${idx}" style="display:none; margin-top:4px;">
-                <input type="number" class="ii wide k-tolangan-uzs" data-idx="${idx}" step="1" min="0" placeholder="To'langan UZS">
-                <span class="unit">so'm</span>
+            <div class="k-row-pay-wrap" data-idx="${idx}" style="${currentKirimMode === 'waterfall' ? 'display:none;' : ''}">
+                <select class="k-tolov-holati" data-idx="${idx}" style="padding:.35rem .6rem; font-size:.8125rem; background:var(--bg-primary); color:var(--text-primary); border:1px solid var(--border-color); border-radius:4px; outline:none; cursor:pointer;">
+                    <option value="tolanmagan">To'lanmagan</option>
+                    <option value="qisman">Qisman</option>
+                    <option value="toliq">To'liq</option>
+                </select>
+                <div class="k-qisman-wrap" data-idx="${idx}" style="display:none; margin-top:4px;">
+                    <input type="number" class="ii wide k-tolangan-uzs" data-idx="${idx}" step="1" min="0" placeholder="To'langan UZS">
+                    <span class="unit">so'm</span>
+                </div>
+            </div>
+            <div class="k-waterfall-preview" data-idx="${idx}" style="${currentKirimMode === 'waterfall' ? 'display:inline-flex;' : 'display:none;'} align-items:center; gap:6px;">
+                <span class="badge k-wf-badge badge-danger" style="font-size:.75rem;">To'lanmagan</span>
+                <span class="k-wf-summa" style="font-weight:600; font-size:.8125rem;">0 so'm</span>
             </div>
         </td>
-        <td><button type="button" class="rm-btn" onclick="removeRow(this,'kirim-row',calcKirim)">
+        <td><button type="button" class="rm-btn" onclick="removeRow(this,'kirim-row',onKirimRowChanged)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M7 7v5M9 7v5"/></svg>
         </button></td>`;
     document.getElementById('kirimBody').appendChild(tr);
@@ -689,20 +755,21 @@ function addKirimRow() {
         const usd = tr.querySelector('.k-narx-usd');
         if (!uzs.value && item.narx > 0) uzs.value = item.narx;
         if (!usd.value && item.narx_usd > 0) usd.value = item.narx_usd;
-        calcKirimRow(idx); calcKirim();
+        calcKirimRow(idx);
+        onKirimRowChanged();
     });
 
-    tr.querySelector('.k-miqdor').addEventListener('input', () => { calcKirimRow(idx); calcKirim(); });
+    tr.querySelector('.k-miqdor').addEventListener('input', () => { calcKirimRow(idx); onKirimRowChanged(); });
     tr.querySelector('.k-narx-uzs').addEventListener('input', () => {
-        // Agar global kurs kiritilgan bo'lsa — USD avtomatik hisoblash
         const kurs = parseFloat(document.getElementById('globalKurs').value) || 0;
         const uzs  = parseFloat(tr.querySelector('.k-narx-uzs').value) || 0;
         if (kurs > 0 && uzs > 0) {
             tr.querySelector('.k-narx-usd').value = (uzs / kurs).toFixed(4);
         }
-        calcKirimRow(idx); calcKirim();
+        calcKirimRow(idx);
+        onKirimRowChanged();
     });
-    tr.querySelector('.k-narx-usd').addEventListener('input', () => { calcKirimRow(idx); calcKirim(); });
+    tr.querySelector('.k-narx-usd').addEventListener('input', () => { calcKirimRow(idx); onKirimRowChanged(); });
 
     const tolovSelect = tr.querySelector('.k-tolov-holati');
     const qismanWrap  = tr.querySelector('.k-qisman-wrap');
@@ -725,6 +792,14 @@ function addKirimRow() {
     renumber('kirim-row');
 }
 
+function onKirimRowChanged() {
+    if (currentKirimMode === 'waterfall') {
+        calcWaterfallPreview();
+    } else {
+        calcKirim();
+    }
+}
+
 function calcKirimRow(idx) {
     const miqdor = parseFloat(document.querySelector(`.k-miqdor[data-idx="${idx}"]`)?.value) || 0;
     const uzs    = parseFloat(document.querySelector(`.k-narx-uzs[data-idx="${idx}"]`)?.value) || 0;
@@ -745,7 +820,8 @@ function calcKirim() {
         const uzs    = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
         const usd    = parseFloat(tr.querySelector('.k-narx-usd')?.value) || 0;
         const holat  = tr.querySelector('.k-tolov-holati')?.value || 'tolanmagan';
-        const tolangan = parseFloat(tr.querySelector('.k-tolangan-uzs')?.value) || 0;
+        const tolInp = tr.querySelector('.k-tolangan-uzs');
+        const tolangan = tolInp && tolInp.value !== '' ? (parseFloat(tolInp.value) || 0) : 0;
 
         if (tr.querySelector('.k-xom-id')?.value && miqdor) {
             const rowTotal = miqdor * uzs;
@@ -771,9 +847,81 @@ function calcKirim() {
     if (qoldiqEl) qoldiqEl.textContent = fmt(qoldiq);
 }
 
+function calcWaterfallPreview() {
+    let totalUzs = 0, totalUsd = 0;
+    const rowsData = [];
+
+    document.querySelectorAll('.kirim-row').forEach(tr => {
+        const idx = tr.dataset.idx;
+        const miqdor = parseFloat(tr.querySelector('.k-miqdor')?.value) || 0;
+        const uzs = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
+        const usd = parseFloat(tr.querySelector('.k-narx-usd')?.value) || 0;
+        const xomId = tr.querySelector('.k-xom-id')?.value;
+
+        if (xomId && miqdor > 0) {
+            const rowTotal = miqdor * uzs;
+            totalUzs += rowTotal;
+            totalUsd += miqdor * usd;
+            rowsData.push({ idx, rowTotal });
+        }
+    });
+
+    const wfInput = document.getElementById('tolovUmumiyUzs');
+    const inputVal = wfInput ? parseFloat(wfInput.value) : 0;
+    const entered = isNaN(inputVal) || inputVal < 0 ? 0 : inputVal;
+
+    let qolgan = entered;
+    let totalPaid = 0;
+
+    rowsData.forEach(item => {
+        const previewEl = document.querySelector(`.k-waterfall-preview[data-idx="${item.idx}"]`);
+        if (!previewEl) return;
+        const badge = previewEl.querySelector('.k-wf-badge');
+        const sumEl = previewEl.querySelector('.k-wf-summa');
+
+        let rowAllocated = 0;
+        if (qolgan > 0) {
+            rowAllocated = Math.min(item.rowTotal, qolgan);
+            qolgan -= rowAllocated;
+        }
+        totalPaid += rowAllocated;
+
+        sumEl.textContent = fmt(rowAllocated);
+        badge.className = 'badge k-wf-badge';
+        if (rowAllocated >= item.rowTotal && item.rowTotal > 0) {
+            badge.classList.add('badge-success');
+            badge.textContent = "To'liq";
+        } else if (rowAllocated > 0) {
+            badge.classList.add('badge-warning');
+            badge.textContent = "Qisman";
+        } else {
+            badge.classList.add('badge-danger');
+            badge.textContent = "To'lanmagan";
+        }
+    });
+
+    if (qolgan > 0 && wfInput) {
+        wfInput.style.borderColor = '#ef4444';
+    } else if (wfInput) {
+        wfInput.style.borderColor = 'var(--border-color)';
+    }
+
+    const qoldiq = Math.max(0, totalUzs - totalPaid);
+
+    document.getElementById('kirimSummary').style.display = totalUzs > 0 ? 'block' : 'none';
+    document.getElementById('kirimTotal').textContent    = fmt(totalUzs);
+    document.getElementById('kirimTotalUsd').textContent = fmtUsd(totalUsd);
+    const tolEl = document.getElementById('kirimTolangan');
+    if (tolEl) tolEl.textContent = fmt(totalPaid);
+    const qoldiqEl = document.getElementById('kirimQoldiq');
+    if (qoldiqEl) qoldiqEl.textContent = fmt(qoldiq);
+}
+
 function resetKirim() {
     document.getElementById('kirimBody').innerHTML = '';
-    kirimIdx = 0; addKirimRow(); calcKirim();
+    kirimIdx = 0;
+    addKirimRow();
+    setKirimMode('qator');
     const btn = document.getElementById('kirimSubmitBtn');
     if (btn) {
         btn.disabled = false;
@@ -782,6 +930,40 @@ function resetKirim() {
 }
 
 document.getElementById('addKirimRow').addEventListener('click', addKirimRow);
+
+const btnModeQator = document.getElementById('btnModeQator');
+if (btnModeQator) {
+    btnModeQator.addEventListener('click', () => setKirimMode('qator'));
+}
+const btnModeWaterfall = document.getElementById('btnModeWaterfall');
+if (btnModeWaterfall) {
+    btnModeWaterfall.addEventListener('click', () => setKirimMode('waterfall'));
+}
+
+const tolovUmumiyInp = document.getElementById('tolovUmumiyUzs');
+if (tolovUmumiyInp) {
+    tolovUmumiyInp.addEventListener('input', calcWaterfallPreview);
+}
+
+const btnToliq = document.getElementById('btnToliqTolash');
+if (btnToliq) {
+    btnToliq.addEventListener('click', function () {
+        let totalUzs = 0;
+        document.querySelectorAll('.kirim-row').forEach(tr => {
+            const miqdor = parseFloat(tr.querySelector('.k-miqdor')?.value) || 0;
+            const uzs = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
+            const xomId = tr.querySelector('.k-xom-id')?.value;
+            if (xomId && miqdor > 0) {
+                totalUzs += miqdor * uzs;
+            }
+        });
+        const wfInp = document.getElementById('tolovUmumiyUzs');
+        if (wfInp) {
+            wfInp.value = totalUzs;
+            calcWaterfallPreview();
+        }
+    });
+}
 
 // Global kurs o'zgarganda barcha USD ni qayta hisoblash
 document.getElementById('globalKurs').addEventListener('input', function () {
@@ -796,49 +978,64 @@ document.getElementById('globalKurs').addEventListener('input', function () {
         const idx = tr.dataset.idx;
         calcKirimRow(idx);
     });
-    calcKirim();
+    onKirimRowChanged();
 });
 
 document.getElementById('kirimForm').addEventListener('submit', function (e) {
     const items = [];
     let hasError = false;
+    let totalUzs = 0;
 
     document.querySelectorAll('.kirim-row').forEach(tr => {
         const xomId  = tr.querySelector('.k-xom-id')?.value;
         const miqdor = parseFloat(tr.querySelector('.k-miqdor')?.value) || 0;
         const uzs    = parseFloat(tr.querySelector('.k-narx-uzs')?.value) || 0;
         const usd    = parseFloat(tr.querySelector('.k-narx-usd')?.value) || 0;
-        const holat  = tr.querySelector('.k-tolov-holati')?.value || 'tolanmagan';
-        const tolInp = tr.querySelector('.k-tolangan-uzs');
-        const tolVal = tolInp && tolInp.value !== '' ? parseFloat(tolInp.value) : null;
 
         if (!xomId || !miqdor) return;
 
         const rowTotal = miqdor * uzs;
-        if (holat === 'qisman') {
-            if (tolVal === null || isNaN(tolVal) || tolVal <= 0) {
-                alert("Qisman to'lov uchun to'langan summani to'g'ri kiriting!");
-                hasError = true;
-                return;
-            }
-            if (tolVal > rowTotal) {
-                alert("To'langan summa qator jami summasidan oshib ketmasligi kerak!");
-                hasError = true;
-                return;
-            }
-        }
+        totalUzs += rowTotal;
 
-        const itemObj = {
-            xomashyo_id:     xomId,
-            miqdor:          miqdor,
-            birlik_narx_uzs: uzs,
-            birlik_narx_usd: usd || null,
-            tolov_holati:    holat,
-        };
-        if (holat === 'qisman') {
-            itemObj.tolangan_uzs = tolVal;
+        if (currentKirimMode === 'waterfall') {
+            // Waterfall rejimida qator-bo'yicha to'lov holati yuborilmaydi (aralashmasligi uchun)
+            items.push({
+                xomashyo_id:     xomId,
+                miqdor:          miqdor,
+                birlik_narx_uzs: uzs,
+                birlik_narx_usd: usd || null,
+            });
+        } else {
+            // Qator-bo'yicha rejim
+            const holat  = tr.querySelector('.k-tolov-holati')?.value || 'tolanmagan';
+            const tolInp = tr.querySelector('.k-tolangan-uzs');
+            const tolVal = tolInp && tolInp.value !== '' ? parseFloat(tolInp.value) : null;
+
+            if (holat === 'qisman') {
+                if (tolVal === null || isNaN(tolVal) || tolVal <= 0) {
+                    alert("Qisman to'lov uchun to'langan summani to'g'ri kiriting!");
+                    hasError = true;
+                    return;
+                }
+                if (tolVal > rowTotal) {
+                    alert("To'langan summa qator jami summasidan oshib ketmasligi kerak!");
+                    hasError = true;
+                    return;
+                }
+            }
+
+            const itemObj = {
+                xomashyo_id:     xomId,
+                miqdor:          miqdor,
+                birlik_narx_uzs: uzs,
+                birlik_narx_usd: usd || null,
+                tolov_holati:    holat,
+            };
+            if (holat === 'qisman') {
+                itemObj.tolangan_uzs = tolVal;
+            }
+            items.push(itemObj);
         }
-        items.push(itemObj);
     });
 
     if (hasError) {
@@ -850,6 +1047,20 @@ document.getElementById('kirimForm').addEventListener('submit', function (e) {
         e.preventDefault();
         alert("Kamida bitta xomashyo qatori to'ldiring!");
         return;
+    }
+
+    if (currentKirimMode === 'waterfall') {
+        const wfInput = document.getElementById('tolovUmumiyUzs');
+        const wfVal = wfInput ? parseFloat(wfInput.value) : 0;
+        if (wfVal > totalUzs) {
+            alert("To'lov summasi jami qarzdan oshib ketdi!");
+            e.preventDefault();
+            return;
+        }
+    } else {
+        // Qator rejimida umumiy summa inputini tozalash (backendga tushmasligi uchun)
+        const wfInput = document.getElementById('tolovUmumiyUzs');
+        if (wfInput) wfInput.value = '';
     }
 
     document.getElementById('kirimItems').value = JSON.stringify(items);
