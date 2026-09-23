@@ -256,3 +256,107 @@ class XomashyoTolovTestCase(TestCase):
 
         self.assertEqual(Chiqim.objects.count(), 1)
         self.assertEqual(ChiqimItem.objects.count(), 1)
+
+    def test_waterfall_tortta_qator(self):
+        """
+        4 ta qatorli kirim, umumiy summa:
+        1-2 qator to'liq, 3-qator qisman, 4-qator to'lanmagan.
+        Natija: 1 ta Chiqim, 1 ta Tranzaksiya, 3 ta ChiqimItem.
+        """
+        items = [
+            {"xomashyo_id": self.xomashyo1.id, "miqdor": 2, "birlik_narx_uzs": 10000},  # 20,000
+            {"xomashyo_id": self.xomashyo2.id, "miqdor": 1, "birlik_narx_uzs": 30000},  # 30,000
+            {"xomashyo_id": self.xomashyo1.id, "miqdor": 4, "birlik_narx_uzs": 10000},  # 40,000
+            {"xomashyo_id": self.xomashyo2.id, "miqdor": 2, "birlik_narx_uzs": 25000},  # 50,000
+        ]
+        # Jami qarz = 140,000. To'lov = 70,000.
+        response = self.client.post(reverse('xomashyo:xomashyo_kirim_qoshish'), {
+            'sana': '2026-09-23',
+            'yetkazib_beruvchi': self.yetkazib_beruvchi.id,
+            'tolov_umumiy_uzs': '70000',
+            'items': json.dumps(items)
+        })
+        self.assertEqual(response.status_code, 302)
+
+        harakatlar = list(XomashyoHarakat.objects.filter(harakat_turi='kirim').order_by('id'))
+        self.assertEqual(len(harakatlar), 4)
+
+        # 1-chi: 20,000 to'liq yopildi
+        self.assertEqual(harakatlar[0].tolov_holati, 'toliq')
+        self.assertEqual(harakatlar[0].tolangan_uzs, Decimal('20000.00'))
+        self.assertEqual(harakatlar[0].qoldiq_uzs, Decimal('0.00'))
+
+        # 2-chi: 30,000 to'liq yopildi
+        self.assertEqual(harakatlar[1].tolov_holati, 'toliq')
+        self.assertEqual(harakatlar[1].tolangan_uzs, Decimal('30000.00'))
+        self.assertEqual(harakatlar[1].qoldiq_uzs, Decimal('0.00'))
+
+        # 3-chi: 40,000 dan 20,000 qisman yopildi
+        self.assertEqual(harakatlar[2].tolov_holati, 'qisman')
+        self.assertEqual(harakatlar[2].tolangan_uzs, Decimal('20000.00'))
+        self.assertEqual(harakatlar[2].qoldiq_uzs, Decimal('20000.00'))
+
+        # 4-chi: tegilmadi
+        self.assertEqual(harakatlar[3].tolov_holati, 'tolanmagan')
+        self.assertEqual(harakatlar[3].tolangan_uzs, Decimal('0.00'))
+        self.assertEqual(harakatlar[3].qoldiq_uzs, Decimal('50000.00'))
+
+        # 1 ta Chiqim, 3 ta ChiqimItem (chunki 4-qatorga to'lov tegmagan)
+        self.assertEqual(Chiqim.objects.count(), 1)
+        chiqim = Chiqim.objects.first()
+        self.assertEqual(chiqim.price, Decimal('70000.00'))
+        self.assertEqual(ChiqimItem.objects.count(), 3)
+
+        # 1 ta Tranzaksiya
+        self.assertEqual(Tranzaksiya.objects.filter(chiqim=chiqim).count(), 1)
+
+    def test_waterfall_xato_katta_summa_rollback(self):
+        """Umumiy summa > jami qarz bo'lsa xato beradi va HECH NARSA saqlanmaydi (ombor ham o'zgarmaydi)."""
+        boshlangich_miqdor1 = self.xomashyo1.miqdori
+        boshlangich_miqdor2 = self.xomashyo2.miqdori
+
+        items = [
+            {"xomashyo_id": self.xomashyo1.id, "miqdor": 2, "birlik_narx_uzs": 10000},  # 20,000
+            {"xomashyo_id": self.xomashyo2.id, "miqdor": 1, "birlik_narx_uzs": 30000},  # 30,000
+        ]
+        # Jami qarz 50,000. Umumiy summa 80,000 (oshgan).
+        response = self.client.post(reverse('xomashyo:xomashyo_kirim_qoshish'), {
+            'sana': '2026-09-23',
+            'yetkazib_beruvchi': self.yetkazib_beruvchi.id,
+            'tolov_umumiy_uzs': '80000',
+            'items': json.dumps(items)
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Rollback tekshiruvi:
+        self.assertEqual(XomashyoHarakat.objects.filter(harakat_turi='kirim').count(), 0)
+        self.assertEqual(Chiqim.objects.count(), 0)
+        self.assertEqual(ChiqimItem.objects.count(), 0)
+
+        self.xomashyo1.refresh_from_db()
+        self.xomashyo2.refresh_from_db()
+        self.assertEqual(self.xomashyo1.miqdori, boshlangich_miqdor1)
+        self.assertEqual(self.xomashyo2.miqdori, boshlangich_miqdor2)
+
+    def test_ikkala_rejim_bir_vaqtda_xato(self):
+        """Ikkala rejim (umumiy summa va qator-bo'yicha to'lov) bir vaqtda to'ldirilsa xato beriladi va hech narsa saqlanmaydi."""
+        items = [
+            {
+                "xomashyo_id": self.xomashyo1.id,
+                "miqdor": 2,
+                "birlik_narx_uzs": 10000,
+                "tolov_holati": "toliq"  # Qator bo'yicha to'lov
+            }
+        ]
+        response = self.client.post(reverse('xomashyo:xomashyo_kirim_qoshish'), {
+            'sana': '2026-09-23',
+            'yetkazib_beruvchi': self.yetkazib_beruvchi.id,
+            'tolov_umumiy_uzs': '20000',  # Bir vaqtda umumiy summa ham yuborildi
+            'items': json.dumps(items)
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Hech narsa saqlanmasligi kerak:
+        self.assertEqual(XomashyoHarakat.objects.filter(harakat_turi='kirim').count(), 0)
+        self.assertEqual(Chiqim.objects.count(), 0)
+
